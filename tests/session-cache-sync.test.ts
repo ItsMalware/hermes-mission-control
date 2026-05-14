@@ -128,12 +128,40 @@ vi.mock("better-sqlite3", () => {
       throw new Error(`Unhandled fake run SQL: ${this.sql}`);
     }
 
-    all(...args: unknown[]): SessionRow[] {
+    all(
+      ...args: unknown[]
+    ): SessionRow[] | Array<{ session_id: string; content: string }> {
       if (this.sql.includes("FROM sessions s")) {
         const threshold = Number(args[0] ?? 0);
         return Array.from(this.store.sessions.values())
           .filter((session) => session.started_at > threshold)
           .sort((a, b) => b.started_at - a.started_at);
+      }
+
+      if (this.sql.includes("FROM messages m")) {
+        const firstBySession = new Map<
+          string,
+          { session_id: string; content: string; timestamp: number; id: number }
+        >();
+        for (const message of this.store.messages) {
+          if (message.role !== "user" || message.content === null) continue;
+          const existing = firstBySession.get(message.session_id);
+          if (
+            !existing ||
+            message.timestamp < existing.timestamp ||
+            (message.timestamp === existing.timestamp && message.id < existing.id)
+          ) {
+            firstBySession.set(message.session_id, {
+              session_id: message.session_id,
+              content: message.content,
+              timestamp: message.timestamp,
+              id: message.id,
+            });
+          }
+        }
+        return Array.from(firstBySession.values()).map(
+          ({ session_id, content }) => ({ session_id, content }),
+        );
       }
 
       throw new Error(`Unhandled fake all SQL: ${this.sql}`);
