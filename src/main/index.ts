@@ -37,6 +37,10 @@ import {
   testRemoteConnection,
   stopHealthPolling,
   restartGateway,
+  getDashboardUrl,
+  startDashboard,
+  stopDashboard,
+  isDashboardRunning,
 } from "./hermes";
 import {
   getClaw3dStatus,
@@ -62,6 +66,8 @@ import {
   getHermesHome,
   getModelConfig,
   setModelConfig,
+  getFallbackProviders,
+  setFallbackProviders,
   getCredentialPool,
   setCredentialPool,
   getConnectionConfig,
@@ -75,6 +81,7 @@ import {
   listCachedSessions,
   updateSessionTitle,
 } from "./session-cache";
+import { getSessionTodoState } from "./session-state";
 import { listModels, addModel, removeModel, updateModel } from "./models";
 import {
   listProfiles,
@@ -246,7 +253,8 @@ function setupIPC(): void {
       if (
         (isGatewayRunning() && key.endsWith("_API_KEY")) ||
         key.endsWith("_TOKEN") ||
-        key === "HF_TOKEN"
+        key === "HF_TOKEN" ||
+        key.startsWith("HERMES_GEMINI_")
       ) {
         restartGateway(profile);
       }
@@ -274,6 +282,10 @@ function setupIPC(): void {
     getModelConfig(profile),
   );
 
+  ipcMain.handle("get-fallback-providers", (_event, profile?: string) =>
+    getFallbackProviders(profile),
+  );
+
   ipcMain.handle(
     "set-model-config",
     (
@@ -296,6 +308,21 @@ function setupIPC(): void {
         restartGateway(profile);
       }
 
+      return true;
+    },
+  );
+
+  ipcMain.handle(
+    "set-fallback-providers",
+    (
+      _event,
+      entries: Array<{ provider: string; model: string; baseUrl?: string }>,
+      profile?: string,
+    ) => {
+      setFallbackProviders(entries, profile);
+      if (isGatewayRunning()) {
+        restartGateway(profile);
+      }
       return true;
     },
   );
@@ -417,6 +444,17 @@ function setupIPC(): void {
   });
   ipcMain.handle("gateway-status", () => isGatewayRunning());
 
+  // Hermes dashboard / dashboard plugins
+  ipcMain.handle("get-dashboard-url", (_event, path?: string) =>
+    getDashboardUrl(path),
+  );
+  ipcMain.handle("start-dashboard", () => startDashboard());
+  ipcMain.handle("stop-dashboard", () => {
+    stopDashboard(true);
+    return true;
+  });
+  ipcMain.handle("dashboard-status", () => isDashboardRunning());
+
   // Platform toggles (config.yaml platforms section)
   ipcMain.handle("get-platform-enabled", (_event, profile?: string) =>
     getPlatformEnabled(profile),
@@ -434,13 +472,19 @@ function setupIPC(): void {
   );
 
   // Sessions
-  ipcMain.handle("list-sessions", (_event, limit?: number, offset?: number) => {
-    return listSessions(limit, offset);
-  });
+  ipcMain.handle(
+    "list-sessions",
+    (_event, limit?: number, offset?: number, profile?: string) => {
+      return listSessions(limit, offset, profile);
+    },
+  );
 
-  ipcMain.handle("get-session-messages", (_event, sessionId: string) => {
-    return getSessionMessages(sessionId);
-  });
+  ipcMain.handle(
+    "get-session-messages",
+    (_event, sessionId: string, profile?: string) => {
+      return getSessionMessages(sessionId, profile);
+    },
+  );
 
   // Profiles
   ipcMain.handle("list-profiles", async () => listProfiles());
@@ -520,19 +564,26 @@ function setupIPC(): void {
   // Session cache (fast local cache with generated titles)
   ipcMain.handle(
     "list-cached-sessions",
-    (_event, limit?: number, offset?: number) =>
-      listCachedSessions(limit, offset),
+    (_event, limit?: number, offset?: number, profile?: string) =>
+      listCachedSessions(limit, offset, profile),
   );
-  ipcMain.handle("sync-session-cache", () => syncSessionCache());
+  ipcMain.handle("sync-session-cache", (_event, profile?: string) =>
+    syncSessionCache(profile),
+  );
   ipcMain.handle(
     "update-session-title",
-    (_event, sessionId: string, title: string) =>
-      updateSessionTitle(sessionId, title),
+    (_event, sessionId: string, title: string, profile?: string) =>
+      updateSessionTitle(sessionId, title, profile),
   );
 
   // Session search
-  ipcMain.handle("search-sessions", (_event, query: string, limit?: number) =>
-    searchSessions(query, limit),
+  ipcMain.handle(
+    "search-sessions",
+    (_event, query: string, limit?: number, profile?: string) =>
+      searchSessions(query, limit, profile),
+  );
+  ipcMain.handle("get-session-todo-state", (_event, profile?: string) =>
+    getSessionTodoState(profile),
   );
 
   // Credential Pool

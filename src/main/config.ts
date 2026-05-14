@@ -194,7 +194,11 @@ export function getModelConfig(profile?: string): {
   baseUrl: string;
 } {
   const cacheKey = `mc:${profile || "default"}`;
-  const cached = getCached<{ provider: string; model: string; baseUrl: string }>(cacheKey);
+  const cached = getCached<{
+    provider: string;
+    model: string;
+    baseUrl: string;
+  }>(cacheKey);
   if (cached) return cached;
 
   const { configFile } = profilePaths(profile);
@@ -266,13 +270,123 @@ export function setModelConfig(
   safeWriteFile(configFile, content);
 }
 
+export interface FallbackProvider {
+  provider: string;
+  model: string;
+  baseUrl?: string;
+}
+
+function findTopLevelBlock(
+  content: string,
+  key: string,
+): { start: number; end: number } | null {
+  const re = new RegExp(`^${escapeRegex(key)}:\\s*.*$`, "m");
+  const match = content.match(re);
+  if (!match || match.index === undefined) return null;
+
+  const start = match.index;
+  let end = content.length;
+  const after = content.slice(start + match[0].length);
+  const nextTopLevel = after.match(/\n(?!\s|#|\n)[A-Za-z0-9_-]+:\s*/);
+  if (nextTopLevel && nextTopLevel.index !== undefined) {
+    end = start + match[0].length + nextTopLevel.index;
+  }
+  return { start, end };
+}
+
+function parseFallbackProviders(content: string): FallbackProvider[] {
+  const block = findTopLevelBlock(content, "fallback_providers");
+  if (!block) return [];
+
+  const raw = content.slice(block.start, block.end);
+  if (/^fallback_providers:\s*\[\s*\]\s*$/m.test(raw)) return [];
+
+  const entries: FallbackProvider[] = [];
+  let current: FallbackProvider | null = null;
+
+  for (const line of raw.split("\n").slice(1)) {
+    const providerStart = line.match(
+      /^\s*-\s+provider:\s*["']?([^"'\n#]+)["']?/,
+    );
+    const keyValue = line.match(
+      /^\s+(provider|model|base_url):\s*["']?([^"'\n#]*)["']?/,
+    );
+
+    if (providerStart) {
+      if (current?.provider && current.model) entries.push(current);
+      current = { provider: providerStart[1].trim(), model: "" };
+      continue;
+    }
+
+    if (!current || !keyValue) continue;
+    const [, key, value] = keyValue;
+    if (key === "provider") current.provider = value.trim();
+    if (key === "model") current.model = value.trim();
+    if (key === "base_url") current.baseUrl = value.trim();
+  }
+
+  if (current?.provider && current.model) entries.push(current);
+  return entries;
+}
+
+function serializeFallbackProviders(entries: FallbackProvider[]): string {
+  if (entries.length === 0) return "fallback_providers: []\n";
+
+  const lines = ["fallback_providers:"];
+  for (const entry of entries) {
+    lines.push(`- provider: "${entry.provider}"`);
+    lines.push(`  model: "${entry.model}"`);
+    if (entry.baseUrl?.trim()) {
+      lines.push(`  base_url: "${entry.baseUrl.trim()}"`);
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+export function getFallbackProviders(profile?: string): FallbackProvider[] {
+  const { configFile } = profilePaths(profile);
+  if (!existsSync(configFile)) return [];
+
+  const content = readFileSync(configFile, "utf-8");
+  return parseFallbackProviders(content);
+}
+
+export function setFallbackProviders(
+  entries: FallbackProvider[],
+  profile?: string,
+): void {
+  const { configFile } = profilePaths(profile);
+  if (!existsSync(configFile)) return;
+
+  let content = readFileSync(configFile, "utf-8");
+  const nextBlock = serializeFallbackProviders(entries);
+  const block = findTopLevelBlock(content, "fallback_providers");
+
+  if (block) {
+    content =
+      content.slice(0, block.start) +
+      nextBlock.trimEnd() +
+      content.slice(block.end);
+  } else {
+    content += `${content.endsWith("\n") ? "" : "\n"}${nextBlock}`;
+  }
+
+  safeWriteFile(configFile, content);
+}
+
 export function getHermesHome(profile?: string): string {
   return profilePaths(profile).home;
 }
 
 // ── Platform enabled/disabled in config.yaml ────────────
 
-const SUPPORTED_PLATFORMS = ["telegram", "discord", "slack", "whatsapp", "signal"];
+const SUPPORTED_PLATFORMS = [
+  "telegram",
+  "discord",
+  "slack",
+  "whatsapp",
+  "signal",
+];
 
 export function getPlatformEnabled(profile?: string): Record<string, boolean> {
   const { configFile } = profilePaths(profile);

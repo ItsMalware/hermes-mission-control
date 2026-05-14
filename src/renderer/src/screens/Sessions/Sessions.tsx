@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, memo } from "react";
+import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
 import { Plus, Search, X, ChatBubble } from "../../assets/icons";
 import { useI18n } from "../../components/useI18n";
 
@@ -25,6 +25,7 @@ interface SessionsProps {
   onResumeSession: (sessionId: string) => void;
   onNewChat: () => void;
   currentSessionId: string | null;
+  profile?: string;
 }
 
 function formatTime(ts: number): string {
@@ -151,6 +152,7 @@ function Sessions({
   onResumeSession,
   onNewChat,
   currentSessionId,
+  profile,
 }: SessionsProps): React.JSX.Element {
   const { t } = useI18n();
   const [sessions, setSessions] = useState<CachedSession[]>([]);
@@ -158,20 +160,21 @@ function Sessions({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(50);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const loadSessions = useCallback(async (): Promise<void> => {
     setLoading(true);
-    const cached = await window.hermesAPI.listCachedSessions(50);
+    const cached = await window.hermesAPI.listCachedSessions(50, 0, profile);
     if (cached.length > 0) {
       setSessions(cached);
       setLoading(false);
     }
-    const synced = await window.hermesAPI.syncSessionCache();
-    setSessions(synced.slice(0, 50));
+    const synced = await window.hermesAPI.syncSessionCache(profile);
+    setSessions(synced);
     setLoading(false);
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     loadSessions();
@@ -186,17 +189,26 @@ function Sessions({
     }
     setIsSearching(true);
     searchTimer.current = setTimeout(async () => {
-      const results = await window.hermesAPI.searchSessions(searchQuery);
+      const results = await window.hermesAPI.searchSessions(
+        searchQuery,
+        20,
+        profile,
+      );
       setSearchResults(results);
       setIsSearching(false);
     }, 300);
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
-  }, [searchQuery]);
+  }, [searchQuery, profile]);
 
   const isShowingSearch = searchQuery.trim().length > 0;
-  const grouped = groupSessions(sessions);
+  const visibleSessions = useMemo(
+    () => sessions.slice(0, visibleCount),
+    [sessions, visibleCount],
+  );
+  const grouped = groupSessions(visibleSessions);
+  const hasMoreSessions = visibleCount < sessions.length;
 
   return (
     <div className="sessions-container">
@@ -312,6 +324,14 @@ function Sessions({
               ))}
             </div>
           ))}
+          {hasMoreSessions && (
+            <button
+              className="btn btn-secondary sessions-load-more"
+              onClick={() => setVisibleCount((count) => count + 50)}
+            >
+              {t("sessions.loadMore")}
+            </button>
+          )}
         </div>
       )}
     </div>

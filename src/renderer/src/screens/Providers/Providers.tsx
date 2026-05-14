@@ -2,6 +2,15 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { SETTINGS_SECTIONS, PROVIDERS } from "../../constants";
 import { useI18n } from "../../components/useI18n";
 
+type FallbackProvider = { provider: string; model: string; baseUrl?: string };
+
+function defaultFallbackModel(provider: string): string {
+  if (provider === "google-gemini-cli") return "gemini-3.1-pro-preview";
+  if (provider === "gemini" || provider === "google")
+    return "gemini-3-flash-preview";
+  return "";
+}
+
 function Providers({
   profile,
   visible,
@@ -24,6 +33,12 @@ function Providers({
   const modelLoaded = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Fallback model chain
+  const [fallbacks, setFallbacks] = useState<FallbackProvider[]>([]);
+  const [fallbackSaved, setFallbackSaved] = useState(false);
+  const fallbackLoaded = useRef(false);
+  const fallbackSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Credential pool
   const [credPool, setCredPool] = useState<
     Record<string, Array<{ key: string; label: string }>>
@@ -33,24 +48,28 @@ function Providers({
   const [poolNewLabel, setPoolNewLabel] = useState("");
 
   const loadConfig = useCallback(async (): Promise<void> => {
-    const [envData, mc, pool] = await Promise.all([
+    const [envData, mc, pool, fallbacks] = await Promise.all([
       window.hermesAPI.getEnv(profile),
       window.hermesAPI.getModelConfig(profile),
       window.hermesAPI.getCredentialPool(),
+      window.hermesAPI.getFallbackProviders(profile),
     ]);
     setEnv(envData);
     setModelProvider(mc.provider);
     setModelName(mc.model);
     setModelBaseUrl(mc.baseUrl);
     setCredPool(pool);
+    setFallbacks(fallbacks);
 
     requestAnimationFrame(() => {
       modelLoaded.current = true;
+      fallbackLoaded.current = true;
     });
   }, [profile]);
 
   useEffect(() => {
     modelLoaded.current = false;
+    fallbackLoaded.current = false;
     loadConfig();
   }, [loadConfig]);
 
@@ -58,13 +77,19 @@ function Providers({
   useEffect(() => {
     if (!visible) return;
     (async (): Promise<void> => {
-      const mc = await window.hermesAPI.getModelConfig(profile);
+      const [mc, fallbacks] = await Promise.all([
+        window.hermesAPI.getModelConfig(profile),
+        window.hermesAPI.getFallbackProviders(profile),
+      ]);
       modelLoaded.current = false;
+      fallbackLoaded.current = false;
       setModelProvider(mc.provider);
       setModelName(mc.model);
       setModelBaseUrl(mc.baseUrl);
+      setFallbacks(fallbacks);
       requestAnimationFrame(() => {
         modelLoaded.current = true;
+        fallbackLoaded.current = true;
       });
     })();
   }, [visible, profile]);
@@ -101,6 +126,59 @@ function Providers({
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [modelProvider, modelName, modelBaseUrl, saveModelConfig]);
+
+  const saveFallbackProviders = useCallback(async () => {
+    if (!fallbackLoaded.current) return;
+    const entries = fallbacks
+      .map((entry) => ({
+        provider: entry.provider.trim(),
+        model: entry.model.trim(),
+        baseUrl: entry.baseUrl?.trim() || undefined,
+      }))
+      .filter((entry) => entry.provider && entry.model);
+    await window.hermesAPI.setFallbackProviders(entries, profile);
+    setFallbackSaved(true);
+    setTimeout(() => setFallbackSaved(false), 2000);
+  }, [fallbacks, profile]);
+
+  useEffect(() => {
+    if (!fallbackLoaded.current) return;
+    if (fallbackSaveTimer.current) clearTimeout(fallbackSaveTimer.current);
+    fallbackSaveTimer.current = setTimeout(() => {
+      saveFallbackProviders();
+    }, 500);
+    return () => {
+      if (fallbackSaveTimer.current) clearTimeout(fallbackSaveTimer.current);
+    };
+  }, [fallbacks, saveFallbackProviders]);
+
+  function updateFallback(index: number, patch: Partial<FallbackProvider>): void {
+    setFallbacks((prev) =>
+      prev.map((entry, i) => {
+        if (i !== index) return entry;
+        const next = { ...entry, ...patch };
+        if (patch.provider) {
+          next.model = defaultFallbackModel(patch.provider) || entry.model;
+          if (patch.provider === "custom" && !next.baseUrl) {
+            next.baseUrl = "http://localhost:1234/v1";
+          }
+          if (patch.provider !== "custom") delete next.baseUrl;
+        }
+        return next;
+      }),
+    );
+  }
+
+  function addFallback(): void {
+    setFallbacks((prev) => [
+      ...prev,
+      { provider: "google-gemini-cli", model: "gemini-3.1-pro-preview" },
+    ]);
+  }
+
+  function removeFallback(index: number): void {
+    setFallbacks((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function handleBlur(key: string): Promise<void> {
     const value = env[key] || "";
@@ -222,6 +300,87 @@ function Providers({
             </div>
           </div>
         )}
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-section-title">
+          {t("settings.sections.fallbackModel")}
+          {fallbackSaved && (
+            <span className="settings-saved" style={{ marginLeft: 8 }}>
+              {t("common.saved")}
+            </span>
+          )}
+        </div>
+
+        <div className="settings-field">
+          <div className="settings-field-hint" style={{ marginBottom: 10 }}>
+            {t("settings.fallbackHint")}
+          </div>
+          {fallbacks.length === 0 && (
+            <div className="settings-field-hint" style={{ marginBottom: 10 }}>
+              {t("settings.noFallback")}
+            </div>
+          )}
+          {fallbacks.map((fallback, index) => (
+            <div
+              key={`${fallback.provider}-${index}`}
+              className="settings-pool-add"
+              style={{ marginBottom: 10, alignItems: "flex-start" }}
+            >
+              <select
+                className="input"
+                value={fallback.provider}
+                onChange={(e) =>
+                  updateFallback(index, { provider: e.target.value })
+                }
+                style={{ width: 170 }}
+              >
+                {PROVIDERS.options
+                  .filter((opt) => opt.value !== "auto")
+                  .map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {t(opt.label)}
+                    </option>
+                  ))}
+              </select>
+              <input
+                className="input"
+                type="text"
+                value={fallback.model}
+                onChange={(e) =>
+                  updateFallback(index, { model: e.target.value })
+                }
+                placeholder={
+                  defaultFallbackModel(fallback.provider) ||
+                  t("settings.modelNamePlaceholder")
+                }
+                style={{ flex: 1 }}
+              />
+              {fallback.provider === "custom" && (
+                <input
+                  className="input"
+                  type="text"
+                  value={fallback.baseUrl || ""}
+                  onChange={(e) =>
+                    updateFallback(index, { baseUrl: e.target.value })
+                  }
+                  placeholder={t("settings.modelBaseUrlPlaceholder")}
+                  style={{ flex: 1 }}
+                />
+              )}
+              <button
+                className="btn-ghost"
+                style={{ color: "var(--error)", fontSize: 11 }}
+                onClick={() => removeFallback(index)}
+              >
+                {t("settings.remove")}
+              </button>
+            </div>
+          ))}
+          <button className="btn btn-secondary btn-sm" onClick={addFallback}>
+            {t("settings.add")}
+          </button>
+        </div>
       </div>
 
       <div className="settings-section">

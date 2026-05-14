@@ -1,9 +1,7 @@
 import Database from "better-sqlite3";
 import { join } from "path";
-import { existsSync } from "fs";
-import { HERMES_HOME } from "./installer";
-
-const DB_PATH = join(HERMES_HOME, "state.db");
+import { existsSync, readFileSync } from "fs";
+import { profileHome } from "./utils";
 
 export interface SessionSummary {
   id: string;
@@ -33,13 +31,26 @@ export interface SearchResult {
   snippet: string;
 }
 
-function getDb(): Database.Database | null {
+function dbPath(profile?: string): string {
+  return join(profileHome(profile), "state.db");
+}
+
+function sessionsDir(profile?: string): string {
+  return join(profileHome(profile), "sessions");
+}
+
+function getDb(profile?: string): Database.Database | null {
+  const DB_PATH = dbPath(profile);
   if (!existsSync(DB_PATH)) return null;
   return new Database(DB_PATH, { readonly: true });
 }
 
-export function listSessions(limit = 30, offset = 0): SessionSummary[] {
-  const db = getDb();
+export function listSessions(
+  limit = 30,
+  offset = 0,
+  profile?: string,
+): SessionSummary[] {
+  const db = getDb(profile);
   if (!db) return [];
 
   try {
@@ -83,8 +94,12 @@ export function listSessions(limit = 30, offset = 0): SessionSummary[] {
   }
 }
 
-export function searchSessions(query: string, limit = 20): SearchResult[] {
-  const db = getDb();
+export function searchSessions(
+  query: string,
+  limit = 20,
+  profile?: string,
+): SearchResult[] {
+  const db = getDb(profile);
   if (!db) return [];
 
   try {
@@ -150,9 +165,12 @@ export function searchSessions(query: string, limit = 20): SearchResult[] {
   }
 }
 
-export function getSessionMessages(sessionId: string): SessionMessage[] {
-  const db = getDb();
-  if (!db) return [];
+export function getSessionMessages(
+  sessionId: string,
+  profile?: string,
+): SessionMessage[] {
+  const db = getDb(profile);
+  if (!db) return getFileSessionMessages(sessionId, profile);
 
   try {
     const rows = db
@@ -169,13 +187,45 @@ export function getSessionMessages(sessionId: string): SessionMessage[] {
       timestamp: number;
     }>;
 
-    return rows.map((r) => ({
+    const messages = rows.map((r) => ({
       id: r.id,
       role: r.role as "user" | "assistant",
       content: r.content,
       timestamp: r.timestamp,
     }));
+    return messages.length > 0
+      ? messages
+      : getFileSessionMessages(sessionId, profile);
   } finally {
     db.close();
+  }
+}
+
+function getFileSessionMessages(
+  sessionId: string,
+  profile?: string,
+): SessionMessage[] {
+  const SESSIONS_DIR = sessionsDir(profile);
+  const file = join(SESSIONS_DIR, `session_${sessionId}.json`);
+  if (!existsSync(file)) return [];
+
+  try {
+    const payload = JSON.parse(readFileSync(file, "utf-8"));
+    const startedAt = Math.floor(Date.parse(payload.session_start || "") / 1000);
+    const baseTimestamp = Number.isFinite(startedAt) ? startedAt : 0;
+    const rows = Array.isArray(payload.messages) ? payload.messages : [];
+    return rows
+      .map((m, index) => ({
+        id: index + 1,
+        role: m?.role,
+        content: typeof m?.content === "string" ? m.content : "",
+        timestamp: baseTimestamp + index,
+      }))
+      .filter(
+        (m): m is SessionMessage =>
+          (m.role === "user" || m.role === "assistant") && m.content.length > 0,
+      );
+  } catch {
+    return [];
   }
 }

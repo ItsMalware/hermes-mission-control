@@ -17,6 +17,7 @@ import sessionsEn from "./locales/en/sessions";
 import modelsEn from "./locales/en/models";
 import providersEn from "./locales/en/providers";
 import officeEn from "./locales/en/office";
+import kanbanEn from "./locales/en/kanban";
 import errorsEn from "./locales/en/errors";
 import schedulesEn from "./locales/en/schedules";
 import skillsEn from "./locales/en/skills";
@@ -37,6 +38,7 @@ import sessionsEs from "./locales/es/sessions";
 import modelsEs from "./locales/es/models";
 import providersEs from "./locales/es/providers";
 import officeEs from "./locales/es/office";
+import kanbanEs from "./locales/es/kanban";
 import errorsEs from "./locales/es/errors";
 import schedulesEs from "./locales/es/schedules";
 import skillsEs from "./locales/es/skills";
@@ -57,6 +59,7 @@ import sessionsZh from "./locales/zh-CN/sessions";
 import modelsZh from "./locales/zh-CN/models";
 import providersZh from "./locales/zh-CN/providers";
 import officeZh from "./locales/zh-CN/office";
+import kanbanZh from "./locales/zh-CN/kanban";
 import errorsZh from "./locales/zh-CN/errors";
 import schedulesZh from "./locales/zh-CN/schedules";
 import skillsZh from "./locales/zh-CN/skills";
@@ -77,6 +80,7 @@ import sessionsPt from "./locales/pt-BR/sessions";
 import modelsPt from "./locales/pt-BR/models";
 import providersPt from "./locales/pt-BR/providers";
 import officePt from "./locales/pt-BR/office";
+import kanbanPt from "./locales/pt-BR/kanban";
 import errorsPt from "./locales/pt-BR/errors";
 import schedulesPt from "./locales/pt-BR/schedules";
 import skillsPt from "./locales/pt-BR/skills";
@@ -101,6 +105,7 @@ export const resources = {
       models: modelsEn,
       providers: providersEn,
       office: officeEn,
+      kanban: kanbanEn,
       errors: errorsEn,
       schedules: schedulesEn,
       skills: skillsEn,
@@ -125,6 +130,7 @@ export const resources = {
       models: modelsEs,
       providers: providersEs,
       office: officeEs,
+      kanban: kanbanEs,
       errors: errorsEs,
       schedules: schedulesEs,
       skills: skillsEs,
@@ -149,6 +155,7 @@ export const resources = {
       models: modelsZh,
       providers: providersZh,
       office: officeZh,
+      kanban: kanbanZh,
       errors: errorsZh,
       schedules: schedulesZh,
       skills: skillsZh,
@@ -173,6 +180,7 @@ export const resources = {
       models: modelsPt,
       providers: providersPt,
       office: officePt,
+      kanban: kanbanPt,
       errors: errorsPt,
       schedules: schedulesPt,
       skills: skillsPt,

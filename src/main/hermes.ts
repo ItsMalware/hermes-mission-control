@@ -15,6 +15,8 @@ import { getModelConfig, readEnv, getConnectionConfig } from "./config";
 import { stripAnsi } from "./utils";
 
 const LOCAL_API_URL = "http://127.0.0.1:8642";
+const DASHBOARD_PORT = 9119;
+const DASHBOARD_URL = `http://127.0.0.1:${DASHBOARD_PORT}`;
 
 export function getApiUrl(): string {
   const conn = getConnectionConfig();
@@ -26,6 +28,11 @@ export function getApiUrl(): string {
 
 export function isRemoteMode(): boolean {
   return getConnectionConfig().mode === "remote";
+}
+
+export function getDashboardUrl(path = "/"): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${DASHBOARD_URL}${normalizedPath}`;
 }
 
 export function getRemoteAuthHeader(): Record<string, string> {
@@ -443,6 +450,11 @@ function sendMessageViaCli(
     "KIMI_API_KEY",
     "MINIMAX_API_KEY",
     "MINIMAX_CN_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "HERMES_GEMINI_CLIENT_ID",
+    "HERMES_GEMINI_CLIENT_SECRET",
+    "HERMES_GEMINI_PROJECT_ID",
     "HF_TOKEN",
     "EXA_API_KEY",
     "PARALLEL_API_KEY",
@@ -652,6 +664,8 @@ export function stopHealthPolling(): void {
 
 let gatewayProcess: ChildProcess | null = null;
 let gatewayStartedByApp = false;
+let dashboardProcess: ChildProcess | null = null;
+let dashboardStartedByApp = false;
 
 export function startGateway(profile?: string): boolean {
   ensureInitialized();
@@ -756,6 +770,98 @@ export function isGatewayRunning(): boolean {
   } catch {
     return false;
   }
+}
+
+function isDashboardReady(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.request(
+      `${DASHBOARD_URL}/api/dashboard/plugins`,
+      { method: "GET", timeout: 1500 },
+      (res) => {
+        resolve(res.statusCode === 200);
+        res.resume();
+      },
+    );
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+}
+
+export async function startDashboard(): Promise<boolean> {
+  ensureInitialized();
+
+  if (await isDashboardReady()) {
+    return true;
+  }
+
+  if (dashboardProcess && !dashboardProcess.killed) {
+    return true;
+  }
+
+  dashboardProcess = spawn(
+    HERMES_PYTHON,
+    [HERMES_SCRIPT, "dashboard", "--port", String(DASHBOARD_PORT), "--no-open"],
+    {
+      cwd: HERMES_REPO,
+      env: {
+        ...(process.env as Record<string, string>),
+        PATH: getEnhancedPath(),
+        HOME: homedir(),
+        HERMES_HOME,
+        PYTHONUNBUFFERED: "1",
+      },
+      stdio: "ignore",
+      detached: true,
+    },
+  );
+  dashboardProcess.unref();
+
+  dashboardProcess.on("close", () => {
+    dashboardProcess = null;
+    dashboardStartedByApp = false;
+  });
+
+  dashboardStartedByApp = true;
+
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline) {
+    if (await isDashboardReady()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  return false;
+}
+
+export async function isDashboardRunning(): Promise<boolean> {
+  if (dashboardProcess && !dashboardProcess.killed) return true;
+  return isDashboardReady();
+}
+
+export function stopDashboard(force = false): void {
+  if (!force && !dashboardStartedByApp) return;
+
+  if (dashboardProcess && !dashboardProcess.killed) {
+    dashboardProcess.kill("SIGTERM");
+    dashboardProcess = null;
+  } else if (force) {
+    const proc = spawn(HERMES_PYTHON, [HERMES_SCRIPT, "dashboard", "--stop"], {
+      cwd: HERMES_REPO,
+      env: {
+        ...(process.env as Record<string, string>),
+        PATH: getEnhancedPath(),
+        HOME: homedir(),
+        HERMES_HOME,
+      },
+      stdio: "ignore",
+      detached: true,
+    });
+    proc.unref();
+  }
+
+  dashboardStartedByApp = false;
 }
 
 export function isApiReady(): boolean {

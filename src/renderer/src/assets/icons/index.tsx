@@ -9,6 +9,7 @@ export {
   Download,
   ExternalLink,
   KeyRound,
+  LayoutDashboard,
   Layers,
   Monitor,
   Moon,

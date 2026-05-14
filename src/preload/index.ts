@@ -82,6 +82,11 @@ const hermesAPI = {
   ): Promise<{ provider: string; model: string; baseUrl: string }> =>
     ipcRenderer.invoke("get-model-config", profile),
 
+  getFallbackProviders: (
+    profile?: string,
+  ): Promise<Array<{ provider: string; model: string; baseUrl?: string }>> =>
+    ipcRenderer.invoke("get-fallback-providers", profile),
+
   setModelConfig: (
     provider: string,
     model: string,
@@ -89,6 +94,12 @@ const hermesAPI = {
     profile?: string,
   ): Promise<boolean> =>
     ipcRenderer.invoke("set-model-config", provider, model, baseUrl, profile),
+
+  setFallbackProviders: (
+    entries: Array<{ provider: string; model: string; baseUrl?: string }>,
+    profile?: string,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("set-fallback-providers", entries, profile),
 
   // Connection mode (local vs remote)
   isRemoteMode: (): Promise<boolean> => ipcRenderer.invoke("is-remote-mode"),
@@ -185,6 +196,14 @@ const hermesAPI = {
   stopGateway: (): Promise<boolean> => ipcRenderer.invoke("stop-gateway"),
   gatewayStatus: (): Promise<boolean> => ipcRenderer.invoke("gateway-status"),
 
+  // Hermes dashboard / dashboard plugins
+  getDashboardUrl: (path?: string): Promise<string> =>
+    ipcRenderer.invoke("get-dashboard-url", path),
+  startDashboard: (): Promise<boolean> => ipcRenderer.invoke("start-dashboard"),
+  stopDashboard: (): Promise<boolean> => ipcRenderer.invoke("stop-dashboard"),
+  dashboardStatus: (): Promise<boolean> =>
+    ipcRenderer.invoke("dashboard-status"),
+
   // Platform toggles
   getPlatformEnabled: (profile?: string): Promise<Record<string, boolean>> =>
     ipcRenderer.invoke("get-platform-enabled", profile),
@@ -199,6 +218,7 @@ const hermesAPI = {
   listSessions: (
     limit?: number,
     offset?: number,
+    profile?: string,
   ): Promise<
     Array<{
       id: string;
@@ -210,10 +230,11 @@ const hermesAPI = {
       title: string | null;
       preview: string;
     }>
-  > => ipcRenderer.invoke("list-sessions", limit, offset),
+  > => ipcRenderer.invoke("list-sessions", limit, offset, profile),
 
   getSessionMessages: (
     sessionId: string,
+    profile?: string,
   ): Promise<
     Array<{
       id: number;
@@ -221,7 +242,7 @@ const hermesAPI = {
       content: string;
       timestamp: number;
     }>
-  > => ipcRenderer.invoke("get-session-messages", sessionId),
+  > => ipcRenderer.invoke("get-session-messages", sessionId, profile),
 
   // Profiles
   listProfiles: (): Promise<
@@ -334,6 +355,7 @@ const hermesAPI = {
   listCachedSessions: (
     limit?: number,
     offset?: number,
+    profile?: string,
   ): Promise<
     Array<{
       id: string;
@@ -343,9 +365,11 @@ const hermesAPI = {
       messageCount: number;
       model: string;
     }>
-  > => ipcRenderer.invoke("list-cached-sessions", limit, offset),
+  > => ipcRenderer.invoke("list-cached-sessions", limit, offset, profile),
 
-  syncSessionCache: (): Promise<
+  syncSessionCache: (
+    profile?: string,
+  ): Promise<
     Array<{
       id: string;
       title: string;
@@ -354,15 +378,20 @@ const hermesAPI = {
       messageCount: number;
       model: string;
     }>
-  > => ipcRenderer.invoke("sync-session-cache"),
+  > => ipcRenderer.invoke("sync-session-cache", profile),
 
-  updateSessionTitle: (sessionId: string, title: string): Promise<void> =>
-    ipcRenderer.invoke("update-session-title", sessionId, title),
+  updateSessionTitle: (
+    sessionId: string,
+    title: string,
+    profile?: string,
+  ): Promise<void> =>
+    ipcRenderer.invoke("update-session-title", sessionId, title, profile),
 
   // Session search
   searchSessions: (
     query: string,
     limit?: number,
+    profile?: string,
   ): Promise<
     Array<{
       sessionId: string;
@@ -373,7 +402,26 @@ const hermesAPI = {
       model: string;
       snippet: string;
     }>
-  > => ipcRenderer.invoke("search-sessions", query, limit),
+  > => ipcRenderer.invoke("search-sessions", query, limit, profile),
+
+  getSessionTodoState: (
+    profile?: string,
+  ): Promise<{
+    sessionId: string;
+    updatedAt: number;
+    todos: Array<{
+      id: string;
+      content: string;
+      status: string;
+    }>;
+    summary: {
+      total: number;
+      pending: number;
+      in_progress: number;
+      completed: number;
+      cancelled: number;
+    };
+  } | null> => ipcRenderer.invoke("get-session-todo-state", profile),
 
   // Credential Pool
   getCredentialPool: (): Promise<

@@ -6,6 +6,7 @@ export default {
   empty: "Nenhuma sessão ainda",
   newConversation: "Nova conversa",
   newChat: "Novo Chat",
+  loadMore: "Carregar mais",
   today: "Hoje",
   yesterday: "Ontem",
   thisWeek: "Esta Semana",

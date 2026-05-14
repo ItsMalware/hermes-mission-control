@@ -6,6 +6,7 @@ export default {
   empty: "还没有会话",
   newConversation: "新对话",
   newChat: "新建聊天",
+  loadMore: "加载更多",
   today: "今天",
   yesterday: "昨天",
   thisWeek: "本周",

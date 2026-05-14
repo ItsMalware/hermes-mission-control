@@ -3,6 +3,7 @@ export default {
   sessions: "Sessions",
   agents: "Profiles",
   office: "Office",
+  kanban: "Kanban",
   models: "Models",
   providers: "Providers",
   skills: "Skills",

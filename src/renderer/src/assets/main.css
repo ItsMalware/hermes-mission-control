@@ -1,74 +1,80 @@
 /* ========================================================================
    Hermes Agent Desktop — Clean Design System
-   Dark + Light mode, no gradients, flat design
+   Dark + Light mode with a retro jade jewel palette
    ======================================================================== */
 
 /* ----- Dark Theme (default) ----- */
 [data-theme="dark"] {
-  --bg-primary: #212121;
-  --bg-secondary: #171717;
-  --bg-tertiary: #2f2f2f;
-  --bg-elevated: #303030;
-  --bg-hover: #3a3a3a;
-  --bg-active: #424242;
-  --accent: #003f7a;
-  --accent-hover: #0055a4;
-  --accent-subtle: rgba(0, 63, 122, 0.15);
-  --accent-text: #006acd;
+  --bg-primary: #061512;
+  --bg-secondary: #081c18;
+  --bg-tertiary: #102a24;
+  --bg-elevated: #15352e;
+  --bg-hover: #1b433a;
+  --bg-active: #235348;
+  --accent: #0f766e;
+  --accent-hover: #14a38b;
+  --accent-subtle: rgba(45, 212, 191, 0.14);
+  --accent-text: #5eead4;
+  --jewel-ruby: #d95f75;
+  --jewel-amethyst: #a78bfa;
+  --jewel-gold: #d6a84f;
   --text-primary: #ececec;
-  --text-secondary: #b4b4b4;
-  --text-muted: #8e8e8e;
-  --border: rgba(255, 255, 255, 0.06);
-  --border-bright: rgba(255, 255, 255, 0.1);
-  --border-focus: #003f7a;
-  --success: #22c55e;
-  --success-bg: rgba(34, 197, 94, 0.1);
-  --error: #ef4444;
-  --error-bg: rgba(239, 68, 68, 0.1);
-  --warning: #f59e0b;
-  --warning-bg: rgba(245, 158, 11, 0.1);
-  --user-bubble: #003f7a;
+  --text-secondary: #bbd0c8;
+  --text-muted: #7f9c92;
+  --border: rgba(169, 224, 211, 0.08);
+  --border-bright: rgba(190, 242, 232, 0.16);
+  --border-focus: #2dd4bf;
+  --success: #34d399;
+  --success-bg: rgba(52, 211, 153, 0.12);
+  --error: #d95f75;
+  --error-bg: rgba(217, 95, 117, 0.12);
+  --warning: #d6a84f;
+  --warning-bg: rgba(214, 168, 79, 0.12);
+  --user-bubble: #0f766e;
   --user-bubble-text: #ffffff;
-  --agent-bubble: #2f2f2f;
+  --agent-bubble: #0d241f;
   --agent-bubble-text: #ececec;
-  --code-bg: #1a1a1a;
-  --scrollbar-thumb: #424242;
-  --scrollbar-hover: #555555;
-  --selection: rgba(0, 63, 122, 0.4);
+  --code-bg: #03100e;
+  --scrollbar-thumb: #235348;
+  --scrollbar-hover: #2f6b5d;
+  --selection: rgba(45, 212, 191, 0.35);
 }
 
 /* ----- Light Theme ----- */
 [data-theme="light"] {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f8f8;
-  --bg-tertiary: #f0f0f0;
-  --bg-elevated: #e8e8e8;
-  --bg-hover: #ebebeb;
-  --bg-active: #e0e0e0;
-  --accent: #003f7a;
-  --accent-hover: #002d58;
-  --accent-subtle: rgba(0, 63, 122, 0.08);
-  --accent-text: #003f7a;
-  --text-primary: #111111;
-  --text-secondary: #555555;
-  --text-muted: #999999;
-  --border: #e5e5e5;
-  --border-bright: #d4d4d4;
-  --border-focus: #003f7a;
-  --success: #16a34a;
-  --success-bg: rgba(22, 163, 74, 0.08);
-  --error: #dc2626;
-  --error-bg: rgba(220, 38, 38, 0.06);
-  --warning: #d97706;
-  --warning-bg: rgba(217, 119, 6, 0.08);
-  --user-bubble: #003f7a;
+  --bg-primary: #f6fbf8;
+  --bg-secondary: #edf7f2;
+  --bg-tertiary: #e2efe9;
+  --bg-elevated: #d7e8df;
+  --bg-hover: #dceee6;
+  --bg-active: #cbe3d8;
+  --accent: #0f766e;
+  --accent-hover: #0b5f58;
+  --accent-subtle: rgba(15, 118, 110, 0.1);
+  --accent-text: #0b5f58;
+  --jewel-ruby: #b43d57;
+  --jewel-amethyst: #7c5bd6;
+  --jewel-gold: #9a6f18;
+  --text-primary: #12231f;
+  --text-secondary: #3c5d54;
+  --text-muted: #719086;
+  --border: #d7e6df;
+  --border-bright: #bfd8ce;
+  --border-focus: #0f766e;
+  --success: #15803d;
+  --success-bg: rgba(21, 128, 61, 0.08);
+  --error: #b43d57;
+  --error-bg: rgba(180, 61, 87, 0.08);
+  --warning: #9a6f18;
+  --warning-bg: rgba(154, 111, 24, 0.1);
+  --user-bubble: #0f766e;
   --user-bubble-text: #ffffff;
-  --agent-bubble: #f0f0f0;
-  --agent-bubble-text: #111111;
-  --code-bg: #f5f5f5;
-  --scrollbar-thumb: #d4d4d4;
-  --scrollbar-hover: #bbbbbb;
-  --selection: rgba(0, 63, 122, 0.2);
+  --agent-bubble: #e9f4ef;
+  --agent-bubble-text: #12231f;
+  --code-bg: #eef7f2;
+  --scrollbar-thumb: #bfd8ce;
+  --scrollbar-hover: #9ec5b6;
+  --selection: rgba(15, 118, 110, 0.2);
 }
 
 /* ----- Google Sans ----- */
@@ -194,10 +200,12 @@ body {
 .btn-primary {
   background: var(--accent);
   color: #fff;
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.12);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.22);
 }
 
 .btn-secondary {
@@ -804,12 +812,14 @@ body {
 
 .sidebar {
   width: 230px;
-  background: var(--bg-secondary);
+  background:
+    linear-gradient(180deg, rgba(15, 118, 110, 0.16), transparent 34%),
+    var(--bg-secondary);
   border-right: none;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-
+  box-shadow: inset -1px 0 0 var(--border);
   border-radius: 16px;
 }
 
@@ -873,8 +883,11 @@ body {
 }
 
 .sidebar-nav-item.active {
-  background: var(--accent-subtle);
+  background:
+    linear-gradient(90deg, rgba(214, 168, 79, 0.12), transparent 58%),
+    var(--accent-subtle);
   color: var(--accent-text);
+  box-shadow: inset 2px 0 0 var(--jewel-gold);
 }
 
 .sidebar-nav-item svg {
@@ -1011,7 +1024,7 @@ body {
 
 .chat-fast-active {
   opacity: 1;
-  color: #f59e0b;
+  color: var(--jewel-gold);
 }
 
 .chat-fast-active:hover {
@@ -1089,7 +1102,16 @@ body {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: var(--bg-elevated);
+  background:
+    radial-gradient(
+      circle at 35% 30%,
+      rgba(167, 139, 250, 0.18),
+      transparent 42%
+    ),
+    var(--bg-elevated);
+  box-shadow:
+    inset 0 0 0 1px var(--border-bright),
+    0 18px 40px rgba(3, 16, 14, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1225,12 +1247,14 @@ body {
   background: var(--user-bubble);
   color: var(--user-bubble-text);
   border-bottom-right-radius: 4px;
+  box-shadow: 0 8px 22px rgba(15, 118, 110, 0.18);
 }
 
 .chat-bubble-agent {
   background: var(--agent-bubble);
   color: var(--agent-bubble-text);
   border-bottom-left-radius: 4px;
+  border: 1px solid var(--border);
 }
 
 .chat-bubble-agent code {
@@ -1543,6 +1567,7 @@ body {
 
 .chat-input-wrapper:focus-within {
   border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
 .chat-input {
@@ -1582,6 +1607,7 @@ body {
 
 .chat-send-btn:hover:not(:disabled) {
   background: var(--accent-hover);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
 .chat-send-btn:disabled {
@@ -2740,6 +2766,12 @@ body {
   color: var(--text-primary);
   padding: 0 2px;
   border-radius: 2px;
+}
+
+.sessions-load-more {
+  width: 100%;
+  justify-content: center;
+  margin-top: 10px;
 }
 
 /* ========================================================================
@@ -4527,6 +4559,65 @@ body {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+.kanban-session-panel {
+  flex-shrink: 0;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-secondary) 82%, var(--accent) 18%);
+}
+
+.kanban-session-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.kanban-session-header h2 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.6px;
+  color: var(--text-primary);
+}
+
+.kanban-session-header p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.kanban-session-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kanban-session-group {
+  min-width: 0;
+}
+
+.kanban-session-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.kanban-session-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.kanban-session-item {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
 }
 
 .office-loading-overlay {

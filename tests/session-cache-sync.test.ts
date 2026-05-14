@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "path";
-import { mkdirSync, rmSync, existsSync } from "fs";
+import { mkdirSync, rmSync, existsSync, writeFileSync } from "fs";
 
 // vi.hoisted runs before module imports, so we can't reference imported
 // helpers here — use the bare Node modules via require.
@@ -195,6 +195,79 @@ describe("syncSessionCache", () => {
     expect(result.map((r) => r.id)).toEqual(["s2", "s1"]);
   });
 
+  it("backfills older DB sessions missing from a stale partial cache", () => {
+    const now = Math.floor(Date.now() / 1000);
+    seedDb([
+      {
+        id: "newer",
+        started_at: now,
+        message_count: 2,
+        firstUserMessage: "newer message",
+      },
+      {
+        id: "older",
+        started_at: now - 10_000,
+        message_count: 4,
+        firstUserMessage: "older missing message",
+      },
+    ]);
+    mkdirSync(join(TEST_HOME, "desktop"), { recursive: true });
+    writeFileSync(
+      CACHE_FILE,
+      JSON.stringify({
+        sessions: [
+          {
+            id: "newer",
+            title: "newer message",
+            startedAt: now,
+            source: "cli",
+            messageCount: 2,
+            model: "gpt-4o",
+          },
+        ],
+        lastSync: now + 1_000,
+      }),
+    );
+
+    const result = syncSessionCache();
+
+    expect(result.map((r) => r.id)).toEqual(["newer", "older"]);
+    expect(result[1].title).toContain("older missing message");
+  });
+
+  it("includes legacy file-backed sessions that are not in state.db", () => {
+    const now = Math.floor(Date.now() / 1000);
+    seedDb([
+      {
+        id: "db-session",
+        started_at: now,
+        message_count: 2,
+        firstUserMessage: "database session",
+      },
+    ]);
+    const sessionsDir = join(TEST_HOME, "sessions");
+    mkdirSync(sessionsDir, { recursive: true });
+    writeFileSync(
+      join(sessionsDir, "session_file-session.json"),
+      JSON.stringify({
+        session_id: "file-session",
+        session_start: new Date((now - 100) * 1000).toISOString(),
+        platform: "cli",
+        model: "gemini-3-flash-preview",
+        message_count: 2,
+        messages: [
+          { role: "user", content: "legacy transcript session" },
+          { role: "assistant", content: "legacy answer" },
+        ],
+      }),
+    );
+
+    const result = syncSessionCache();
+
+    expect(result.map((r) => r.id)).toEqual(["db-session", "file-session"]);
+    expect(result[1].title).toContain("legacy transcript session");
+  });
+
   it("handles a large existing cache without quadratic blowup (issue #16)", () => {
     // 1500 existing sessions in cache, then sync sees same 1500 but with
     // bumped message counts. The pre-fix O(N²) implementation took >2s here
@@ -220,5 +293,5 @@ describe("syncSessionCache", () => {
     expect(result).toHaveLength(N);
     expect(result.every((r) => r.messageCount === 2)).toBe(true);
     expect(elapsed).toBeLessThan(500);
-  });
+  }, 10000);
 });

@@ -9,6 +9,7 @@ import Memory from "../Memory/Memory";
 import Tools from "../Tools/Tools";
 import Gateway from "../Gateway/Gateway";
 import Office from "../Office/Office";
+import Kanban from "../Kanban/Kanban";
 import Models from "../Models/Models";
 import Providers from "../Providers/Providers";
 import Schedules from "../Schedules/Schedules";
@@ -25,6 +26,7 @@ import {
   Wrench,
   Signal,
   Building,
+  LayoutDashboard,
   Layers,
   KeyRound,
   Timer,
@@ -38,6 +40,7 @@ type View =
   | "sessions"
   | "agents"
   | "office"
+  | "kanban"
   | "models"
   | "providers"
   | "skills"
@@ -53,6 +56,7 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "sessions", icon: Clock, labelKey: "navigation.sessions" },
   { view: "agents", icon: Users, labelKey: "navigation.agents" },
   { view: "office", icon: Building, labelKey: "navigation.office" },
+  { view: "kanban", icon: LayoutDashboard, labelKey: "navigation.kanban" },
   { view: "models", icon: Layers, labelKey: "navigation.models" },
   { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
   { view: "skills", icon: Puzzle, labelKey: "navigation.skills" },
@@ -72,6 +76,7 @@ function Layout(): React.JSX.Element {
   const [activeProfile, setActiveProfile] = useState("default");
   // Lazy mount: only render Office after first visit, then keep mounted
   const [officeVisited, setOfficeVisited] = useState(false);
+  const [kanbanVisited, setKanbanVisited] = useState(false);
   // Remote mode — many screens show "not available" instead of empty data
   const [remoteMode, setRemoteMode] = useState(false);
 
@@ -144,17 +149,23 @@ function Layout(): React.JSX.Element {
     setCurrentSessionId(null);
   }, []);
 
-  const handleResumeSession = useCallback(async (sessionId: string) => {
-    const dbMessages = await window.hermesAPI.getSessionMessages(sessionId);
-    const chatMessages: ChatMessage[] = dbMessages.map((m) => ({
-      id: `db-${m.id}`,
-      role: m.role === "user" ? "user" : "agent",
-      content: m.content,
-    }));
-    setMessages(chatMessages);
-    setCurrentSessionId(sessionId);
-    setView("chat");
-  }, []);
+  const handleResumeSession = useCallback(
+    async (sessionId: string) => {
+      const dbMessages = await window.hermesAPI.getSessionMessages(
+        sessionId,
+        activeProfile,
+      );
+      const chatMessages: ChatMessage[] = dbMessages.map((m) => ({
+        id: `db-${m.id}`,
+        role: m.role === "user" ? "user" : "agent",
+        content: m.content,
+      }));
+      setMessages(chatMessages);
+      setCurrentSessionId(sessionId);
+      setView("chat");
+    },
+    [activeProfile],
+  );
 
   return (
     <div className="layout">
@@ -170,6 +181,7 @@ function Layout(): React.JSX.Element {
               className={`sidebar-nav-item ${view === v ? "active" : ""}`}
               onClick={() => {
                 if (v === "office") setOfficeVisited(true);
+                if (v === "kanban") setKanbanVisited(true);
                 setView(v);
               }}
             >
@@ -229,6 +241,7 @@ function Layout(): React.JSX.Element {
               onResumeSession={handleResumeSession}
               onNewChat={handleNewChat}
               currentSessionId={currentSessionId}
+              profile={activeProfile}
             />
           ))}
         {view === "agents" &&
@@ -254,6 +267,22 @@ function Layout(): React.JSX.Element {
             }}
           >
             <Office visible={view === "office"} />
+          </div>
+        )}
+        {kanbanVisited && (
+          <div
+            style={{
+              display: view === "kanban" ? "flex" : "none",
+              flex: 1,
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            {remoteMode ? (
+              view === "kanban" && <RemoteNotice feature="Kanban" />
+            ) : (
+              <Kanban visible={view === "kanban"} profile={activeProfile} />
+            )}
           </div>
         )}
         {view === "models" && <Models />}

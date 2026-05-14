@@ -1,14 +1,9 @@
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { HERMES_HOME } from "./installer";
-import { safeWriteFile } from "./utils";
+import { profileHome, safeWriteFile } from "./utils";
 import Database from "better-sqlite3";
 import { t } from "../shared/i18n";
 import { getAppLocale } from "./locale";
-
-const CACHE_DIR = join(HERMES_HOME, "desktop");
-const CACHE_FILE = join(CACHE_DIR, "sessions.json");
-const DB_PATH = join(HERMES_HOME, "state.db");
 
 export interface CachedSession {
   id: string;
@@ -22,6 +17,18 @@ export interface CachedSession {
 interface CacheData {
   sessions: CachedSession[];
   lastSync: number;
+}
+
+function cacheFile(profile?: string): string {
+  return join(profileHome(profile), "desktop", "sessions.json");
+}
+
+function dbPath(profile?: string): string {
+  return join(profileHome(profile), "state.db");
+}
+
+function sessionsDir(profile?: string): string {
+  return join(profileHome(profile), "sessions");
 }
 
 // Generate a short, readable title from the first user message (like ChatGPT/Claude)
@@ -55,8 +62,9 @@ function generateTitle(message: string): string {
   return title || text.slice(0, 45) + "...";
 }
 
-function readCache(): CacheData {
+function readCache(profile?: string): CacheData {
   try {
+    const CACHE_FILE = cacheFile(profile);
     if (!existsSync(CACHE_FILE)) return { sessions: [], lastSync: 0 };
     return JSON.parse(readFileSync(CACHE_FILE, "utf-8"));
   } catch {
@@ -64,35 +72,96 @@ function readCache(): CacheData {
   }
 }
 
-function writeCache(data: CacheData): void {
+function writeCache(data: CacheData, profile?: string): void {
   try {
-    safeWriteFile(CACHE_FILE, JSON.stringify(data));
+    safeWriteFile(cacheFile(profile), JSON.stringify(data));
   } catch {
     // non-fatal
   }
 }
 
-function getDb(): Database.Database | null {
+function getDb(profile?: string): Database.Database | null {
+  const DB_PATH = dbPath(profile);
   if (!existsSync(DB_PATH)) return null;
   return new Database(DB_PATH, { readonly: true });
 }
 
-// Sync from hermes DB to local cache — only fetches new/updated sessions
-export function syncSessionCache(): CachedSession[] {
-  const cache = readCache();
-  const db = getDb();
-  if (!db) return cache.sessions;
+function readFileBackedSessions(
+  dbIds: Set<string>,
+  profile?: string,
+): CachedSession[] {
+  const SESSIONS_DIR = sessionsDir(profile);
+  if (!existsSync(SESSIONS_DIR)) return [];
+
+  const sessions: CachedSession[] = [];
+  for (const file of readdirSync(SESSIONS_DIR)) {
+    if (!file.startsWith("session_") || !file.endsWith(".json")) continue;
+
+    try {
+      const payload = JSON.parse(readFileSync(join(SESSIONS_DIR, file), "utf-8"));
+      const id = String(payload.session_id || file.slice(8, -5));
+      if (!id || dbIds.has(id)) continue;
+
+      const messages = Array.isArray(payload.messages) ? payload.messages : [];
+      const firstUserMessage = messages.find(
+        (m) => m?.role === "user" && typeof m.content === "string",
+      )?.content;
+      const startedAt = Math.floor(
+        Date.parse(payload.session_start || payload.last_updated || "") / 1000,
+      );
+
+      sessions.push({
+        id,
+        title: firstUserMessage
+          ? generateTitle(firstUserMessage)
+          : t("sessions.newConversation", getAppLocale()),
+        startedAt: Number.isFinite(startedAt) ? startedAt : 0,
+        source: payload.platform || "file",
+        messageCount:
+          typeof payload.message_count === "number"
+            ? payload.message_count
+            : messages.length,
+        model: payload.model || "",
+      });
+    } catch {
+      // Ignore malformed legacy transcript files.
+    }
+  }
+
+  return sessions;
+}
+
+// Sync from hermes DB to local cache. Reconcile the full session index so a
+// partial/stale cache cannot permanently hide older sessions.
+export function syncSessionCache(profile?: string): CachedSession[] {
+  const cache = readCache(profile);
+  const db = getDb(profile);
+  if (!db) {
+    const fileSessions = readFileBackedSessions(new Set(), profile);
+    if (fileSessions.length === 0) return cache.sessions;
+    fileSessions.sort((a, b) => b.startedAt - a.startedAt);
+    const updated: CacheData = {
+      sessions: fileSessions,
+      lastSync: Math.floor(Date.now() / 1000),
+    };
+    writeCache(updated, profile);
+    return updated.sessions;
+  }
 
   try {
-    // Fetch sessions newer than last sync, or all if first sync
     const rows = db
       .prepare(
-        `SELECT s.id, s.started_at, s.source, s.message_count, s.model, s.title
+        `SELECT
+           s.id,
+           s.started_at,
+           s.source,
+           s.message_count,
+           s.model,
+           s.title
          FROM sessions s
-         WHERE s.started_at > ?
          ORDER BY s.started_at DESC`,
       )
-      .all(cache.lastSync > 0 ? cache.lastSync - 300 : 0) as Array<{
+      .all() as Array<{
       id: string;
       started_at: number;
       source: string;
@@ -108,32 +177,40 @@ export function syncSessionCache(): CachedSession[] {
     const existingById = new Map<string, CachedSession>();
     for (const s of cache.sessions) existingById.set(s.id, s);
     const newSessions: CachedSession[] = [];
+    const firstMessages = new Map<string, string>();
+    for (const msg of db
+      .prepare(
+        `SELECT m.session_id, m.content
+         FROM messages m
+         JOIN (
+           SELECT session_id, MIN(id) AS first_id
+           FROM messages
+           WHERE role = 'user' AND content IS NOT NULL
+           GROUP BY session_id
+         ) first ON first.first_id = m.id`,
+      )
+      .all() as Array<{ session_id: string; content: string }>) {
+      firstMessages.set(msg.session_id, msg.content);
+    }
 
     for (const row of rows) {
       const existing = existingById.get(row.id);
       if (existing) {
-        // Update existing entry (message count may have changed)
+        existing.startedAt = row.started_at;
+        existing.source = row.source;
         existing.messageCount = row.message_count;
+        existing.model = row.model || "";
+        if (row.title) existing.title = row.title;
         continue;
       }
 
       // Generate title from first user message
       let title = row.title || "";
       if (!title) {
-        try {
-          const msg = db
-            .prepare(
-              `SELECT content FROM messages
-               WHERE session_id = ? AND role = 'user' AND content IS NOT NULL
-               ORDER BY timestamp, id LIMIT 1`,
-            )
-            .get(row.id) as { content: string } | undefined;
-          title = msg
-            ? generateTitle(msg.content)
-            : t("sessions.newConversation", getAppLocale());
-        } catch {
-          title = t("sessions.newConversation", getAppLocale());
-        }
+        const firstMessage = firstMessages.get(row.id);
+        title = firstMessage
+          ? generateTitle(firstMessage)
+          : t("sessions.newConversation", getAppLocale());
       }
 
       newSessions.push({
@@ -146,8 +223,19 @@ export function syncSessionCache(): CachedSession[] {
       });
     }
 
-    // Merge: new sessions first (most recent), then existing
-    const allSessions = [...newSessions, ...cache.sessions];
+    // Merge DB-backed sessions with legacy file-backed transcripts.
+    const dbIds = new Set(rows.map((row) => row.id));
+    const fileSessions = readFileBackedSessions(dbIds, profile);
+    const fileIds = new Set(fileSessions.map((s) => s.id));
+    const retainedSessions = cache.sessions.filter(
+      (s) => dbIds.has(s.id) || fileIds.has(s.id),
+    );
+    const retainedIds = new Set(retainedSessions.map((s) => s.id));
+    const allSessions = [
+      ...newSessions,
+      ...fileSessions.filter((s) => !retainedIds.has(s.id)),
+      ...retainedSessions,
+    ];
     // Sort by startedAt descending
     allSessions.sort((a, b) => b.startedAt - a.startedAt);
 
@@ -155,9 +243,10 @@ export function syncSessionCache(): CachedSession[] {
       sessions: allSessions,
       lastSync: Math.floor(Date.now() / 1000),
     };
-    writeCache(updated);
+    writeCache(updated, profile);
     return updated.sessions;
-  } catch {
+  } catch (err) {
+    console.warn("Failed to sync Hermes session cache", err);
     return cache.sessions;
   } finally {
     db.close();
@@ -168,8 +257,9 @@ export function syncSessionCache(): CachedSession[] {
 export function listCachedSessions(
   limit = 50,
   offset = 0,
+  profile?: string,
 ): CachedSession[] {
-  const cache = readCache();
+  const cache = readCache(profile);
   return cache.sessions.slice(offset, offset + limit);
 }
 
@@ -177,11 +267,12 @@ export function listCachedSessions(
 export function updateSessionTitle(
   sessionId: string,
   title: string,
+  profile?: string,
 ): void {
-  const cache = readCache();
+  const cache = readCache(profile);
   const idx = cache.sessions.findIndex((s) => s.id === sessionId);
   if (idx >= 0) {
     cache.sessions[idx].title = title;
-    writeCache(cache);
+    writeCache(cache, profile);
   }
 }

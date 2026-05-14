@@ -47,10 +47,17 @@ interface HermesAPI {
   getModelConfig: (
     profile?: string,
   ) => Promise<{ provider: string; model: string; baseUrl: string }>;
+  getFallbackProviders: (
+    profile?: string,
+  ) => Promise<Array<{ provider: string; model: string; baseUrl?: string }>>;
   setModelConfig: (
     provider: string,
     model: string,
     baseUrl: string,
+    profile?: string,
+  ) => Promise<boolean>;
+  setFallbackProviders: (
+    entries: Array<{ provider: string; model: string; baseUrl?: string }>,
     profile?: string,
   ) => Promise<boolean>;
 
@@ -96,6 +103,12 @@ interface HermesAPI {
   stopGateway: () => Promise<boolean>;
   gatewayStatus: () => Promise<boolean>;
 
+  // Hermes dashboard / dashboard plugins
+  getDashboardUrl: (path?: string) => Promise<string>;
+  startDashboard: () => Promise<boolean>;
+  stopDashboard: () => Promise<boolean>;
+  dashboardStatus: () => Promise<boolean>;
+
   // Platform toggles
   getPlatformEnabled: (profile?: string) => Promise<Record<string, boolean>>;
   setPlatformEnabled: (
@@ -108,6 +121,7 @@ interface HermesAPI {
   listSessions: (
     limit?: number,
     offset?: number,
+    profile?: string,
   ) => Promise<
     Array<{
       id: string;
@@ -120,7 +134,7 @@ interface HermesAPI {
       preview: string;
     }>
   >;
-  getSessionMessages: (sessionId: string) => Promise<
+  getSessionMessages: (sessionId: string, profile?: string) => Promise<
     Array<{
       id: number;
       role: "user" | "assistant";
@@ -221,6 +235,7 @@ interface HermesAPI {
   listCachedSessions: (
     limit?: number,
     offset?: number,
+    profile?: string,
   ) => Promise<
     Array<{
       id: string;
@@ -231,7 +246,7 @@ interface HermesAPI {
       model: string;
     }>
   >;
-  syncSessionCache: () => Promise<
+  syncSessionCache: (profile?: string) => Promise<
     Array<{
       id: string;
       title: string;
@@ -241,12 +256,17 @@ interface HermesAPI {
       model: string;
     }>
   >;
-  updateSessionTitle: (sessionId: string, title: string) => Promise<void>;
+  updateSessionTitle: (
+    sessionId: string,
+    title: string,
+    profile?: string,
+  ) => Promise<void>;
 
   // Session search
   searchSessions: (
     query: string,
     limit?: number,
+    profile?: string,
   ) => Promise<
     Array<{
       sessionId: string;
@@ -258,6 +278,22 @@ interface HermesAPI {
       snippet: string;
     }>
   >;
+  getSessionTodoState: (profile?: string) => Promise<{
+    sessionId: string;
+    updatedAt: number;
+    todos: Array<{
+      id: string;
+      content: string;
+      status: string;
+    }>;
+    summary: {
+      total: number;
+      pending: number;
+      in_progress: number;
+      completed: number;
+      cancelled: number;
+    };
+  } | null>;
 
   // Credential Pool
   getCredentialPool: () => Promise<
