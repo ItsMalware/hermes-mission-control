@@ -492,7 +492,7 @@ function Kanban({ profile, visible }: KanbanProps): React.JSX.Element {
         </div>
       </div>
 
-      {boards.length > 0 && (
+      {boards.length > 1 && (
         <div className="kanban-boards-bar">
           {boards.map((b) => (
             <button
@@ -509,13 +509,6 @@ function Kanban({ profile, visible }: KanbanProps): React.JSX.Element {
               <span className="kanban-board-count">{b.total}</span>
             </button>
           ))}
-          <button
-            className="kanban-board-chip kanban-board-chip-add"
-            onClick={() => setShowNewBoard(true)}
-          >
-            <Plus size={12} />
-            New board
-          </button>
         </div>
       )}
 
