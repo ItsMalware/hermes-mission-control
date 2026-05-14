@@ -1,6 +1,16 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { electronAPI } from "@electron-toolkit/preload";
 import type { AppLocale } from "../shared/i18n/types";
+
+const electronAPI = {
+  process: {
+    platform: process.platform,
+    versions: {
+      chrome: process.versions.chrome,
+      electron: process.versions.electron,
+      node: process.versions.node,
+    },
+  },
+};
 
 const hermesAPI = {
   // Installation
@@ -101,23 +111,60 @@ const hermesAPI = {
   ): Promise<boolean> =>
     ipcRenderer.invoke("set-fallback-providers", entries, profile),
 
-  // Connection mode (local vs remote)
+  // Connection mode (local / remote / ssh)
   isRemoteMode: (): Promise<boolean> => ipcRenderer.invoke("is-remote-mode"),
+  isRemoteOnlyMode: (): Promise<boolean> => ipcRenderer.invoke("is-remote-only-mode"),
   getConnectionConfig: (): Promise<{
-    mode: "local" | "remote";
+    mode: "local" | "remote" | "ssh";
     remoteUrl: string;
     apiKey: string;
+    ssh: {
+      host: string;
+      port: number;
+      username: string;
+      keyPath: string;
+      remotePort: number;
+      localPort: number;
+    };
   }> => ipcRenderer.invoke("get-connection-config"),
 
   setConnectionConfig: (
-    mode: "local" | "remote",
+    mode: "local" | "remote" | "ssh",
     remoteUrl: string,
     apiKey?: string,
   ): Promise<boolean> =>
     ipcRenderer.invoke("set-connection-config", mode, remoteUrl, apiKey),
 
+  setSshConfig: (
+    host: string,
+    port: number,
+    username: string,
+    keyPath: string,
+    remotePort: number,
+    localPort: number,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("set-ssh-config", host, port, username, keyPath, remotePort, localPort),
+
   testRemoteConnection: (url: string, apiKey?: string): Promise<boolean> =>
     ipcRenderer.invoke("test-remote-connection", url, apiKey),
+
+  testSshConnection: (
+    host: string,
+    port: number,
+    username: string,
+    keyPath: string,
+    remotePort: number,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("test-ssh-connection", host, port, username, keyPath, remotePort),
+
+  isSshTunnelActive: (): Promise<boolean> =>
+    ipcRenderer.invoke("is-ssh-tunnel-active"),
+
+  startSshTunnel: (): Promise<boolean> =>
+    ipcRenderer.invoke("start-ssh-tunnel"),
+
+  stopSshTunnel: (): Promise<boolean> =>
+    ipcRenderer.invoke("stop-ssh-tunnel"),
 
   // Chat
   sendMessage: (
@@ -558,6 +605,13 @@ const hermesAPI = {
     const handler = (): void => callback();
     ipcRenderer.on("update-downloaded", handler);
     return () => ipcRenderer.removeListener("update-downloaded", handler);
+  },
+
+  onUpdateError: (callback: (message: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, message: unknown): void =>
+      callback(String(message));
+    ipcRenderer.on("update-error", handler);
+    return () => ipcRenderer.removeListener("update-error", handler);
   },
 
   // Menu events (from native menu bar)

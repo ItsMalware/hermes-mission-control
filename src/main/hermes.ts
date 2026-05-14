@@ -8,11 +8,13 @@ import {
   HERMES_HOME,
   HERMES_REPO,
   HERMES_PYTHON,
-  HERMES_SCRIPT,
+  hermesCliArgs,
   getEnhancedPath,
 } from "./installer";
 import { getModelConfig, readEnv, getConnectionConfig } from "./config";
+import { getSshTunnelUrl, isSshTunnelActive, isSshTunnelHealthy, startSshTunnel } from "./ssh-tunnel";
 import { stripAnsi } from "./utils";
+import { readModels } from "./models";
 
 const LOCAL_API_URL = "http://127.0.0.1:8642";
 const DASHBOARD_PORT = 9119;
@@ -20,6 +22,11 @@ const DASHBOARD_URL = `http://127.0.0.1:${DASHBOARD_PORT}`;
 
 export function getApiUrl(): string {
   const conn = getConnectionConfig();
+  if (conn.mode === "ssh") {
+    const sshUrl = getSshTunnelUrl();
+    if (!sshUrl) throw new Error("SSH tunnel is not active");
+    return sshUrl;
+  }
   if (conn.mode === "remote" && conn.remoteUrl) {
     return conn.remoteUrl.replace(/\/+$/, "");
   }
@@ -27,6 +34,12 @@ export function getApiUrl(): string {
 }
 
 export function isRemoteMode(): boolean {
+  const mode = getConnectionConfig().mode;
+  return mode === "remote" || mode === "ssh";
+}
+
+/** True only for pure remote HTTP — SSH tunnel has full local access via SSH exec */
+export function isRemoteOnlyMode(): boolean {
   return getConnectionConfig().mode === "remote";
 }
 
@@ -35,12 +48,30 @@ export function getDashboardUrl(path = "/"): string {
   return `${DASHBOARD_URL}${normalizedPath}`;
 }
 
+// Cached API key read from the remote .env when SSH tunnel starts
+let _sshRemoteApiKey = "";
+
+export function setSshRemoteApiKey(key: string): void {
+  _sshRemoteApiKey = key;
+}
+
 export function getRemoteAuthHeader(): Record<string, string> {
   const conn = getConnectionConfig();
+  if (conn.mode === "ssh") {
+    if (_sshRemoteApiKey) return { Authorization: `Bearer ${_sshRemoteApiKey}` };
+    return {};
+  }
   if (conn.mode === "remote" && conn.apiKey) {
     return { Authorization: `Bearer ${conn.apiKey}` };
   }
   return {};
+}
+
+export async function ensureSshTunnelIfNeeded(): Promise<void> {
+  const conn = getConnectionConfig();
+  if (conn.mode === "ssh" && (!isSshTunnelActive() || !await isSshTunnelHealthy())) {
+    await startSshTunnel(conn.ssh);
+  }
 }
 
 const LOCAL_PROVIDERS = new Set([
@@ -315,6 +346,7 @@ function sendMessageViaApi(
       method: "POST",
       headers,
       signal: controller.signal,
+      timeout: 120000,
     },
     (res) => {
       const sid = res.headers["x-hermes-session-id"];
@@ -392,6 +424,10 @@ function sendMessageViaApi(
     if (err.name === "AbortError") return;
     finish(`API request failed: ${err.message}`);
   });
+  req.on("timeout", () => {
+    req.destroy();
+    finish("API request timed out. Check the SSH tunnel and remote Hermes gateway.");
+  });
 
   req.write(body);
   req.end();
@@ -418,7 +454,7 @@ function sendMessageViaCli(
   const mc = getModelConfig(profile);
   const profileEnv = readEnv(profile);
 
-  const args = [HERMES_SCRIPT];
+  const args = hermesCliArgs();
   if (profile && profile !== "default") {
     args.push("-p", profile);
   }
@@ -476,8 +512,20 @@ function sendMessageViaCli(
 
   const isCustomEndpoint = LOCAL_PROVIDERS.has(mc.provider);
   if (isCustomEndpoint && mc.baseUrl) {
-    env.HERMES_INFERENCE_PROVIDER = "custom";
-    env.OPENAI_BASE_URL = mc.baseUrl.replace(/\/+$/, "");
+    // Check if this model has an explicit apiMode from custom_providers
+    let modelApiMode: string | null = null;
+    try {
+      const modelEntry = readModels().find(m => m.baseUrl === mc.baseUrl && m.model === mc.model);
+      if (modelEntry) modelApiMode = modelEntry.apiMode || null;
+    } catch { /* ignore */ }
+    const isAnthropicProtocol = modelApiMode === "anthropic_messages";
+    if (isAnthropicProtocol) {
+      env.HERMES_INFERENCE_PROVIDER = "anthropic";
+      env.ANTHROPIC_BASE_URL = mc.baseUrl.replace(/\/+$/, "");
+    } else {
+      env.HERMES_INFERENCE_PROVIDER = "custom";
+      env.OPENAI_BASE_URL = mc.baseUrl.replace(/\/+$/, "");
+    }
 
     // Resolve the right API key: check URL-specific key first, then OPENAI_API_KEY
     let resolvedKey = "";
@@ -488,21 +536,35 @@ function sendMessageViaCli(
       }
     }
     if (!resolvedKey) {
-      resolvedKey =
-        profileEnv.CUSTOM_API_KEY ||
-        env.CUSTOM_API_KEY ||
-        profileEnv.OPENAI_API_KEY ||
-        env.OPENAI_API_KEY ||
-        "";
+      // Try custom provider auto-generated key from models.json
+      try {
+        const models = readModels();
+        const matching = models.find(m => m.baseUrl === mc.baseUrl);
+        if (matching) {
+          const envKey2 = "CUSTOM_PROVIDER_" + matching.name.replace(/[^A-Za-z0-9]/g, "_").toUpperCase() + "_KEY";
+          resolvedKey = profileEnv[envKey2] || env[envKey2] || "";
+        }
+      } catch { /* ignore */ }
+      if (!resolvedKey) {
+        resolvedKey =
+          profileEnv.CUSTOM_API_KEY ||
+          env.CUSTOM_API_KEY ||
+          profileEnv.OPENAI_API_KEY ||
+          env.OPENAI_API_KEY ||
+          "";
+      }
     }
     // Local servers (localhost/127.0.0.1) don't need a real key
     if (!resolvedKey && /localhost|127\.0\.0\.1/i.test(mc.baseUrl)) {
       resolvedKey = "no-key-required";
     }
-    env.OPENAI_API_KEY = resolvedKey || "no-key-required";
+    if (isAnthropicProtocol) {
+      env.ANTHROPIC_API_KEY = resolvedKey || "no-key-required";
+    } else {
+      env.OPENAI_API_KEY = resolvedKey || "no-key-required";
+    }
 
     delete env.OPENROUTER_API_KEY;
-    delete env.ANTHROPIC_API_KEY;
     delete env.ANTHROPIC_TOKEN;
     delete env.OPENROUTER_BASE_URL;
   }
@@ -688,7 +750,7 @@ export function startGateway(profile?: string): boolean {
     }
   }
 
-  gatewayProcess = spawn(HERMES_PYTHON, [HERMES_SCRIPT, "gateway"], {
+  gatewayProcess = spawn(HERMES_PYTHON, hermesCliArgs(["gateway"]), {
     cwd: HERMES_REPO,
     env: gatewayEnv,
     stdio: "ignore",
@@ -804,7 +866,7 @@ export async function startDashboard(): Promise<boolean> {
 
   dashboardProcess = spawn(
     HERMES_PYTHON,
-    [HERMES_SCRIPT, "dashboard", "--port", String(DASHBOARD_PORT), "--no-open"],
+    hermesCliArgs(["dashboard", "--port", String(DASHBOARD_PORT), "--no-open"]),
     {
       cwd: HERMES_REPO,
       env: {
@@ -847,7 +909,7 @@ export function stopDashboard(force = false): void {
     dashboardProcess.kill("SIGTERM");
     dashboardProcess = null;
   } else if (force) {
-    const proc = spawn(HERMES_PYTHON, [HERMES_SCRIPT, "dashboard", "--stop"], {
+    const proc = spawn(HERMES_PYTHON, hermesCliArgs(["dashboard", "--stop"]), {
       cwd: HERMES_REPO,
       env: {
         ...(process.env as Record<string, string>),

@@ -1,5 +1,15 @@
-import { ElectronAPI } from "@electron-toolkit/preload";
 import type { AppLocale } from "../shared/i18n/types";
+
+interface ElectronAPI {
+  process: {
+    platform: NodeJS.Platform;
+    versions: {
+      chrome: string;
+      electron: string;
+      node: string;
+    };
+  };
+}
 
 interface InstallStatus {
   installed: boolean;
@@ -61,19 +71,46 @@ interface HermesAPI {
     profile?: string,
   ) => Promise<boolean>;
 
-  // Connection mode (local vs remote)
+  // Connection mode (local / remote / ssh)
   isRemoteMode: () => Promise<boolean>;
+  isRemoteOnlyMode: () => Promise<boolean>;
   getConnectionConfig: () => Promise<{
-    mode: "local" | "remote";
+    mode: "local" | "remote" | "ssh";
     remoteUrl: string;
     apiKey: string;
+    ssh: {
+      host: string;
+      port: number;
+      username: string;
+      keyPath: string;
+      remotePort: number;
+      localPort: number;
+    };
   }>;
   setConnectionConfig: (
-    mode: "local" | "remote",
+    mode: "local" | "remote" | "ssh",
     remoteUrl: string,
     apiKey?: string,
   ) => Promise<boolean>;
+  setSshConfig: (
+    host: string,
+    port: number,
+    username: string,
+    keyPath: string,
+    remotePort: number,
+    localPort: number,
+  ) => Promise<boolean>;
   testRemoteConnection: (url: string, apiKey?: string) => Promise<boolean>;
+  testSshConnection: (
+    host: string,
+    port: number,
+    username: string,
+    keyPath: string,
+    remotePort: number,
+  ) => Promise<boolean>;
+  isSshTunnelActive: () => Promise<boolean>;
+  startSshTunnel: () => Promise<boolean>;
+  stopSshTunnel: () => Promise<boolean>;
 
   // Chat
   sendMessage: (
@@ -377,6 +414,7 @@ interface HermesAPI {
     callback: (info: { percent: number }) => void,
   ) => () => void;
   onUpdateDownloaded: (callback: () => void) => () => void;
+  onUpdateError: (callback: (message: string) => void) => () => void;
 
   // Menu events
   onMenuNewChat: (callback: () => void) => () => void;

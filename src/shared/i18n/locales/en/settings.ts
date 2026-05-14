@@ -15,6 +15,7 @@ export default {
   language: {
     label: "Language",
     english: "English",
+    indonesian: "Bahasa Indonesia",
     spanish: "Español",
     chinese: "中文",
     portuguese: "Portuguese",
