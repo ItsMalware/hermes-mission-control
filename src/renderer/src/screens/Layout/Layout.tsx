@@ -27,10 +27,10 @@ import {
   Wrench,
   Signal,
   Building,
-  LayoutDashboard,
   Layers,
   KeyRound,
   Timer,
+  Kanban as KanbanIcon,
   Download,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
@@ -57,7 +57,7 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "sessions", icon: Clock, labelKey: "navigation.sessions" },
   { view: "agents", icon: Users, labelKey: "navigation.agents" },
   { view: "office", icon: Building, labelKey: "navigation.office" },
-  { view: "kanban", icon: LayoutDashboard, labelKey: "navigation.kanban" },
+  { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
   { view: "models", icon: Layers, labelKey: "navigation.models" },
   { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
   { view: "skills", icon: Puzzle, labelKey: "navigation.skills" },
@@ -392,6 +392,19 @@ function Layout({
         {visitedViews.has("schedules") && (
           <div style={paneStyle("schedules")}>
             <Schedules profile={activeProfile} />
+          </div>
+        )}
+
+        {visitedViews.has("kanban") && (
+          <div style={paneStyle("kanban")}>
+            {remoteMode ? (
+              <RemoteNotice feature="Kanban" />
+            ) : (
+              <Kanban
+                profile={activeProfile}
+                visible={view === "kanban"}
+              />
+            )}
           </div>
         )}
 
