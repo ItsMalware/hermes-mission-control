@@ -15,20 +15,24 @@ import type { ChatMessage, UsageState } from "./types";
 export type { ChatMessage } from "./types";
 
 interface ChatProps {
+  requestId: string;
   messages: ChatMessage[];
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   sessionId: string | null;
   profile?: string;
   onSessionStarted?: () => void;
+  onSessionIdChange?: (sessionId: string) => void;
   onNewChat?: () => void;
 }
 
 function Chat({
+  requestId,
   messages,
   setMessages,
   sessionId,
   profile,
   onSessionStarted,
+  onSessionIdChange,
   onNewChat,
 }: ChatProps): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(false);
@@ -46,11 +50,13 @@ function Chat({
   } = useFastMode(profile);
 
   useChatIPC({
+    requestId,
     setMessages,
     setHermesSessionId,
     setToolProgress,
     setIsLoading,
     setUsage,
+    onSessionIdChange,
   });
 
   // Reset hermes session when the parent clears messages (new chat).
@@ -60,8 +66,11 @@ function Chat({
     if (messages.length === 0) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setHermesSessionId(null);
+    } else if (sessionId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHermesSessionId(sessionId);
     }
-  }, [messages]);
+  }, [messages, sessionId]);
 
   // Cmd/Ctrl+N → new chat
   useEffect(() => {
@@ -87,14 +96,14 @@ function Chat({
 
   const handleClear = useCallback(() => {
     if (isLoading) {
-      window.hermesAPI.abortChat();
+      window.hermesAPI.abortChat(requestId);
       setIsLoading(false);
     }
     setMessages([]);
     setHermesSessionId(null);
     setUsage(null);
     setToolProgress(null);
-  }, [isLoading, setMessages]);
+  }, [isLoading, requestId, setMessages]);
 
   const localCommands = useLocalCommands({
     profile,
@@ -107,6 +116,7 @@ function Chat({
 
   const actions = useChatActions({
     profile,
+    requestId,
     hermesSessionId,
     messages,
     isLoading,

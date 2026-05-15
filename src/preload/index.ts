@@ -172,6 +172,7 @@ const hermesAPI = {
     profile?: string,
     resumeSessionId?: string,
     history?: Array<{ role: string; content: string }>,
+    requestId?: string,
   ): Promise<{ response: string; sessionId?: string }> =>
     ipcRenderer.invoke(
       "send-message",
@@ -179,61 +180,108 @@ const hermesAPI = {
       profile,
       resumeSessionId,
       history,
+      requestId,
     ),
 
-  abortChat: (): Promise<void> => ipcRenderer.invoke("abort-chat"),
+  abortChat: (requestId?: string): Promise<void> =>
+    ipcRenderer.invoke("abort-chat", requestId),
 
-  onChatChunk: (callback: (chunk: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, chunk: string): void =>
-      callback(chunk);
+  onChatChunk: (
+    callback: (payload: { requestId?: string; chunk: string }) => void,
+  ): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      if (typeof payload === "string") {
+        callback({ chunk: payload });
+        return;
+      }
+      callback(payload as { requestId?: string; chunk: string });
+    };
     ipcRenderer.on("chat-chunk", handler);
     return () => ipcRenderer.removeListener("chat-chunk", handler);
   },
 
-  onChatDone: (callback: (sessionId?: string) => void): (() => void) => {
+  onChatDone: (
+    callback: (payload: { requestId?: string; sessionId?: string }) => void,
+  ): (() => void) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
-      sessionId?: string,
-    ): void => callback(sessionId);
+      payload?: unknown,
+    ): void => {
+      if (typeof payload === "string") {
+        callback({ sessionId: payload });
+        return;
+      }
+      callback((payload || {}) as { requestId?: string; sessionId?: string });
+    };
     ipcRenderer.on("chat-done", handler);
     return () => ipcRenderer.removeListener("chat-done", handler);
   },
 
-  onChatToolProgress: (callback: (tool: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, tool: string): void =>
-      callback(tool);
+  onChatToolProgress: (
+    callback: (payload: { requestId?: string; tool: string }) => void,
+  ): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      if (typeof payload === "string") {
+        callback({ tool: payload });
+        return;
+      }
+      callback(payload as { requestId?: string; tool: string });
+    };
     ipcRenderer.on("chat-tool-progress", handler);
     return () => ipcRenderer.removeListener("chat-tool-progress", handler);
   },
 
   onChatUsage: (
-    callback: (usage: {
+    callback: (payload: {
+      requestId?: string;
+      usage: {
       promptTokens: number;
       completionTokens: number;
       totalTokens: number;
       cost?: number;
       rateLimitRemaining?: number;
       rateLimitReset?: number;
+      };
     }) => void,
   ): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, usage: unknown): void =>
-      callback(
-        usage as {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const value = payload as {
+        requestId?: string;
+        usage?: {
           promptTokens: number;
           completionTokens: number;
           totalTokens: number;
           cost?: number;
           rateLimitRemaining?: number;
           rateLimitReset?: number;
-        },
-      );
+        };
+      };
+      callback({
+        requestId: value?.requestId,
+        usage: value?.usage || (payload as {
+          promptTokens: number;
+          completionTokens: number;
+          totalTokens: number;
+          cost?: number;
+          rateLimitRemaining?: number;
+          rateLimitReset?: number;
+        }),
+      });
+    };
     ipcRenderer.on("chat-usage", handler);
     return () => ipcRenderer.removeListener("chat-usage", handler);
   },
 
-  onChatError: (callback: (error: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, error: string): void =>
-      callback(error);
+  onChatError: (
+    callback: (payload: { requestId?: string; error: string }) => void,
+  ): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      if (typeof payload === "string") {
+        callback({ error: payload });
+        return;
+      }
+      callback(payload as { requestId?: string; error: string });
+    };
     ipcRenderer.on("chat-error", handler);
     return () => ipcRenderer.removeListener("chat-error", handler);
   },

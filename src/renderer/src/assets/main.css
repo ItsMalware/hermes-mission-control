@@ -1021,6 +1021,62 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+}
+
+.conversation-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px 0;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.conversation-tab {
+  height: 30px;
+  max-width: 210px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.conversation-tab span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-tab.active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+}
+
+.conversation-tab-add {
+  width: 34px;
+  justify-content: center;
+  padding: 0;
+}
+
+.conversation-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.65;
+}
+
+.conversation-tab-close:hover {
+  opacity: 1;
 }
 
 .chat-header {
@@ -5410,4 +5466,3 @@ body {
   font-size: 11px;
   color: var(--text-muted);
 }
-

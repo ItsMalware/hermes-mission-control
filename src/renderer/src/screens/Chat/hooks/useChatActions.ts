@@ -9,6 +9,7 @@ interface LocalCommands {
 
 interface UseChatActionsArgs {
   profile?: string;
+  requestId: string;
   hermesSessionId: string | null;
   messages: ChatMessage[];
   isLoading: boolean;
@@ -35,6 +36,7 @@ interface UseChatActionsResult {
  */
 export function useChatActions({
   profile,
+  requestId,
   hermesSessionId,
   messages,
   isLoading,
@@ -72,12 +74,13 @@ export function useChatActions({
             role: m.role,
             content: m.content,
           })),
+          requestId,
         );
       } catch {
         // onChatError IPC already surfaces this to the user
       }
     },
-    [profile, hermesSessionId],
+    [profile, hermesSessionId, requestId],
   );
 
   const handleSend = useCallback(
@@ -110,10 +113,10 @@ export function useChatActions({
   );
 
   const handleAbort = useCallback(() => {
-    window.hermesAPI.abortChat();
+    window.hermesAPI.abortChat(requestId);
     setIsLoading(false);
     setTimeout(() => chatInputRef.current?.focus(), 50);
-  }, [chatInputRef, setIsLoading]);
+  }, [chatInputRef, requestId, setIsLoading]);
 
   const handleApprove = useCallback(() => {
     chatInputRef.current?.clear();

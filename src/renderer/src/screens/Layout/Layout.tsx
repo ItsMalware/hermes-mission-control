@@ -32,6 +32,8 @@ import {
   Timer,
   Kanban as KanbanIcon,
   Download,
+  Plus,
+  X,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
@@ -69,6 +71,32 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "settings", icon: SettingsIcon, labelKey: "navigation.settings" },
 ];
 
+interface ConversationState {
+  id: string;
+  title: string;
+  sessionId: string | null;
+  messages: ChatMessage[];
+}
+
+function createConversation(
+  partial: Partial<ConversationState> = {},
+): ConversationState {
+  return {
+    id:
+      partial.id ||
+      `conv-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    title: partial.title || "New chat",
+    sessionId: partial.sessionId ?? null,
+    messages: partial.messages || [],
+  };
+}
+
+function titleFromMessages(messages: ChatMessage[]): string {
+  const firstUser = messages.find((m) => m.role === "user")?.content.trim();
+  if (!firstUser) return "New chat";
+  return firstUser.replace(/\s+/g, " ").slice(0, 42);
+}
+
 interface LayoutProps {
   verifyWarning?: boolean;
   onReinstall?: () => void;
@@ -82,8 +110,12 @@ function Layout({
 }: LayoutProps = {}): React.JSX.Element {
   const { t } = useI18n();
   const [view, setView] = useState<View>("chat");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationState[]>(() => [
+    createConversation(),
+  ]);
+  const [activeConversationId, setActiveConversationId] = useState<string>(
+    () => conversations[0].id,
+  );
   const [activeProfile, setActiveProfile] = useState("default");
   // Tabs lazy-mount on first visit, then stay mounted (display:none toggle).
   // Keeps IPC refetch / DOM rebuild off the tab-switch hot path.
@@ -164,13 +196,80 @@ function Layout({
     }
   }
 
+  const activeConversation =
+    conversations.find((c) => c.id === activeConversationId) ||
+    conversations[0];
+  const currentSessionId = activeConversation?.sessionId ?? null;
+
+  const setActiveMessages = useCallback(
+    (update: React.SetStateAction<ChatMessage[]>) => {
+      setConversations((prev) =>
+        prev.map((conversation) => {
+          if (conversation.id !== activeConversationId) return conversation;
+          const nextMessages =
+            typeof update === "function"
+              ? update(conversation.messages)
+              : update;
+          return {
+            ...conversation,
+            messages: nextMessages,
+            title:
+              conversation.sessionId || conversation.title !== "New chat"
+                ? conversation.title
+                : titleFromMessages(nextMessages),
+          };
+        }),
+      );
+    },
+    [activeConversationId],
+  );
+
+  const updateActiveSessionId = useCallback(
+    (sessionId: string) => {
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === activeConversationId
+            ? {
+                ...conversation,
+                sessionId,
+                title:
+                  conversation.title === "New chat"
+                    ? `Session ${sessionId.slice(-6)}`
+                    : conversation.title,
+              }
+            : conversation,
+        ),
+      );
+    },
+    [activeConversationId],
+  );
+
   const handleNewChat = useCallback(() => {
-    // Abort any in-flight chat before clearing
-    window.hermesAPI.abortChat();
-    setMessages([]);
-    setCurrentSessionId(null);
+    const conversation = createConversation();
+    setConversations((prev) => [...prev, conversation]);
+    setActiveConversationId(conversation.id);
     goTo("chat");
   }, [goTo]);
+
+  const handleCloseConversation = useCallback(
+    (conversationId: string) => {
+      setConversations((prev) => {
+        const closing = prev.find((c) => c.id === conversationId);
+        if (closing) window.hermesAPI.abortChat(closing.id);
+        const next = prev.filter((c) => c.id !== conversationId);
+        if (next.length === 0) {
+          const replacement = createConversation();
+          setActiveConversationId(replacement.id);
+          return [replacement];
+        }
+        if (conversationId === activeConversationId) {
+          setActiveConversationId(next[next.length - 1].id);
+        }
+        return next;
+      });
+    },
+    [activeConversationId],
+  );
 
   // Listen for menu IPC events (Cmd+N, Cmd+K from app menu)
   useEffect(() => {
@@ -188,8 +287,9 @@ function Layout({
 
   const handleSelectProfile = useCallback((name: string) => {
     setActiveProfile(name);
-    setMessages([]);
-    setCurrentSessionId(null);
+    const conversation = createConversation();
+    setConversations([conversation]);
+    setActiveConversationId(conversation.id);
   }, []);
 
   const handleResumeSession = useCallback(
@@ -203,11 +303,21 @@ function Layout({
         role: m.role === "user" ? "user" : "agent",
         content: m.content,
       }));
-      setMessages(chatMessages);
-      setCurrentSessionId(sessionId);
+      const existing = conversations.find((c) => c.sessionId === sessionId);
+      if (existing) {
+        setActiveConversationId(existing.id);
+      } else {
+        const conversation = createConversation({
+          title: `Session ${sessionId.slice(-6)}`,
+          sessionId,
+          messages: chatMessages,
+        });
+        setConversations((prev) => [...prev, conversation]);
+        setActiveConversationId(conversation.id);
+      }
       goTo("chat");
     },
-    [activeProfile, goTo],
+    [activeProfile, conversations, goTo],
   );
 
   return (
@@ -273,11 +383,46 @@ function Layout({
           />
         )}
         <div style={paneStyle("chat")}>
+          <div className="conversation-tabs">
+            {conversations.map((conversation) => (
+              <button
+                key={conversation.id}
+                className={`conversation-tab${
+                  conversation.id === activeConversationId ? " active" : ""
+                }`}
+                onClick={() => setActiveConversationId(conversation.id)}
+                title={conversation.title}
+              >
+                <span>{conversation.title}</span>
+                {conversations.length > 1 && (
+                  <span
+                    className="conversation-tab-close"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleCloseConversation(conversation.id);
+                    }}
+                  >
+                    <X size={12} />
+                  </span>
+                )}
+              </button>
+            ))}
+            <button
+              className="conversation-tab conversation-tab-add"
+              onClick={handleNewChat}
+              title="New chat"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
           <Chat
-            messages={messages}
-            setMessages={setMessages}
-            sessionId={currentSessionId}
+            key={activeConversation.id}
+            requestId={activeConversation.id}
+            messages={activeConversation.messages}
+            setMessages={setActiveMessages}
+            sessionId={activeConversation.sessionId}
             profile={activeProfile}
+            onSessionIdChange={updateActiveSessionId}
             onNewChat={handleNewChat}
           />
         </div>

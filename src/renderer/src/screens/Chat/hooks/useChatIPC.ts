@@ -2,11 +2,13 @@ import { useEffect } from "react";
 import type { ChatMessage, UsageState } from "../types";
 
 interface UseChatIPCArgs {
+  requestId: string;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setHermesSessionId: (id: string) => void;
   setToolProgress: (tool: string | null) => void;
   setIsLoading: (loading: boolean) => void;
   setUsage: React.Dispatch<React.SetStateAction<UsageState | null>>;
+  onSessionIdChange?: (sessionId: string) => void;
 }
 
 /**
@@ -16,14 +18,18 @@ interface UseChatIPCArgs {
  * stable `useState`/`useDispatch` setters (React guarantees identity).
  */
 export function useChatIPC({
+  requestId,
   setMessages,
   setHermesSessionId,
   setToolProgress,
   setIsLoading,
   setUsage,
+  onSessionIdChange,
 }: UseChatIPCArgs): void {
   useEffect(() => {
-    const cleanupChunk = window.hermesAPI.onChatChunk((chunk) => {
+    const cleanupChunk = window.hermesAPI.onChatChunk((payload) => {
+      if (payload.requestId && payload.requestId !== requestId) return;
+      const { chunk } = payload;
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last && last.role === "agent") {
@@ -41,13 +47,18 @@ export function useChatIPC({
       });
     });
 
-    const cleanupDone = window.hermesAPI.onChatDone((sessionId) => {
+    const cleanupDone = window.hermesAPI.onChatDone((payload) => {
+      if (payload.requestId && payload.requestId !== requestId) return;
+      const { sessionId } = payload;
       if (sessionId) setHermesSessionId(sessionId);
+      if (sessionId) onSessionIdChange?.(sessionId);
       setToolProgress(null);
       setIsLoading(false);
     });
 
-    const cleanupError = window.hermesAPI.onChatError((error) => {
+    const cleanupError = window.hermesAPI.onChatError((payload) => {
+      if (payload.requestId && payload.requestId !== requestId) return;
+      const { error } = payload;
       setMessages((prev) => [
         ...prev,
         {
@@ -60,11 +71,15 @@ export function useChatIPC({
       setIsLoading(false);
     });
 
-    const cleanupToolProgress = window.hermesAPI.onChatToolProgress((tool) => {
+    const cleanupToolProgress = window.hermesAPI.onChatToolProgress((payload) => {
+      if (payload.requestId && payload.requestId !== requestId) return;
+      const { tool } = payload;
       setToolProgress(tool);
     });
 
-    const cleanupUsage = window.hermesAPI.onChatUsage((u) => {
+    const cleanupUsage = window.hermesAPI.onChatUsage((payload) => {
+      if (payload.requestId && payload.requestId !== requestId) return;
+      const u = payload.usage;
       setUsage((prev) => ({
         promptTokens: (prev?.promptTokens || 0) + u.promptTokens,
         completionTokens: (prev?.completionTokens || 0) + u.completionTokens,
@@ -86,5 +101,7 @@ export function useChatIPC({
     setToolProgress,
     setIsLoading,
     setUsage,
+    requestId,
+    onSessionIdChange,
   ]);
 }

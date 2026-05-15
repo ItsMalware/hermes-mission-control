@@ -208,7 +208,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 let mainWindow: BrowserWindow | null = null;
-let currentChatAbort: (() => void) | null = null;
+const chatAborts = new Map<string, () => void>();
 
 function openExternalUrl(rawUrl: unknown): void {
   if (!isAllowedExternalUrl(rawUrl)) {
@@ -596,7 +596,11 @@ function setupIPC(): void {
       profile?: string,
       resumeSessionId?: string,
       history?: Array<{ role: string; content: string }>,
+      requestId?: string,
     ) => {
+      const chatRequestId =
+        requestId || `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
       if (!isRemoteMode() && !isGatewayRunning()) {
         startGateway(profile);
       }
@@ -612,10 +616,6 @@ function setupIPC(): void {
           const key = await sshReadRemoteApiKey(conn.ssh);
           setSshRemoteApiKey(key);
         }
-      }
-
-      if (currentChatAbort) {
-        currentChatAbort();
       }
 
       let fullResponse = "";
@@ -634,11 +634,14 @@ function setupIPC(): void {
         {
           onChunk: (chunk) => {
             fullResponse += chunk;
-            event.sender.send("chat-chunk", chunk);
+            event.sender.send("chat-chunk", { requestId: chatRequestId, chunk });
           },
           onDone: (sessionId) => {
-            currentChatAbort = null;
-            event.sender.send("chat-done", sessionId || "");
+            chatAborts.delete(chatRequestId);
+            event.sender.send("chat-done", {
+              requestId: chatRequestId,
+              sessionId: sessionId || "",
+            });
             resolveChat({ response: fullResponse, sessionId });
             // Desktop notification when window is not focused and response took >10s
             if (
@@ -657,8 +660,11 @@ function setupIPC(): void {
             }
           },
           onError: (error) => {
-            currentChatAbort = null;
-            event.sender.send("chat-error", error);
+            chatAborts.delete(chatRequestId);
+            event.sender.send("chat-error", {
+              requestId: chatRequestId,
+              error,
+            });
             rejectChat(new Error(error));
             // Notify on error too if window not focused
             if (mainWindow && !mainWindow.isFocused()) {
@@ -669,10 +675,16 @@ function setupIPC(): void {
             }
           },
           onToolProgress: (tool) => {
-            event.sender.send("chat-tool-progress", tool);
+            event.sender.send("chat-tool-progress", {
+              requestId: chatRequestId,
+              tool,
+            });
           },
           onUsage: (usage) => {
-            event.sender.send("chat-usage", usage);
+            event.sender.send("chat-usage", {
+              requestId: chatRequestId,
+              usage,
+            });
           },
         },
         profile,
@@ -680,16 +692,22 @@ function setupIPC(): void {
         history,
       );
 
-      currentChatAbort = handle.abort;
+      chatAborts.set(chatRequestId, handle.abort);
       return promise;
     },
   );
 
-  ipcMain.handle("abort-chat", () => {
-    if (currentChatAbort) {
-      currentChatAbort();
-      currentChatAbort = null;
+  ipcMain.handle("abort-chat", (_event, requestId?: string) => {
+    if (requestId) {
+      const abort = chatAborts.get(requestId);
+      if (abort) {
+        abort();
+        chatAborts.delete(requestId);
+      }
+      return;
     }
+    for (const abort of chatAborts.values()) abort();
+    chatAborts.clear();
   });
 
   // Gateway
@@ -750,7 +768,7 @@ function setupIPC(): void {
     (_event, limit?: number, offset?: number, profile?: string) => {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh)
-        return sshListSessions(conn.ssh, limit, offset);
+        return sshListSessions(conn.ssh, limit, offset, profile);
       return listSessions(limit, offset, profile);
     },
   );
@@ -760,7 +778,7 @@ function setupIPC(): void {
     (_event, sessionId: string, profile?: string) => {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh)
-        return sshGetSessionMessages(conn.ssh, sessionId);
+        return sshGetSessionMessages(conn.ssh, sessionId, profile);
       return getSessionMessages(sessionId, profile);
     },
   );
@@ -893,7 +911,7 @@ function setupIPC(): void {
     (_event, limit?: number, offset?: number, profile?: string) => {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh)
-        return sshListCachedSessions(conn.ssh, limit, offset);
+        return sshListCachedSessions(conn.ssh, limit, offset, profile);
       return listCachedSessions(limit, offset, profile);
     },
   );
@@ -901,7 +919,7 @@ function setupIPC(): void {
     {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh)
-        return sshListCachedSessions(conn.ssh, 50);
+        return sshListCachedSessions(conn.ssh, 200, 0, profile);
       return syncSessionCache(profile);
     },
   );
@@ -917,7 +935,7 @@ function setupIPC(): void {
     (_event, query: string, limit?: number, profile?: string) => {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh)
-        return sshSearchSessions(conn.ssh, query, limit);
+        return sshSearchSessions(conn.ssh, query, limit, profile);
       return searchSessions(query, limit, profile);
     },
   );
@@ -1414,10 +1432,8 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   stopHealthPolling();
-  if (currentChatAbort) {
-    currentChatAbort();
-    currentChatAbort = null;
-  }
+  for (const abort of chatAborts.values()) abort();
+  chatAborts.clear();
   stopGateway();
   stopSshTunnel();
   stopClaw3d();
