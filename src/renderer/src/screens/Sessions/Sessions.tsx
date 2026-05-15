@@ -165,17 +165,30 @@ function Sessions({
   const [visibleCount, setVisibleCount] = useState(50);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const loadSeqRef = useRef(0);
 
   const loadSessions = useCallback(async (): Promise<void> => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
-    const cached = await window.hermesAPI.listCachedSessions(50, 0, profile);
-    if (cached.length > 0) {
+    try {
+      const cached = await window.hermesAPI.listCachedSessions(50, 0, profile);
+      if (seq !== loadSeqRef.current) return;
       setSessions(cached);
       setLoading(false);
+    } catch {
+      if (seq !== loadSeqRef.current) return;
+      setLoading(false);
     }
-    const synced = await window.hermesAPI.syncSessionCache(profile);
-    setSessions(synced);
-    setLoading(false);
+
+    try {
+      const synced = await window.hermesAPI.syncSessionCache(profile);
+      if (seq !== loadSeqRef.current) return;
+      setSessions(synced);
+    } catch {
+      // Keep the cached/empty state visible instead of trapping the view in a spinner.
+    } finally {
+      if (seq === loadSeqRef.current) setLoading(false);
+    }
   }, [profile]);
 
   useEffect(() => {

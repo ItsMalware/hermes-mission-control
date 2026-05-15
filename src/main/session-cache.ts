@@ -19,8 +19,6 @@ interface CacheData {
   lastSync: number;
 }
 
-const CACHE_STALE_SECONDS = 30;
-
 function cacheFile(profile?: string): string {
   return join(profileHome(profile), "desktop", "sessions.json");
 }
@@ -262,10 +260,6 @@ export function listCachedSessions(
   profile?: string,
 ): CachedSession[] {
   const cache = readCache(profile);
-  const now = Math.floor(Date.now() / 1000);
-  if (now - (cache.lastSync || 0) > CACHE_STALE_SECONDS) {
-    return syncSessionCache(profile).slice(offset, offset + limit);
-  }
   return cache.sessions.slice(offset, offset + limit);
 }
 
