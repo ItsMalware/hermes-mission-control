@@ -7,6 +7,7 @@ import {
   Notification,
   dialog,
 } from "electron";
+import { existsSync } from "fs";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import type { AppUpdater } from "electron-updater";
@@ -1290,6 +1291,16 @@ function setupUpdater(): void {
     // Skip auto-update in dev mode
     ipcMain.handle("check-for-updates", async () => null);
     ipcMain.handle("download-update", () => true);
+    ipcMain.handle("install-update", () => {});
+    return;
+  }
+
+  const updateConfigPath = join(process.resourcesPath, "app-update.yml");
+  if (!existsSync(updateConfigPath)) {
+    // Local unpacked builds do not include updater metadata. Treat them like
+    // dev builds so the sidebar does not show a false "Update failed" badge.
+    ipcMain.handle("check-for-updates", async () => null);
+    ipcMain.handle("download-update", () => false);
     ipcMain.handle("install-update", () => {});
     return;
   }
