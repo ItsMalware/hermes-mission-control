@@ -38,6 +38,19 @@
   --scrollbar-thumb: #235348;
   --scrollbar-hover: #2f6b5d;
   --selection: rgba(45, 212, 191, 0.35);
+  --wallpaper-overlay:
+    linear-gradient(135deg, rgba(4, 18, 14, 0.78), rgba(8, 45, 38, 0.58)),
+    linear-gradient(180deg, rgba(4, 18, 14, 0.42), rgba(4, 18, 14, 0.74));
+  --shell-overlay:
+    linear-gradient(180deg, rgba(4, 18, 14, 0.48), rgba(4, 18, 14, 0.7));
+  --content-overlay:
+    linear-gradient(180deg, rgba(4, 18, 14, 0.2), rgba(4, 18, 14, 0.5));
+  --screen-overlay:
+    linear-gradient(180deg, rgba(4, 18, 14, 0.26), rgba(4, 18, 14, 0.54));
+  --panel-bg: rgba(8, 28, 24, 0.84);
+  --panel-bg-strong: rgba(8, 28, 24, 0.93);
+  --panel-bg-soft: rgba(8, 28, 24, 0.72);
+  --panel-border: rgba(190, 242, 232, 0.14);
 }
 
 /* ----- Light Theme ----- */
@@ -75,6 +88,19 @@
   --scrollbar-thumb: #bfd8ce;
   --scrollbar-hover: #9ec5b6;
   --selection: rgba(15, 118, 110, 0.2);
+  --wallpaper-overlay:
+    linear-gradient(135deg, rgba(241, 248, 244, 0.62), rgba(8, 45, 38, 0.28)),
+    linear-gradient(180deg, rgba(241, 248, 244, 0.28), rgba(8, 45, 38, 0.3));
+  --shell-overlay:
+    linear-gradient(180deg, rgba(246, 251, 248, 0.34), rgba(8, 45, 38, 0.18));
+  --content-overlay:
+    linear-gradient(180deg, rgba(246, 251, 248, 0.18), rgba(246, 251, 248, 0.36));
+  --screen-overlay:
+    linear-gradient(180deg, rgba(246, 251, 248, 0.22), rgba(246, 251, 248, 0.42));
+  --panel-bg: rgba(237, 247, 242, 0.82);
+  --panel-bg-strong: rgba(246, 251, 248, 0.92);
+  --panel-bg-soft: rgba(237, 247, 242, 0.72);
+  --panel-border: rgba(15, 118, 110, 0.18);
 }
 
 /* ----- Google Sans ----- */
@@ -133,12 +159,17 @@
     sans-serif;
   --font-mono:
     "SF Mono", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  --app-wallpaper: url("./cozy-hermes-bg.webp");
 }
 
 /* ----- Body ----- */
 body {
   font-family: var(--font-sans);
-  background: var(--bg-primary);
+  min-height: 100vh;
+  background:
+    var(--wallpaper-overlay),
+    var(--app-wallpaper) center / cover fixed no-repeat,
+    var(--bg-primary);
   color: var(--text-primary);
   transition:
     background-color 0.2s ease,
@@ -150,7 +181,8 @@ body {
   height: 97vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
+  background: var(--shell-overlay);
+  backdrop-filter: saturate(1.05);
 }
 
 .drag-region {
@@ -168,6 +200,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: var(--content-overlay);
 }
 
 /* ----- Shared Components ----- */
@@ -179,6 +212,7 @@ body {
   justify-content: center;
   padding: 40px;
   overflow-y: auto;
+  background: var(--screen-overlay);
 }
 
 .btn {
@@ -442,8 +476,8 @@ body {
 .welcome-remote-card {
   width: 100%;
   max-width: 420px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--panel-bg-strong);
+  border: 1px solid var(--panel-border);
   border-radius: var(--radius-md);
   padding: 20px;
   text-align: left;
@@ -564,8 +598,8 @@ body {
   max-width: 620px;
   flex: 1;
   min-height: 200px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--panel-bg-strong);
+  border: 1px solid var(--panel-border);
   border-radius: var(--radius-md);
   padding: 16px;
   margin-top: 20px;
@@ -674,8 +708,8 @@ body {
 
 .setup-provider-card {
   padding: 16px 12px;
-  background: var(--bg-secondary);
-  border: 1.5px solid var(--border);
+  background: var(--panel-bg);
+  border: 1.5px solid var(--panel-border);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition);
@@ -842,12 +876,15 @@ body {
   width: 230px;
   background:
     linear-gradient(180deg, rgba(15, 118, 110, 0.16), transparent 34%),
-    var(--bg-secondary);
-  border-right: none;
+    var(--panel-bg-strong);
+  border: 1px solid var(--panel-border);
+  border-right: 1px solid var(--panel-border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  box-shadow: inset -1px 0 0 var(--border);
+  box-shadow:
+    inset -1px 0 0 rgba(190, 242, 232, 0.08),
+    0 18px 36px rgba(0, 0, 0, 0.18);
   border-radius: 16px;
 }
 
@@ -1012,6 +1049,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: var(--content-overlay);
 }
 
 /* ========================================================================
@@ -1042,7 +1080,7 @@ body {
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 8px 8px 0 0;
-  background: var(--bg-secondary);
+  background: var(--panel-bg);
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
@@ -1057,7 +1095,7 @@ body {
 }
 
 .conversation-tab.active {
-  background: var(--bg-primary);
+  background: var(--panel-bg-strong);
   color: var(--text-primary);
   border-color: var(--border-bright);
 }
@@ -1253,7 +1291,7 @@ body {
   padding: 8px 16px;
   border-radius: 20px;
   border: 1px solid var(--border);
-  background: var(--bg-secondary);
+  background: var(--panel-bg);
   color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
@@ -2004,8 +2042,8 @@ body {
 }
 
 .settings-section {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 16px;
@@ -2817,8 +2855,8 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: var(--radius-md);
   padding: 0 12px;
   transition:
@@ -5033,7 +5071,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
+  background: var(--bg-primary);
+}
+
+.splash-screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 28% 34%, rgba(214, 168, 79, 0.12), transparent 32%),
+    linear-gradient(135deg, rgba(4, 18, 14, 0.5), rgba(4, 18, 14, 0.78));
 }
 
 .splash-bg {
@@ -5042,11 +5090,12 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  z-index: 0;
 }
 
 .splash-logo {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   width: 600px;
   max-width: 60%;
   opacity: 0;
@@ -5075,15 +5124,18 @@ body {
   justify-content: center;
   height: 100vh;
   padding: 24px;
-  background: var(--bg-primary);
+  background:
+    var(--wallpaper-overlay),
+    var(--app-wallpaper) center / cover fixed no-repeat,
+    var(--bg-primary);
 }
 
 .error-boundary-card {
   text-align: center;
   padding: 32px;
   border-radius: 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--panel-bg-strong);
+  border: 1px solid var(--panel-border);
   max-width: 420px;
 }
 
@@ -5154,7 +5206,7 @@ body {
   gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: var(--bg-secondary);
+  background: var(--panel-bg);
   color: var(--text-secondary);
   border: 1px solid var(--border);
   font-size: 12px;
@@ -5205,8 +5257,8 @@ body {
 .kanban-column {
   display: flex;
   flex-direction: column;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: var(--radius-md);
   min-height: 0;
 }
@@ -5254,7 +5306,7 @@ body {
 }
 
 .kanban-card {
-  background: var(--bg-primary);
+  background: var(--panel-bg-strong);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 12px;

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import splashBg from "../../assets/hermesbg.webp";
+import splashBg from "../../assets/cozy-hermes-bg.webp";
 import splashLogo from "../../assets/splashtext-w.webp";
 
 interface SplashScreenProps {
