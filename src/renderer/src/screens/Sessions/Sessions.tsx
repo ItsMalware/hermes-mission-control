@@ -26,6 +26,7 @@ interface SessionsProps {
   onNewChat: () => void;
   currentSessionId: string | null;
   profile?: string;
+  visible: boolean;
 }
 
 function formatTime(ts: number): string {
@@ -153,6 +154,7 @@ function Sessions({
   onNewChat,
   currentSessionId,
   profile,
+  visible,
 }: SessionsProps): React.JSX.Element {
   const { t } = useI18n();
   const [sessions, setSessions] = useState<CachedSession[]>([]);
@@ -179,6 +181,16 @@ function Sessions({
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
+
+  // Refresh sessions whenever the Sessions view becomes visible.
+  // This ensures new sessions created in the Chat view (via "+")
+  // appear immediately when the user navigates back to Sessions,
+  // and also fixes stale sessions list after clearing search.
+  useEffect(() => {
+    if (visible) {
+      loadSessions();
+    }
+  }, [visible, loadSessions]);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);

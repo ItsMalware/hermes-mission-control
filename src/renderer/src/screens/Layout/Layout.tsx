@@ -292,6 +292,7 @@ function Layout({
                 onNewChat={handleNewChat}
                 currentSessionId={currentSessionId}
                 profile={activeProfile}
+                visible={view === "sessions"}
               />
             )}
           </div>
@@ -392,19 +393,6 @@ function Layout({
         {visitedViews.has("schedules") && (
           <div style={paneStyle("schedules")}>
             <Schedules profile={activeProfile} />
-          </div>
-        )}
-
-        {visitedViews.has("kanban") && (
-          <div style={paneStyle("kanban")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Kanban" />
-            ) : (
-              <Kanban
-                profile={activeProfile}
-                visible={view === "kanban"}
-              />
-            )}
           </div>
         )}
 

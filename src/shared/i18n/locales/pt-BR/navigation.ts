@@ -11,6 +11,7 @@ export default {
   memory: "Memória",
   tools: "Ferramentas",
   schedules: "Agendamentos",
+  kanban: "Kanban",
   gateway: "Gateway",
   settings: "Configurações",
 } as const;
