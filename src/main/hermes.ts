@@ -198,6 +198,7 @@ function sendMessageViaApi(
     model: mc.model || "hermes-agent",
     messages,
     stream: true,
+    ...(_resumeSessionId ? { session_id: _resumeSessionId } : {}),
   });
 
   const headers: Record<string, string> = {
