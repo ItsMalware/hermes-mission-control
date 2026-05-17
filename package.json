@@ -16,7 +16,7 @@
     "dev": "electron-vite dev",
     "dev:fresh": "HERMES_HOME=$(mktemp -d -t hermes-fresh) electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
-    "rebuild:native": "electron-builder install-app-deps",
+    "rebuild:native": "electron-rebuild -f -w better-sqlite3",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:unpack:local": "CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && npm run rebuild:native && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
