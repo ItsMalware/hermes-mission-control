@@ -1,7 +1,7 @@
 export default {
   chat: "Chat",
   sessions: "Sessions",
-  agents: "Profiles",
+  agents: "Teams",
   office: "Office",
   kanban: "Kanban",
   models: "Models",

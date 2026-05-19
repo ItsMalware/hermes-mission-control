@@ -1,5 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash, ChatBubble } from "../../assets/icons";
+import {
+  Plus,
+  Trash,
+  ChatBubble,
+  Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Users,
+} from "../../assets/icons";
 import HermesLogo from "../../components/common/HermesLogo";
 import { useI18n } from "../../components/useI18n";
 
@@ -22,6 +31,15 @@ interface AgentsProps {
   onChatWith: (name: string) => void;
 }
 
+interface SecretSummary {
+  key: string;
+  profile: string;
+  source: string;
+  category: string;
+  maskedValue: string;
+  length: number;
+}
+
 function AgentAvatar({ name }: { name: string }): React.JSX.Element {
   if (name === "default") {
     return (
@@ -33,6 +51,22 @@ function AgentAvatar({ name }: { name: string }): React.JSX.Element {
   return (
     <div className="agents-card-avatar">{name.charAt(0).toUpperCase()}</div>
   );
+}
+
+function inferTeamName(profile: ProfileInfo): string {
+  const name = profile.name.toLowerCase();
+  if (profile.isDefault || name === "default") return "General";
+  if (name.includes("director")) return "Directors";
+  if (name.includes("dev") || name.includes("worker")) return "Development";
+  if (name.includes("risk")) return "Risk";
+  if (name.includes("intel")) return "Intel";
+  if (name.includes("cozy")) return "CozyHub";
+  if (name.includes("assistant")) return "Assistants";
+  return "Specialists";
+}
+
+function secretId(secret: SecretSummary): string {
+  return `${secret.profile}:${secret.key}`;
 }
 
 function Agents({
@@ -49,15 +83,48 @@ function Agents({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [secrets, setSecrets] = useState<SecretSummary[]>([]);
+  const [secretsLoading, setSecretsLoading] = useState(true);
+  const [revealedSecrets, setRevealedSecrets] = useState<
+    Record<string, string>
+  >({});
+  const [copiedSecret, setCopiedSecret] = useState<string | null>(null);
+  const [secretScanError, setSecretScanError] = useState("");
 
   const loadProfiles = useCallback(async (): Promise<void> => {
-    const list = await window.hermesAPI.listProfiles();
-    setProfiles(list);
-    setLoading(false);
-  }, []);
+    try {
+      const list = await window.hermesAPI.listProfiles();
+      setProfiles(list);
+      setLoading(false);
+      setSecretsLoading(true);
+      setSecretScanError("");
+      const secretLists = await Promise.allSettled(
+        list.map((profile) =>
+          window.hermesAPI.listProfileSecrets(profile.name),
+        ),
+      );
+      setSecrets(
+        secretLists.flatMap((result) =>
+          result.status === "fulfilled" ? result.value : [],
+        ),
+      );
+      if (secretLists.some((result) => result.status === "rejected")) {
+        setSecretScanError("Some profile env files could not be scanned.");
+      }
+    } catch (err) {
+      setError((err as Error).message || t("agents.createFailed"));
+      setLoading(false);
+      setSecrets([]);
+    } finally {
+      setSecretsLoading(false);
+    }
+  }, [t]);
 
   useEffect(() => {
-    loadProfiles();
+    const timer = window.setTimeout(() => {
+      void loadProfiles();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadProfiles]);
 
   async function handleCreate(): Promise<void> {
@@ -96,6 +163,42 @@ function Agents({
     if (provider === "custom") return t("agents.local");
     return provider.charAt(0).toUpperCase() + provider.slice(1);
   }
+
+  async function handleRevealSecret(secret: SecretSummary): Promise<void> {
+    const id = secretId(secret);
+    if (revealedSecrets[id]) {
+      setRevealedSecrets((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      return;
+    }
+    const value = await window.hermesAPI.getEnvValue(
+      secret.key,
+      secret.profile,
+    );
+    setRevealedSecrets((prev) => ({ ...prev, [id]: value }));
+  }
+
+  async function handleCopySecret(secret: SecretSummary): Promise<void> {
+    const value =
+      revealedSecrets[secretId(secret)] ||
+      (await window.hermesAPI.getEnvValue(secret.key, secret.profile));
+    await navigator.clipboard.writeText(value);
+    setCopiedSecret(secretId(secret));
+    setTimeout(() => setCopiedSecret(null), 1600);
+  }
+
+  const teams = profiles.reduce<Record<string, ProfileInfo[]>>(
+    (acc, profile) => {
+      const team = inferTeamName(profile);
+      acc[team] = acc[team] || [];
+      acc[team].push(profile);
+      return acc;
+    },
+    {},
+  );
 
   if (loading) {
     return (
@@ -261,6 +364,107 @@ function Agents({
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="agents-insights">
+        <section className="agents-panel">
+          <div className="agents-panel-header">
+            <div className="agents-panel-title">
+              <Users size={16} />
+              Agent teams
+            </div>
+            <span className="agents-panel-count">
+              {Object.keys(teams).length} teams
+            </span>
+          </div>
+          <div className="agents-team-grid">
+            {Object.entries(teams).map(([team, members]) => (
+              <div key={team} className="agents-team-card">
+                <div className="agents-team-card-header">
+                  <span>{team}</span>
+                  <span>{members.length}</span>
+                </div>
+                <div className="agents-team-members">
+                  {members.map((member) => (
+                    <button
+                      key={member.name}
+                      className={`agents-team-member ${
+                        activeProfile === member.name ? "active" : ""
+                      }`}
+                      onClick={() => handleSelect(member.name)}
+                    >
+                      <span>{member.name}</span>
+                      <span>{providerLabel(member.provider)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="agents-panel">
+          <div className="agents-panel-header">
+            <div className="agents-panel-title">
+              <KeyRound size={16} />
+              Secrets
+            </div>
+            <span className="agents-panel-count">
+              {secretsLoading ? "Scanning" : `${secrets.length} found`}
+            </span>
+          </div>
+          <div className="agents-secrets-table">
+            {secretsLoading && (
+              <div className="agents-empty-row">
+                Scanning profile env files...
+              </div>
+            )}
+            {!secretsLoading && secrets.length === 0 && (
+              <div className="agents-empty-row">
+                No API keys, tokens, or secrets found in Hermes profile env
+                files.
+              </div>
+            )}
+            {secretScanError && (
+              <div className="agents-warning-row">{secretScanError}</div>
+            )}
+            {secrets.map((secret) => {
+              const id = secretId(secret);
+              const revealedValue = revealedSecrets[id];
+              return (
+                <div key={id} className="agents-secret-row">
+                  <div className="agents-secret-main">
+                    <span className="agents-secret-key">{secret.key}</span>
+                    <span className="agents-secret-meta">
+                      {secret.category} · {secret.profile}
+                    </span>
+                  </div>
+                  <div className="agents-secret-value" title={secret.source}>
+                    {revealedValue || secret.maskedValue}
+                  </div>
+                  <div className="agents-secret-actions">
+                    <button
+                      className="agents-icon-btn"
+                      onClick={() => handleRevealSecret(secret)}
+                      title={revealedValue ? "Hide secret" : "Reveal secret"}
+                    >
+                      {revealedValue ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                    <button
+                      className={`agents-icon-btn ${
+                        copiedSecret === id ? "copied" : ""
+                      }`}
+                      onClick={() => handleCopySecret(secret)}
+                      title="Copy secret"
+                    >
+                      {copiedSecret === id ? "Copied" : <Copy size={14} />}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       </div>
     </div>
   );

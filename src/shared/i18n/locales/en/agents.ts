@@ -1,7 +1,7 @@
 export default {
-  title: "Profiles",
+  title: "Agent Teams",
   subtitle:
-    "Each profile is an isolated Hermes workspace with its own config, memory, and skills",
+    "Review Hermes profiles, inferred teams, and masked secrets across workspaces",
   newAgent: "New Agent",
   namePlaceholder: "Agent name (e.g. coder)",
   cloneConfig: "Clone config & API keys from default",

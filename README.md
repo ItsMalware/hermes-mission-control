@@ -180,6 +180,77 @@ Exa Search, Parallel API, Tavily, Firecrawl, FAL.ai (image generation), Honcho, 
 npm install
 ```
 
+### Agent install/update instructions
+
+Use these steps when an agent is installing or updating this fork for a user.
+
+#### Fresh install from this fork
+
+```bash
+git clone https://github.com/ItsMalware/hermes-desktop.git
+cd hermes-desktop
+npm install
+npm run build:unpack:local
+open "dist/mac-arm64/Hermes Agent.app"
+```
+
+For a local macOS app copy:
+
+```bash
+osascript -e 'quit app "Hermes Agent"' || true
+rm -rf "/Applications/Hermes Agent.app"
+ditto "dist/mac-arm64/Hermes Agent.app" "/Applications/Hermes Agent.app"
+xattr -dr com.apple.quarantine "/Applications/Hermes Agent.app" 2>/dev/null || true
+open "/Applications/Hermes Agent.app"
+```
+
+Hermes runtime state is stored separately in `~/.hermes`, so replacing the app
+bundle should not delete profiles, sessions, API keys, Kanban data, or memory.
+
+#### Update an existing install of this fork
+
+```bash
+cd /path/to/hermes-desktop
+git status --short
+git pull --ff-only
+npm install
+npm run typecheck
+npm test -- tests/env-validation.test.ts tests/preload-api-surface.test.ts
+npm run build:unpack:local
+osascript -e 'quit app "Hermes Agent"' || true
+rm -rf "/Applications/Hermes Agent.app"
+ditto "dist/mac-arm64/Hermes Agent.app" "/Applications/Hermes Agent.app"
+xattr -dr com.apple.quarantine "/Applications/Hermes Agent.app" 2>/dev/null || true
+open "/Applications/Hermes Agent.app"
+```
+
+If `git status --short` shows user edits, do not overwrite them. Create a branch
+or stash only after confirming the edits are safe to move.
+
+#### Pull updates from the original repo
+
+Keep this fork connected to upstream so original Hermes Desktop releases can be
+merged without losing fork-specific changes.
+
+```bash
+cd /path/to/hermes-desktop
+git remote -v
+git remote add upstream https://github.com/fathah/hermes-desktop.git 2>/dev/null || true
+git fetch upstream
+git checkout main
+git pull --ff-only origin main
+git merge upstream/main
+npm install
+npm run typecheck
+npm test -- tests/env-validation.test.ts tests/preload-api-surface.test.ts
+git push origin main
+```
+
+For feature branches, rebase or merge from the refreshed `main`, resolve
+conflicts in source files only, rebuild with `npm run build:unpack:local`, and
+verify `/Applications/Hermes Agent.app/Contents/Resources/app.asar` contains the
+expected feature strings before telling a user the installed app is updated.
+
 ### Start the app in development
 
 ```bash

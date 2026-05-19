@@ -72,4 +72,29 @@ describe("environment variable write validation", () => {
 
     expect(readEnvFile()).toBe("SAFE_KEY=original\n");
   });
+
+  it("summarizes secrets without exposing raw values", async () => {
+    const { listProfileSecrets, setEnvValue } = await loadConfigModule();
+
+    setEnvValue("NOTION_API_KEY", "secret-notion-value");
+    setEnvValue("NOTION_DATABASE_ID", "not-a-secret-id");
+    setEnvValue("OPENAI_API_KEY", "sk-valid-openai");
+
+    const secrets = listProfileSecrets();
+
+    expect(secrets.map((secret) => secret.key)).toEqual([
+      "NOTION_API_KEY",
+      "OPENAI_API_KEY",
+    ]);
+    expect(
+      secrets.find((secret) => secret.key === "NOTION_API_KEY"),
+    ).toMatchObject({
+      category: "Notion",
+      maskedValue: "secr••••alue",
+      profile: "default",
+      length: "secret-notion-value".length,
+    });
+    expect(JSON.stringify(secrets)).not.toContain("secret-notion-value");
+    expect(JSON.stringify(secrets)).not.toContain("not-a-secret-id");
+  });
 });

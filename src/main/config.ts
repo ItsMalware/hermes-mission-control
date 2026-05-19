@@ -77,6 +77,17 @@ export function setConnectionConfig(config: ConnectionConfig): void {
 const CACHE_TTL = 5000; // 5 seconds
 const _cache = new Map<string, { data: unknown; ts: number }>();
 const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SECRET_KEY_RE =
+  /(API_?KEY|TOKEN|SECRET|PASSWORD|PASSKEY|CREDENTIAL|PRIVATE_?KEY|ACCESS_?KEY|AUTH)/i;
+
+export interface SecretSummary {
+  key: string;
+  profile: string;
+  source: string;
+  category: string;
+  maskedValue: string;
+  length: number;
+}
 
 function getCached<T>(key: string): T | undefined {
   const entry = _cache.get(key);
@@ -129,6 +140,65 @@ export function readEnv(profile?: string): Record<string, string> {
 
   setCache(cacheKey, result);
   return result;
+}
+
+export function isSecretEnvKey(key: string): boolean {
+  return SECRET_KEY_RE.test(key);
+}
+
+export function classifySecretKey(key: string): string {
+  const upper = key.toUpperCase();
+  if (upper.startsWith("NOTION_")) return "Notion";
+  if (upper.startsWith("OPENAI_")) return "OpenAI";
+  if (upper.startsWith("ANTHROPIC_")) return "Anthropic";
+  if (upper.startsWith("GEMINI_") || upper.startsWith("GOOGLE_")) {
+    return "Google";
+  }
+  if (upper.startsWith("GITHUB_") || upper.startsWith("GH_")) return "GitHub";
+  if (upper.startsWith("SLACK_")) return "Slack";
+  if (upper.startsWith("LINEAR_")) return "Linear";
+  if (upper.startsWith("STRIPE_")) return "Stripe";
+  if (upper.startsWith("AWS_")) return "AWS";
+  if (upper.startsWith("AZURE_")) return "Azure";
+  if (upper.startsWith("HERMES_")) return "Hermes";
+  return "Other";
+}
+
+export function maskSecretValue(value: string): string {
+  if (!value) return "";
+  if (value.length <= 8) return "••••";
+  return `${value.slice(0, 4)}••••${value.slice(-4)}`;
+}
+
+export function summarizeEnvSecrets(
+  env: Record<string, string>,
+  profile: string,
+  source: string,
+): SecretSummary[] {
+  return Object.entries(env)
+    .filter(([key, value]) => value && isSecretEnvKey(key))
+    .map(([key, value]) => ({
+      key,
+      profile,
+      source,
+      category: classifySecretKey(key),
+      maskedValue: maskSecretValue(value),
+      length: value.length,
+    }))
+    .sort(
+      (a, b) =>
+        a.category.localeCompare(b.category) || a.key.localeCompare(b.key),
+    );
+}
+
+export function listProfileSecrets(profile?: string): SecretSummary[] {
+  const { envFile } = profilePaths(profile);
+  return summarizeEnvSecrets(readEnv(profile), profile || "default", envFile);
+}
+
+export function getEnvValue(key: string, profile?: string): string {
+  validateEnvEntry(key, "");
+  return readEnv(profile)[key] || "";
 }
 
 export function setEnvValue(
@@ -274,7 +344,7 @@ export function setModelConfig(
     // Append base_url line after the provider line in the model section
     content = content.replace(
       /^(\s*provider:\s*"[^"]*"\s*\n)/m,
-      `$1  base_url: "${baseUrl}"\n`
+      `$1  base_url: "${baseUrl}"\n`,
     );
   }
 

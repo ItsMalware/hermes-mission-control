@@ -75,6 +75,22 @@ const hermesAPI = {
   getEnv: (profile?: string): Promise<Record<string, string>> =>
     ipcRenderer.invoke("get-env", profile),
 
+  listProfileSecrets: (
+    profile?: string,
+  ): Promise<
+    Array<{
+      key: string;
+      profile: string;
+      source: string;
+      category: string;
+      maskedValue: string;
+      length: number;
+    }>
+  > => ipcRenderer.invoke("list-profile-secrets", profile),
+
+  getEnvValue: (key: string, profile?: string): Promise<string> =>
+    ipcRenderer.invoke("get-env-value", key, profile),
+
   setEnv: (key: string, value: string, profile?: string): Promise<boolean> =>
     ipcRenderer.invoke("set-env", key, value, profile),
 
@@ -113,7 +129,8 @@ const hermesAPI = {
 
   // Connection mode (local / remote / ssh)
   isRemoteMode: (): Promise<boolean> => ipcRenderer.invoke("is-remote-mode"),
-  isRemoteOnlyMode: (): Promise<boolean> => ipcRenderer.invoke("is-remote-only-mode"),
+  isRemoteOnlyMode: (): Promise<boolean> =>
+    ipcRenderer.invoke("is-remote-only-mode"),
   getConnectionConfig: (): Promise<{
     mode: "local" | "remote" | "ssh";
     remoteUrl: string;
@@ -143,7 +160,15 @@ const hermesAPI = {
     remotePort: number,
     localPort: number,
   ): Promise<boolean> =>
-    ipcRenderer.invoke("set-ssh-config", host, port, username, keyPath, remotePort, localPort),
+    ipcRenderer.invoke(
+      "set-ssh-config",
+      host,
+      port,
+      username,
+      keyPath,
+      remotePort,
+      localPort,
+    ),
 
   testRemoteConnection: (url: string, apiKey?: string): Promise<boolean> =>
     ipcRenderer.invoke("test-remote-connection", url, apiKey),
@@ -155,7 +180,14 @@ const hermesAPI = {
     keyPath: string,
     remotePort: number,
   ): Promise<boolean> =>
-    ipcRenderer.invoke("test-ssh-connection", host, port, username, keyPath, remotePort),
+    ipcRenderer.invoke(
+      "test-ssh-connection",
+      host,
+      port,
+      username,
+      keyPath,
+      remotePort,
+    ),
 
   isSshTunnelActive: (): Promise<boolean> =>
     ipcRenderer.invoke("is-ssh-tunnel-active"),
@@ -163,8 +195,7 @@ const hermesAPI = {
   startSshTunnel: (): Promise<boolean> =>
     ipcRenderer.invoke("start-ssh-tunnel"),
 
-  stopSshTunnel: (): Promise<boolean> =>
-    ipcRenderer.invoke("stop-ssh-tunnel"),
+  stopSshTunnel: (): Promise<boolean> => ipcRenderer.invoke("stop-ssh-tunnel"),
 
   // Chat
   sendMessage: (
@@ -189,7 +220,10 @@ const hermesAPI = {
   onChatChunk: (
     callback: (payload: { requestId?: string; chunk: string }) => void,
   ): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      payload: unknown,
+    ): void => {
       if (typeof payload === "string") {
         callback({ chunk: payload });
         return;
@@ -220,7 +254,10 @@ const hermesAPI = {
   onChatToolProgress: (
     callback: (payload: { requestId?: string; tool: string }) => void,
   ): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      payload: unknown,
+    ): void => {
       if (typeof payload === "string") {
         callback({ tool: payload });
         return;
@@ -235,16 +272,19 @@ const hermesAPI = {
     callback: (payload: {
       requestId?: string;
       usage: {
-      promptTokens: number;
-      completionTokens: number;
-      totalTokens: number;
-      cost?: number;
-      rateLimitRemaining?: number;
-      rateLimitReset?: number;
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+        cost?: number;
+        rateLimitRemaining?: number;
+        rateLimitReset?: number;
       };
     }) => void,
   ): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      payload: unknown,
+    ): void => {
       const value = payload as {
         requestId?: string;
         usage?: {
@@ -258,14 +298,16 @@ const hermesAPI = {
       };
       callback({
         requestId: value?.requestId,
-        usage: value?.usage || (payload as {
-          promptTokens: number;
-          completionTokens: number;
-          totalTokens: number;
-          cost?: number;
-          rateLimitRemaining?: number;
-          rateLimitReset?: number;
-        }),
+        usage:
+          value?.usage ||
+          (payload as {
+            promptTokens: number;
+            completionTokens: number;
+            totalTokens: number;
+            cost?: number;
+            rateLimitRemaining?: number;
+            rateLimitReset?: number;
+          }),
       });
     };
     ipcRenderer.on("chat-usage", handler);
@@ -275,7 +317,10 @@ const hermesAPI = {
   onChatError: (
     callback: (payload: { requestId?: string; error: string }) => void,
   ): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      payload: unknown,
+    ): void => {
       if (typeof payload === "string") {
         callback({ error: payload });
         return;
@@ -656,8 +701,10 @@ const hermesAPI = {
   },
 
   onUpdateError: (callback: (message: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, message: unknown): void =>
-      callback(String(message));
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      message: unknown,
+    ): void => callback(String(message));
     ipcRenderer.on("update-error", handler);
     return () => ipcRenderer.removeListener("update-error", handler);
   },
@@ -751,18 +798,8 @@ const hermesAPI = {
     switchAfter?: boolean,
     profile?: string,
   ) =>
-    ipcRenderer.invoke(
-      "kanban-create-board",
-      slug,
-      name,
-      switchAfter,
-      profile,
-    ),
-  kanbanRemoveBoard: (
-    slug: string,
-    hardDelete?: boolean,
-    profile?: string,
-  ) =>
+    ipcRenderer.invoke("kanban-create-board", slug, name, switchAfter, profile),
+  kanbanRemoveBoard: (slug: string, hardDelete?: boolean, profile?: string) =>
     ipcRenderer.invoke("kanban-remove-board", slug, hardDelete, profile),
   kanbanListTasks: (filters?: {
     status?: string;
@@ -804,11 +841,8 @@ const hermesAPI = {
     ipcRenderer.invoke("kanban-archive-task", taskId, profile),
   kanbanSpecifyTask: (taskId: string, profile?: string) =>
     ipcRenderer.invoke("kanban-specify-task", taskId, profile),
-  kanbanReclaimTask: (
-    taskId: string,
-    reason?: string,
-    profile?: string,
-  ) => ipcRenderer.invoke("kanban-reclaim-task", taskId, reason, profile),
+  kanbanReclaimTask: (taskId: string, reason?: string, profile?: string) =>
+    ipcRenderer.invoke("kanban-reclaim-task", taskId, reason, profile),
   kanbanCommentTask: (taskId: string, body: string, profile?: string) =>
     ipcRenderer.invoke("kanban-comment-task", taskId, body, profile),
   kanbanDispatchOnce: (dryRun?: boolean, profile?: string) =>

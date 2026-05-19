@@ -98,6 +98,15 @@ interface KanbanTaskDetail {
   latest_summary: string | null;
 }
 
+interface SecretSummary {
+  key: string;
+  profile: string;
+  source: string;
+  category: string;
+  maskedValue: string;
+  length: number;
+}
+
 interface KanbanCreateTaskInput {
   title: string;
   body?: string;
@@ -134,6 +143,8 @@ interface HermesAPI {
 
   // Configuration (profile-aware)
   getEnv: (profile?: string) => Promise<Record<string, string>>;
+  listProfileSecrets: (profile?: string) => Promise<SecretSummary[]>;
+  getEnvValue: (key: string, profile?: string) => Promise<string>;
   setEnv: (key: string, value: string, profile?: string) => Promise<boolean>;
   getConfig: (key: string, profile?: string) => Promise<string | null>;
   setConfig: (key: string, value: string, profile?: string) => Promise<boolean>;
@@ -218,12 +229,12 @@ interface HermesAPI {
     callback: (payload: {
       requestId?: string;
       usage: {
-      promptTokens: number;
-      completionTokens: number;
-      totalTokens: number;
-      cost?: number;
-      rateLimitRemaining?: number;
-      rateLimitReset?: number;
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+        cost?: number;
+        rateLimitRemaining?: number;
+        rateLimitReset?: number;
       };
     }) => void,
   ) => () => void;
@@ -267,7 +278,10 @@ interface HermesAPI {
       preview: string;
     }>
   >;
-  getSessionMessages: (sessionId: string, profile?: string) => Promise<
+  getSessionMessages: (
+    sessionId: string,
+    profile?: string,
+  ) => Promise<
     Array<{
       id: number;
       role: "user" | "assistant";

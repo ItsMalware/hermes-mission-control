@@ -7,6 +7,8 @@ export {
   Clock,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   ExternalLink,
   KeyRound,
   LayoutDashboard,
