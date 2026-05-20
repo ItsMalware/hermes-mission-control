@@ -2,6 +2,14 @@ import Database from "better-sqlite3";
 import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 import { profileHome } from "./utils";
+import type { Attachment } from "../shared/attachments";
+import { isImageMime } from "../shared/attachments";
+import { removeSessionFromCache } from "./session-cache";
+
+// Sentinel prefix used by hermes-agent's hermes_state.py to mark
+// JSON-encoded multimodal content in the messages.content column.
+// See agent source: hermes_state._CONTENT_JSON_PREFIX = "\x00json:".
+const CONTENT_JSON_PREFIX = "\x00json:";
 
 export interface SessionSummary {
   id: string;
@@ -19,6 +27,86 @@ export interface SessionMessage {
   role: "user" | "assistant" | "tool";
   content: string;
   timestamp: number;
+  attachments?: Attachment[];
+}
+
+interface DecodedContent {
+  text: string;
+  attachments: Attachment[];
+}
+
+/**
+ * Decode the agent's `messages.content` cell.  Plain strings are returned
+ * verbatim; values with the agent's JSON-prefix sentinel are unpacked into
+ * a text portion (concatenated `{type:"text"}` parts) plus an attachment
+ * list (reconstituted from `{type:"image_url"}` parts).  Unknown or
+ * malformed shapes fall through to the raw string.
+ */
+export function decodeContent(raw: string, messageId: number): DecodedContent {
+  if (!raw || !raw.startsWith(CONTENT_JSON_PREFIX)) {
+    return { text: raw || "", attachments: [] };
+  }
+  let parts: unknown;
+  try {
+    parts = JSON.parse(raw.slice(CONTENT_JSON_PREFIX.length));
+  } catch {
+    return { text: raw, attachments: [] };
+  }
+  if (!Array.isArray(parts)) {
+    return { text: typeof parts === "string" ? parts : raw, attachments: [] };
+  }
+
+  const texts: string[] = [];
+  const attachments: Attachment[] = [];
+  let idx = 0;
+  for (const p of parts) {
+    if (typeof p === "string") {
+      if (p) texts.push(p);
+      continue;
+    }
+    if (!p || typeof p !== "object") continue;
+    const type = String(
+      (p as Record<string, unknown>).type || "",
+    ).toLowerCase();
+    if (type === "text" || type === "input_text" || type === "output_text") {
+      const t = (p as Record<string, unknown>).text;
+      if (typeof t === "string" && t) texts.push(t);
+    } else if (type === "image_url" || type === "input_image") {
+      const ref = (p as Record<string, unknown>).image_url;
+      let url = "";
+      if (typeof ref === "string") url = ref;
+      else if (ref && typeof ref === "object") {
+        const u = (ref as Record<string, unknown>).url;
+        if (typeof u === "string") url = u;
+      }
+      if (!url || !url.startsWith("data:image/")) continue;
+      const mime = url.slice("data:".length, url.indexOf(";"));
+      attachments.push({
+        id: `db-${messageId}-${idx++}`,
+        kind: "image",
+        name: `image.${guessExtension(mime)}`,
+        mime: isImageMime(mime) ? mime : "image/png",
+        size: 0,
+        dataUrl: url,
+      });
+    }
+  }
+  return { text: texts.join("\n\n"), attachments };
+}
+
+function guessExtension(mime: string): string {
+  switch (mime.toLowerCase()) {
+    case "image/png":
+      return "png";
+    case "image/jpeg":
+      return "jpg";
+    case "image/gif":
+      return "gif";
+    case "image/webp":
+      return "webp";
+    default:
+      return "bin";
+  }
 }
 
 export interface SearchResult {
@@ -39,10 +127,13 @@ function sessionsDir(profile?: string): string {
   return join(profileHome(profile), "sessions");
 }
 
-function getDb(profile?: string): Database.Database | null {
+function getDb(
+  profile?: string,
+  readonly = true,
+): Database.Database | null {
   const DB_PATH = dbPath(profile);
   if (!existsSync(DB_PATH)) return null;
-  return new Database(DB_PATH, { readonly: true });
+  return new Database(DB_PATH, readonly ? { readonly: true } : {});
 }
 
 export function listSessions(
@@ -187,12 +278,18 @@ export function getSessionMessages(
       timestamp: number;
     }>;
 
-    const messages = rows.map((r) => ({
-      id: r.id,
-      role: r.role as "user" | "assistant",
-      content: r.content,
-      timestamp: r.timestamp,
-    }));
+    const messages = rows.map((r) => {
+      const decoded = decodeContent(r.content, r.id);
+      return {
+        id: r.id,
+        role: r.role as "user" | "assistant",
+        content: decoded.text,
+        timestamp: r.timestamp,
+        ...(decoded.attachments.length > 0
+          ? { attachments: decoded.attachments }
+          : {}),
+      };
+    });
     return messages.length > 0
       ? messages
       : getFileSessionMessages(sessionId, profile);
@@ -228,4 +325,21 @@ function getFileSessionMessages(
   } catch {
     return [];
   }
+}
+
+export function deleteSession(sessionId: string): void {
+  const db = getDb(undefined, false);
+  if (!db) return;
+
+  try {
+    const tx = db.transaction((id: string) => {
+      db.prepare("DELETE FROM messages WHERE session_id = ?").run(id);
+      db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
+    });
+    tx(sessionId);
+  } finally {
+    db.close();
+  }
+
+  removeSessionFromCache(sessionId);
 }

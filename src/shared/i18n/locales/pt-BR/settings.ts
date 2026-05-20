@@ -43,6 +43,13 @@ export default {
     "Use qualquer API compatível com OpenAI (LM Studio, Ollama, vLLM, etc.)",
   modelHint:
     "Nome do modelo padrão (deixe em branco para usar o padrão do provedor)",
+  refreshModels: "Atualizar lista de modelos",
+  discoveringModels: "Carregando modelos disponíveis…",
+  discoveredCount: "{{count}} modelos disponíveis — comece a digitar para filtrar",
+  discoveryNoKey:
+    "Defina a chave de API deste provedor no .env para carregar a lista de modelos disponíveis",
+  discoveryError:
+    "Não foi possível acessar a lista de modelos do provedor — você ainda pode digitar um nome de modelo",
   customBaseUrlHint: "Endpoint da API compatível com OpenAI",
   noFallback: "Sem fallback",
   fallbackHint:

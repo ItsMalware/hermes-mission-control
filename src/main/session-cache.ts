@@ -40,7 +40,7 @@ function generateTitle(message: string): string {
   let text = message.trim();
 
   // Remove markdown formatting
-  text = text.replace(/[#*_`~\[\]()]/g, "");
+  text = text.replace(/[#*_`~[\]()]/g, "");
   // Remove URLs
   text = text.replace(/https?:\/\/\S+/g, "");
   // Remove extra whitespace
@@ -193,7 +193,9 @@ export function syncSessionCache(profile?: string): CachedSession[] {
       firstMessages.set(msg.session_id, msg.content);
     }
 
+    const refreshedIds = new Set<string>();
     for (const row of rows) {
+      refreshedIds.add(row.id);
       const existing = existingById.get(row.id);
       if (existing) {
         existing.startedAt = row.started_at;
@@ -221,6 +223,41 @@ export function syncSessionCache(profile?: string): CachedSession[] {
         messageCount: row.message_count,
         model: row.model || "",
       });
+    }
+
+    // Phase 2: refresh message_count for cached sessions that weren't
+    // returned by the lastSync-windowed query above. Without this, an
+    // old session that's still accumulating messages keeps the stale
+    // count it had at first sync — the renderer reads from the cache,
+    // so the UI reports e.g. 15 messages when the conversation actually
+    // has 200+. Issue #226. Cheap (single column, no joins, batched IN
+    // clause), and skipped entirely on a first sync since cache.sessions
+    // is empty.
+    const staleIds = cache.sessions
+      .map((s) => s.id)
+      .filter((id) => !refreshedIds.has(id));
+    if (staleIds.length > 0) {
+      // SQLite caps prepared-statement parameters; chunk well under
+      // SQLITE_MAX_VARIABLE_NUMBER (default 999 on older builds) for
+      // portability across the better-sqlite3 versions hermes ships.
+      const CHUNK = 500;
+      const countsById = new Map<string, number>();
+      for (let i = 0; i < staleIds.length; i += CHUNK) {
+        const chunk = staleIds.slice(i, i + CHUNK);
+        const placeholders = chunk.map(() => "?").join(", ");
+        const refreshed = db
+          .prepare(
+            `SELECT id, message_count FROM sessions WHERE id IN (${placeholders})`,
+          )
+          .all(...chunk) as Array<{ id: string; message_count: number }>;
+        for (const r of refreshed) countsById.set(r.id, r.message_count);
+      }
+      for (const s of cache.sessions) {
+        const fresh = countsById.get(s.id);
+        if (fresh !== undefined && fresh !== s.messageCount) {
+          s.messageCount = fresh;
+        }
+      }
     }
 
     // Merge DB-backed sessions with legacy file-backed transcripts.
@@ -274,5 +311,17 @@ export function updateSessionTitle(
   if (idx >= 0) {
     cache.sessions[idx].title = title;
     writeCache(cache, profile);
+  }
+}
+
+// Remove a session entry from the local cache. Called after the underlying
+// row in state.db is deleted so the renderer's fast-path cache doesn't keep
+// surfacing a session that no longer exists.
+export function removeSessionFromCache(sessionId: string): void {
+  const cache = readCache();
+  const next = cache.sessions.filter((s) => s.id !== sessionId);
+  if (next.length !== cache.sessions.length) {
+    cache.sessions = next;
+    writeCache(cache);
   }
 }

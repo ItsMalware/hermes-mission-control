@@ -12,6 +12,9 @@ import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import type { AppUpdater } from "electron-updater";
 import icon from "../../resources/icon.png?asset";
+import type { Attachment } from "../shared/attachments";
+import { stageAttachment, clearStagedAttachments } from "./attachment-staging";
+import { discoverProviderModels } from "./model-discovery";
 import {
   checkInstallStatus,
   verifyInstall,
@@ -70,6 +73,7 @@ import {
   getClaw3dWsUrl,
   Claw3dSetupProgress,
 } from "./claw3d";
+import { startOfficeStack } from "./office-start";
 import {
   readEnv,
   getEnvValue,
@@ -86,11 +90,18 @@ import {
   getCredentialPool,
   setCredentialPool,
   getConnectionConfig,
+  getPublicConnectionConfig,
+  resolveConnectionApiKeyUpdate,
   setConnectionConfig,
   getPlatformEnabled,
   setPlatformEnabled,
 } from "./config";
-import { listSessions, getSessionMessages, searchSessions } from "./sessions";
+import {
+  listSessions,
+  getSessionMessages,
+  searchSessions,
+  deleteSession,
+} from "./sessions";
 import {
   syncSessionCache,
   listCachedSessions,
@@ -197,6 +208,9 @@ import {
   sshListCachedSessions,
   sshRunDoctor,
   sshListModels,
+  sshAddModel,
+  sshRemoveModel,
+  sshUpdateModel,
   sshRunUpdate,
   sshRunDump,
   sshDiscoverMemoryProviders,
@@ -440,13 +454,20 @@ function setupIPC(): void {
         return true;
       }
       setEnvValue(key, value, profile);
-      // Restart gateway so it picks up the new API key
-      if (
-        (isGatewayRunning() && key.endsWith("_API_KEY")) ||
+      // Restart gateway so it picks up the new API key.
+      // The earlier condition had a precedence bug —
+      //   `(isGatewayRunning() && _API_KEY) || _TOKEN || HF_TOKEN`
+      // — that triggered a restart for `_TOKEN`/`HF_TOKEN` writes even
+      // when no local gateway was running, which in remote mode hit the
+      // `startGateway` path with no local install (issue #266).
+      // restartGateway() now also self-gates on isRemoteMode(), so this
+      // is belt-and-braces, but the condition is fixed too for clarity.
+      const looksLikeCredential =
+        key.endsWith("_API_KEY") ||
         key.endsWith("_TOKEN") ||
         key === "HF_TOKEN" ||
-        key.startsWith("HERMES_GEMINI_")
-      ) {
+        key.startsWith("HERMES_GEMINI_");
+      if (isGatewayRunning() && looksLikeCredential) {
         restartGateway(profile);
       }
       return true;
@@ -550,7 +571,7 @@ function setupIPC(): void {
   // Connection mode (local / remote / ssh)
   ipcMain.handle("is-remote-mode", () => isRemoteMode());
   ipcMain.handle("is-remote-only-mode", () => isRemoteOnlyMode());
-  ipcMain.handle("get-connection-config", () => getConnectionConfig());
+  ipcMain.handle("get-connection-config", () => getPublicConnectionConfig());
   ipcMain.handle("is-ssh-tunnel-active", () => isSshTunnelActive());
 
   ipcMain.handle(
@@ -561,11 +582,17 @@ function setupIPC(): void {
       remoteUrl: string,
       apiKey?: string,
     ) => {
+      const existing = getConnectionConfig();
       setConnectionConfig({
+        ...existing,
         mode,
         remoteUrl,
-        apiKey: apiKey || "",
-        ssh: getConnectionConfig().ssh, // preserve existing ssh config
+        apiKey: resolveConnectionApiKeyUpdate(
+          existing,
+          mode,
+          remoteUrl,
+          apiKey,
+        ),
       });
       return true;
     },
@@ -647,6 +674,7 @@ function setupIPC(): void {
       resumeSessionId?: string,
       history?: Array<{ role: string; content: string }>,
       requestId?: string,
+      attachments?: Attachment[],
     ) => {
       const chatRequestId =
         requestId ||
@@ -744,6 +772,7 @@ function setupIPC(): void {
         profile,
         resumeSessionId,
         history,
+        attachments,
       );
 
       chatAborts.set(chatRequestId, handle.abort);
@@ -764,6 +793,31 @@ function setupIPC(): void {
     chatAborts.clear();
   });
 
+  // Attachment staging — for pasted blobs that have no filesystem origin.
+  ipcMain.handle(
+    "stage-attachment",
+    (_event, sessionId: string, filename: string, base64Bytes: string) => {
+      return stageAttachment(sessionId, filename, base64Bytes);
+    },
+  );
+  ipcMain.handle("clear-staged-attachments", (_event, sessionId: string) => {
+    clearStagedAttachments(sessionId);
+  });
+
+  // Model discovery — fetch the provider's /v1/models for autocomplete.
+  ipcMain.handle(
+    "discover-provider-models",
+    (
+      _event,
+      provider: string,
+      baseUrl: string | undefined,
+      apiKey: string | undefined,
+      profile?: string,
+    ) => {
+      return discoverProviderModels(provider, baseUrl, apiKey, profile);
+    },
+  );
+
   // Gateway
   ipcMain.handle("start-gateway", async () => {
     const conn = getConnectionConfig();
@@ -771,12 +825,22 @@ function setupIPC(): void {
       await sshStartGateway(conn.ssh);
       return true;
     }
+    if (conn.mode === "remote") {
+      // The remote server runs its own gateway; nothing to start locally.
+      // Without this guard we'd fall through to `startGateway()` and
+      // spawn a non-existent local hermes-agent (issue #266).
+      return false;
+    }
     return startGateway();
   });
   ipcMain.handle("stop-gateway", async () => {
     const conn = getConnectionConfig();
     if (conn.mode === "ssh" && conn.ssh) {
       await sshStopGateway(conn.ssh);
+      return true;
+    }
+    if (conn.mode === "remote") {
+      // No local gateway to stop in pure remote mode.
       return true;
     }
     stopGateway(true);
@@ -843,6 +907,10 @@ function setupIPC(): void {
       return getSessionMessages(sessionId, profile);
     },
   );
+
+  ipcMain.handle("delete-session", (_event, sessionId: string) => {
+    return deleteSession(sessionId);
+  });
 
   // Profiles
   ipcMain.handle("list-profiles", async () => {
@@ -1019,16 +1087,22 @@ function setupIPC(): void {
     getSessionTodoState(profile),
   );
 
-  // Credential Pool
-  ipcMain.handle("get-credential-pool", () => getCredentialPool());
+  // Credential Pool — profile-aware. When `profile` is omitted, the
+  // credential pool helpers default to the currently active profile's
+  // auth.json (see config.ts:authFilePath), so the renderer can pass an
+  // explicit profile or rely on the active-profile fallback.
+  ipcMain.handle("get-credential-pool", (_event, profile?: string) =>
+    getCredentialPool(profile),
+  );
   ipcMain.handle(
     "set-credential-pool",
     (
       _event,
       provider: string,
       entries: Array<{ key: string; label: string }>,
+      profile?: string,
     ) => {
-      setCredentialPool(provider, entries);
+      setCredentialPool(provider, entries, profile);
       return true;
     },
   );
@@ -1041,14 +1115,33 @@ function setupIPC(): void {
   });
   ipcMain.handle(
     "add-model",
-    (_event, name: string, provider: string, model: string, baseUrl: string) =>
-      addModel(name, provider, model, baseUrl),
+    (
+      _event,
+      name: string,
+      provider: string,
+      model: string,
+      baseUrl: string,
+    ) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh) {
+        return sshAddModel(conn.ssh, name, provider, model, baseUrl);
+      }
+      return addModel(name, provider, model, baseUrl);
+    },
   );
-  ipcMain.handle("remove-model", (_event, id: string) => removeModel(id));
+  ipcMain.handle("remove-model", (_event, id: string) => {
+    const conn = getConnectionConfig();
+    if (conn.mode === "ssh" && conn.ssh) return sshRemoveModel(conn.ssh, id);
+    return removeModel(id);
+  });
   ipcMain.handle(
     "update-model",
-    (_event, id: string, fields: Record<string, string>) =>
-      updateModel(id, fields),
+    (_event, id: string, fields: Record<string, string>) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh)
+        return sshUpdateModel(conn.ssh, id, fields);
+      return updateModel(id, fields);
+    },
   );
 
   // Claw3D
@@ -1076,7 +1169,19 @@ function setupIPC(): void {
     return true;
   });
 
-  ipcMain.handle("claw3d-start-all", () => startClaw3dAll());
+  ipcMain.handle("claw3d-start-all", (_event, profile?: string) =>
+    startOfficeStack(profile, {
+      getConnectionConfig,
+      isGatewayRunning,
+      startGateway,
+      sshGatewayStatus,
+      sshStartGateway,
+      startSshTunnel,
+      sshReadRemoteApiKey,
+      setSshRemoteApiKey,
+      startClaw3dAll,
+    }),
+  );
   ipcMain.handle("claw3d-stop-all", () => {
     stopClaw3d();
     return true;

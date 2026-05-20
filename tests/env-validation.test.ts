@@ -97,4 +97,16 @@ describe("environment variable write validation", () => {
     expect(JSON.stringify(secrets)).not.toContain("secret-notion-value");
     expect(JSON.stringify(secrets)).not.toContain("not-a-secret-id");
   });
+
+  it("keeps empty values in the read-back dict (valid POSIX env var)", async () => {
+    const { readEnv, setEnvValue } = await loadConfigModule();
+
+    setEnvValue("EMPTY_FLAG", "");
+    setEnvValue("WITH_VALUE", "present");
+
+    const env = readEnv();
+    expect(env.EMPTY_FLAG).toBe("");
+    expect(env.WITH_VALUE).toBe("present");
+    expect(readEnvFile()).toContain("EMPTY_FLAG=\n");
+  });
 });

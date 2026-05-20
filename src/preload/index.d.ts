@@ -1,4 +1,5 @@
 import type { AppLocale } from "../shared/i18n/types";
+import type { Attachment } from "../shared/attachments";
 
 interface ElectronAPI {
   process: {
@@ -16,6 +17,7 @@ interface InstallStatus {
   configured: boolean;
   hasApiKey: boolean;
   verified: boolean;
+  activeProfile?: string;
 }
 
 interface InstallProgress {
@@ -172,7 +174,8 @@ interface HermesAPI {
   getConnectionConfig: () => Promise<{
     mode: "local" | "remote" | "ssh";
     remoteUrl: string;
-    apiKey: string;
+    hasApiKey: boolean;
+    apiKeyLength: number;
     ssh: {
       host: string;
       port: number;
@@ -214,8 +217,26 @@ interface HermesAPI {
     resumeSessionId?: string,
     history?: Array<{ role: string; content: string }>,
     requestId?: string,
+    attachments?: Attachment[],
   ) => Promise<{ response: string; sessionId?: string }>;
   abortChat: (requestId?: string) => Promise<void>;
+  getPathForFile: (file: File) => string;
+  stageAttachment: (
+    sessionId: string,
+    filename: string,
+    base64Bytes: string,
+  ) => Promise<string>;
+  clearStagedAttachments: (sessionId: string) => Promise<void>;
+  discoverProviderModels: (
+    provider: string,
+    baseUrl?: string,
+    apiKey?: string,
+    profile?: string,
+  ) => Promise<{
+    models: string[];
+    status: "ok" | "no-key" | "unsupported" | "unknown-host";
+    cached: boolean;
+  }>;
   onChatChunk: (
     callback: (payload: { requestId?: string; chunk: string }) => void,
   ) => () => void;
@@ -287,6 +308,7 @@ interface HermesAPI {
       role: "user" | "assistant";
       content: string;
       timestamp: number;
+      attachments?: Attachment[];
     }>
   >;
 
@@ -418,6 +440,7 @@ interface HermesAPI {
     title: string,
     profile?: string,
   ) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
 
   // Session search
   searchSessions: (
@@ -452,13 +475,14 @@ interface HermesAPI {
     };
   } | null>;
 
-  // Credential Pool
-  getCredentialPool: () => Promise<
-    Record<string, Array<{ key: string; label: string }>>
-  >;
+  // Credential Pool (profile-aware)
+  getCredentialPool: (
+    profile?: string,
+  ) => Promise<Record<string, Array<{ key: string; label: string }>>>;
   setCredentialPool: (
     provider: string,
     entries: Array<{ key: string; label: string }>,
+    profile?: string,
   ) => Promise<boolean>;
 
   // Models
@@ -499,6 +523,8 @@ interface HermesAPI {
     wsUrl: string;
     running: boolean;
     error: string;
+    remoteUrl?: string | null;
+    remoteSource?: "ssh" | null;
   }>;
   claw3dSetup: () => Promise<{ success: boolean; error?: string }>;
   onClaw3dSetupProgress: (
@@ -514,7 +540,9 @@ interface HermesAPI {
   claw3dSetPort: (port: number) => Promise<boolean>;
   claw3dGetWsUrl: () => Promise<string>;
   claw3dSetWsUrl: (url: string) => Promise<boolean>;
-  claw3dStartAll: () => Promise<{ success: boolean; error?: string }>;
+  claw3dStartAll: (
+    profile?: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   claw3dStopAll: () => Promise<boolean>;
   claw3dGetLogs: () => Promise<string>;
   claw3dStartDev: () => Promise<boolean>;

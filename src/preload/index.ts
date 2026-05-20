@@ -1,5 +1,6 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AppLocale } from "../shared/i18n/types";
+import type { Attachment } from "../shared/attachments";
 
 const electronAPI = {
   process: {
@@ -134,7 +135,7 @@ const hermesAPI = {
   getConnectionConfig: (): Promise<{
     mode: "local" | "remote" | "ssh";
     remoteUrl: string;
-    apiKey: string;
+    hasApiKey: boolean;
     ssh: {
       host: string;
       port: number;
@@ -204,6 +205,7 @@ const hermesAPI = {
     resumeSessionId?: string,
     history?: Array<{ role: string; content: string }>,
     requestId?: string,
+    attachments?: Attachment[],
   ): Promise<{ response: string; sessionId?: string }> =>
     ipcRenderer.invoke(
       "send-message",
@@ -212,10 +214,50 @@ const hermesAPI = {
       resumeSessionId,
       history,
       requestId,
+      attachments,
     ),
 
   abortChat: (requestId?: string): Promise<void> =>
     ipcRenderer.invoke("abort-chat", requestId),
+
+  // Resolve the absolute filesystem path for a File coming from drag-drop
+  // or the file picker. Returns "" for blobs that have no origin path
+  // (e.g. clipboard paste) — caller should stageAttachment for those.
+  getPathForFile: (file: File): string => {
+    try {
+      return webUtils.getPathForFile(file) || "";
+    } catch {
+      return "";
+    }
+  },
+
+  stageAttachment: (
+    sessionId: string,
+    filename: string,
+    base64Bytes: string,
+  ): Promise<string> =>
+    ipcRenderer.invoke("stage-attachment", sessionId, filename, base64Bytes),
+
+  clearStagedAttachments: (sessionId: string): Promise<void> =>
+    ipcRenderer.invoke("clear-staged-attachments", sessionId),
+
+  discoverProviderModels: (
+    provider: string,
+    baseUrl?: string,
+    apiKey?: string,
+    profile?: string,
+  ): Promise<{
+    models: string[];
+    status: "ok" | "no-key" | "unsupported" | "unknown-host";
+    cached: boolean;
+  }> =>
+    ipcRenderer.invoke(
+      "discover-provider-models",
+      provider,
+      baseUrl,
+      apiKey,
+      profile,
+    ),
 
   onChatChunk: (
     callback: (payload: { requestId?: string; chunk: string }) => void,
@@ -381,6 +423,7 @@ const hermesAPI = {
       role: "user" | "assistant";
       content: string;
       timestamp: number;
+      attachments?: Attachment[];
     }>
   > => ipcRenderer.invoke("get-session-messages", sessionId, profile),
 
@@ -536,6 +579,8 @@ const hermesAPI = {
     profile?: string,
   ): Promise<void> =>
     ipcRenderer.invoke("update-session-title", sessionId, title, profile),
+  deleteSession: (sessionId: string): Promise<void> =>
+    ipcRenderer.invoke("delete-session", sessionId),
 
   // Session search
   searchSessions: (
@@ -573,15 +618,18 @@ const hermesAPI = {
     };
   } | null> => ipcRenderer.invoke("get-session-todo-state", profile),
 
-  // Credential Pool
-  getCredentialPool: (): Promise<
-    Record<string, Array<{ key: string; label: string }>>
-  > => ipcRenderer.invoke("get-credential-pool"),
+  // Credential Pool (profile-aware: reads/writes the named profile's
+  // auth.json; defaults to the currently active profile when omitted)
+  getCredentialPool: (
+    profile?: string,
+  ): Promise<Record<string, Array<{ key: string; label: string }>>> =>
+    ipcRenderer.invoke("get-credential-pool", profile),
   setCredentialPool: (
     provider: string,
     entries: Array<{ key: string; label: string }>,
+    profile?: string,
   ): Promise<boolean> =>
-    ipcRenderer.invoke("set-credential-pool", provider, entries),
+    ipcRenderer.invoke("set-credential-pool", provider, entries, profile),
 
   // Models
   listModels: (): Promise<
@@ -626,6 +674,8 @@ const hermesAPI = {
     wsUrl: string;
     running: boolean;
     error: string;
+    remoteUrl?: string | null;
+    remoteSource?: "ssh" | null;
   }> => ipcRenderer.invoke("claw3d-status"),
 
   claw3dSetup: (): Promise<{ success: boolean; error?: string }> =>
@@ -665,8 +715,10 @@ const hermesAPI = {
   claw3dSetWsUrl: (url: string): Promise<boolean> =>
     ipcRenderer.invoke("claw3d-set-ws-url", url),
 
-  claw3dStartAll: (): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke("claw3d-start-all"),
+  claw3dStartAll: (
+    profile?: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("claw3d-start-all", profile),
   claw3dStopAll: (): Promise<boolean> => ipcRenderer.invoke("claw3d-stop-all"),
   claw3dGetLogs: (): Promise<string> => ipcRenderer.invoke("claw3d-get-logs"),
 
