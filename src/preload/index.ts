@@ -391,8 +391,18 @@ const hermesAPI = {
       path: string;
       isDefault: boolean;
       isActive: boolean;
+      description: string;
       model: string;
       provider: string;
+      role: "director" | "worker" | "assistant" | "specialist" | "general";
+      workerPoolPath: string;
+      teamMembers: Array<{
+        id: string;
+        name: string;
+        role: "director" | "worker" | "assistant" | "specialist" | "general";
+        source: "worker-pool";
+        path: string;
+      }>;
       hasEnv: boolean;
       hasSoul: boolean;
       skillCount: number;

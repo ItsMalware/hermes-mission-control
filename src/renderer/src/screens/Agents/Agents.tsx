@@ -11,14 +11,25 @@ import {
 } from "../../assets/icons";
 import HermesLogo from "../../components/common/HermesLogo";
 import { useI18n } from "../../components/useI18n";
+import {
+  buildDirectorTeamGroups,
+  inferProfileRole,
+  roleLabel,
+  type ProfileRole,
+  type TeamMemberInfo,
+} from "./team-groups";
 
 interface ProfileInfo {
   name: string;
   path: string;
   isDefault: boolean;
   isActive: boolean;
+  description: string;
   model: string;
   provider: string;
+  role: ProfileRole;
+  workerPoolPath: string;
+  teamMembers: TeamMemberInfo[];
   hasEnv: boolean;
   hasSoul: boolean;
   skillCount: number;
@@ -51,18 +62,6 @@ function AgentAvatar({ name }: { name: string }): React.JSX.Element {
   return (
     <div className="agents-card-avatar">{name.charAt(0).toUpperCase()}</div>
   );
-}
-
-function inferTeamName(profile: ProfileInfo): string {
-  const name = profile.name.toLowerCase();
-  if (profile.isDefault || name === "default") return "General";
-  if (name.includes("director")) return "Directors";
-  if (name.includes("dev") || name.includes("worker")) return "Development";
-  if (name.includes("risk")) return "Risk";
-  if (name.includes("intel")) return "Intel";
-  if (name.includes("cozy")) return "CozyHub";
-  if (name.includes("assistant")) return "Assistants";
-  return "Specialists";
 }
 
 function secretId(secret: SecretSummary): string {
@@ -190,15 +189,7 @@ function Agents({
     setTimeout(() => setCopiedSecret(null), 1600);
   }
 
-  const teams = profiles.reduce<Record<string, ProfileInfo[]>>(
-    (acc, profile) => {
-      const team = inferTeamName(profile);
-      acc[team] = acc[team] || [];
-      acc[team].push(profile);
-      return acc;
-    },
-    {},
-  );
+  const directorTeams = buildDirectorTeamGroups(profiles);
 
   if (loading) {
     return (
@@ -289,7 +280,7 @@ function Agents({
               <div className="agents-card-info">
                 <div className="agents-card-name">{p.name}</div>
                 <div className="agents-card-provider">
-                  {providerLabel(p.provider)}
+                  {roleLabel(inferProfileRole(p))} · {providerLabel(p.provider)}
                 </div>
               </div>
               {activeProfile === p.name && (
@@ -374,33 +365,92 @@ function Agents({
               Agent teams
             </div>
             <span className="agents-panel-count">
-              {Object.keys(teams).length} teams
+              {directorTeams.teams.length} teams
             </span>
           </div>
-          <div className="agents-team-grid">
-            {Object.entries(teams).map(([team, members]) => (
-              <div key={team} className="agents-team-card">
-                <div className="agents-team-card-header">
-                  <span>{team}</span>
-                  <span>{members.length}</span>
-                </div>
-                <div className="agents-team-members">
-                  {members.map((member) => (
+          {directorTeams.teams.length === 0 ? (
+            <div className="agents-empty-row">
+              No director profiles found yet. Create a director profile to own a
+              team.
+            </div>
+          ) : (
+            <div className="agents-team-grid">
+              {directorTeams.teams.map((team) => (
+                <div key={team.id} className="agents-team-card">
+                  <div className="agents-team-card-header">
+                    <div>
+                      <span>{team.label}</span>
+                      <small>{team.owner.name}</small>
+                    </div>
+                    <span>
+                      {team.profileMembers.length +
+                        team.workerPoolMembers.length}
+                    </span>
+                  </div>
+                  <div className="agents-team-members">
                     <button
-                      key={member.name}
-                      className={`agents-team-member ${
-                        activeProfile === member.name ? "active" : ""
+                      className={`agents-team-member agents-team-owner ${
+                        activeProfile === team.owner.name ? "active" : ""
                       }`}
-                      onClick={() => handleSelect(member.name)}
+                      onClick={() => handleSelect(team.owner.name)}
                     >
-                      <span>{member.name}</span>
-                      <span>{providerLabel(member.provider)}</span>
+                      <span>{team.owner.name}</span>
+                      <span>{roleLabel(inferProfileRole(team.owner))}</span>
                     </button>
-                  ))}
+                    {team.profileMembers.length === 0 &&
+                      team.workerPoolMembers.length === 0 && (
+                        <div className="agents-team-empty">
+                          No visible members yet.
+                        </div>
+                      )}
+                    {team.profileMembers.map((member) => (
+                      <button
+                        key={member.name}
+                        className={`agents-team-member ${
+                          activeProfile === member.name ? "active" : ""
+                        }`}
+                        onClick={() => handleSelect(member.name)}
+                      >
+                        <span>{member.name}</span>
+                        <span>{roleLabel(inferProfileRole(member))}</span>
+                      </button>
+                    ))}
+                    {team.workerPoolMembers.map((member) => (
+                      <div
+                        key={member.id}
+                        className="agents-team-member agents-team-member-static"
+                        title={member.path}
+                      >
+                        <span>{member.name}</span>
+                        <span>{roleLabel(member.role)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              ))}
+            </div>
+          )}
+          {directorTeams.unassignedProfiles.length > 0 && (
+            <div className="agents-unassigned">
+              <div className="agents-unassigned-title">
+                Profiles without a director
               </div>
-            ))}
-          </div>
+              <div className="agents-team-members">
+                {directorTeams.unassignedProfiles.map((profile) => (
+                  <button
+                    key={profile.name}
+                    className={`agents-team-member ${
+                      activeProfile === profile.name ? "active" : ""
+                    }`}
+                    onClick={() => handleSelect(profile.name)}
+                  >
+                    <span>{profile.name}</span>
+                    <span>{roleLabel(inferProfileRole(profile))}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="agents-panel">

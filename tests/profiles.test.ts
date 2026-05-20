@@ -74,7 +74,15 @@ describe("listProfiles", () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, "config.yaml"),
-      "models:\n  default: gpt-4o\n  provider: openai\n",
+      [
+        "name: config-only",
+        "description: Test profile",
+        "models:",
+        "  default: gpt-4o",
+        "  provider: openai",
+        "WORKER_POOL_PATH: /tmp/missing-pool",
+        "",
+      ].join("\n"),
     );
 
     const profiles = await listProfiles();
@@ -82,6 +90,48 @@ describe("listProfiles", () => {
     expect(found).toBeDefined();
     expect(found?.model).toBe("gpt-4o");
     expect(found?.provider).toBe("openai");
+    expect(found?.description).toBe("Test profile");
+    expect(found?.workerPoolPath).toBe("/tmp/missing-pool");
+  });
+
+  it("classifies director profiles and reads worker pool members from manager markdown", async () => {
+    const poolDir = join(TEST_HOME, "worker_pool");
+    mkdirSync(poolDir, { recursive: true });
+    writeFileSync(
+      join(poolDir, "intel-hub-manager.md"),
+      [
+        "# Intel Hub Manager",
+        "",
+        "## Worker Pool",
+        "",
+        "- **network-traffic-analyst** - traffic review",
+        "- **ai-engineer** - AI systems",
+        "",
+      ].join("\n"),
+    );
+
+    const dir = join(PROFILES_DIR, "intel-hub-director");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "config.yaml"),
+      [
+        "name: intel-hub-director",
+        "description: Director for Intel Hub",
+        "model:",
+        "  default: gemini-3.1-pro-preview",
+        "  provider: google-gemini-cli",
+        `WORKER_POOL_PATH: ${poolDir}`,
+        "",
+      ].join("\n"),
+    );
+
+    const profiles = await listProfiles();
+    const found = profiles.find((p) => p.name === "intel-hub-director");
+    expect(found?.role).toBe("director");
+    expect(found?.teamMembers.map((member) => member.name)).toEqual([
+      "network-traffic-analyst",
+      "ai-engineer",
+    ]);
   });
 
   it("ignores dotfiles like .DS_Store under the profiles directory", async () => {

@@ -1,5 +1,5 @@
 import { execFileSync } from "child_process";
-import { join } from "path";
+import { basename, dirname, join } from "path";
 import { homedir } from "os";
 import { promises as fs } from "fs";
 import { existsSync } from "fs";
@@ -23,17 +23,38 @@ export interface ProfileInfo {
   path: string;
   isDefault: boolean;
   isActive: boolean;
+  description: string;
   model: string;
   provider: string;
+  role: ProfileRole;
+  workerPoolPath: string;
+  teamMembers: TeamMemberInfo[];
   hasEnv: boolean;
   hasSoul: boolean;
   skillCount: number;
   gatewayRunning: boolean;
 }
 
+export type ProfileRole =
+  | "director"
+  | "worker"
+  | "assistant"
+  | "specialist"
+  | "general";
+
+export interface TeamMemberInfo {
+  id: string;
+  name: string;
+  role: ProfileRole;
+  source: "worker-pool";
+  path: string;
+}
+
 async function readProfileConfig(profilePath: string): Promise<{
   model: string;
   provider: string;
+  description: string;
+  workerPoolPath: string;
 }> {
   const configFile = join(profilePath, "config.yaml");
   try {
@@ -42,12 +63,135 @@ async function readProfileConfig(profilePath: string): Promise<{
     const providerMatch = content.match(
       /^\s*provider:\s*["']?([^"'\n#]+)["']?/m,
     );
+    const descriptionMatch = content.match(
+      /^\s*description:\s*["']?([^"'\n#]+)["']?/m,
+    );
+    const workerPoolMatch = content.match(
+      /^\s*WORKER_POOL_PATH:\s*["']?([^"'\n#]+)["']?/m,
+    );
     return {
       model: modelMatch ? modelMatch[1].trim() : "",
       provider: providerMatch ? providerMatch[1].trim() : "auto",
+      description: descriptionMatch ? descriptionMatch[1].trim() : "",
+      workerPoolPath: workerPoolMatch ? workerPoolMatch[1].trim() : "",
     };
   } catch {
-    return { model: "", provider: "" };
+    return { model: "", provider: "", description: "", workerPoolPath: "" };
+  }
+}
+
+function classifyProfileRole(name: string): ProfileRole {
+  const lower = name.toLowerCase();
+  if (lower === "default") return "general";
+  if (lower.includes("director") || lower.includes("manager")) {
+    return "director";
+  }
+  if (lower.includes("worker") || lower.includes("dev")) return "worker";
+  if (lower.includes("assistant")) return "assistant";
+  return "specialist";
+}
+
+function teamKeyForName(name: string): string {
+  let key = name
+    .toLowerCase()
+    .replace(/\.(md|markdown)$/i, "")
+    .replace(/[-_]+hub$/, "-hub")
+    .replace(/[^a-z0-9]+/g, "-");
+
+  while (
+    /(?:^|-)(director|manager|lead|owner|worker|dev|assistant|specialist|agent)$/.test(
+      key,
+    )
+  ) {
+    key = key.replace(
+      /(?:^|-)(director|manager|lead|owner|worker|dev|assistant|specialist|agent)$/,
+      "",
+    );
+  }
+
+  return key.replace(/^-+|-+$/g, "");
+}
+
+async function resolveWorkerPoolPath(path: string): Promise<string> {
+  if (!path) return "";
+  if (await fileExists(path)) return path;
+
+  const underscored = path.replace(/ /g, "_");
+  if (underscored !== path && (await fileExists(underscored))) {
+    return underscored;
+  }
+
+  const localUnderscored = join(
+    dirname(path),
+    basename(path).replace(/ /g, "_"),
+  );
+  if (localUnderscored !== path && (await fileExists(localUnderscored))) {
+    return localUnderscored;
+  }
+
+  return path;
+}
+
+function extractWorkerPoolNames(content: string): string[] {
+  const sectionMatch = content.match(
+    /##\s+Worker Pool\s*\n([\s\S]*?)(?:\n##\s+|\s*$)/i,
+  );
+  if (!sectionMatch) return [];
+
+  const names = new Set<string>();
+  for (const line of sectionMatch[1].split("\n")) {
+    const boldMatch = line.match(/^\s*-\s+\*\*([^*]+)\*\*/);
+    if (boldMatch) {
+      names.add(boldMatch[1].trim());
+      continue;
+    }
+
+    const plainMatch = line.match(/^\s*-\s+([^—-]+?)(?:\s+[—-]|$)/);
+    if (plainMatch) names.add(plainMatch[1].trim());
+  }
+
+  return [...names];
+}
+
+async function listTeamMembersFromWorkerPool(
+  workerPoolPath: string,
+  directorName: string,
+): Promise<TeamMemberInfo[]> {
+  const resolvedPath = await resolveWorkerPoolPath(workerPoolPath);
+  if (!resolvedPath || !(await fileExists(resolvedPath))) return [];
+
+  try {
+    const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
+    const markdownFiles = entries.filter(
+      (entry) =>
+        entry.isFile() &&
+        (entry.name.endsWith(".md") || entry.name.endsWith(".markdown")),
+    );
+
+    const directorKey = teamKeyForName(directorName);
+    const managerFile =
+      markdownFiles.find(
+        (entry) => teamKeyForName(entry.name) === directorKey,
+      ) ||
+      markdownFiles.find((entry) =>
+        teamKeyForName(entry.name).includes(directorKey),
+      );
+
+    if (!managerFile) return [];
+
+    const managerPath = join(resolvedPath, managerFile.name);
+    const managerContent = await fs.readFile(managerPath, "utf-8");
+    const workerNames = extractWorkerPoolNames(managerContent);
+
+    return workerNames.map((name) => ({
+      id: `${directorName}:${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+      name,
+      role: classifyProfileRole(name),
+      source: "worker-pool",
+      path: managerPath,
+    }));
+  } catch {
+    return [];
   }
 }
 
@@ -133,8 +277,12 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
     path: HERMES_HOME,
     isDefault: true,
     isActive: activeName === "default",
+    description: defaultConfig.description,
     model: defaultConfig.model,
     provider: defaultConfig.provider,
+    role: "general",
+    workerPoolPath: defaultConfig.workerPoolPath,
+    teamMembers: [],
     hasEnv: defaultHasEnv,
     hasSoul: defaultHasSoul,
     skillCount: defaultSkills,
@@ -166,14 +314,23 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
             countSkills(profilePath),
             isGatewayRunning(profilePath),
           ]);
+        const role = classifyProfileRole(name);
+        const teamMembers =
+          role === "director"
+            ? await listTeamMembersFromWorkerPool(config.workerPoolPath, name)
+            : [];
 
         return {
           name,
           path: profilePath,
           isDefault: false,
           isActive: activeName === name,
+          description: config.description,
           model: config.model,
           provider: config.provider,
+          role,
+          workerPoolPath: config.workerPoolPath,
+          teamMembers,
           hasEnv: hasEnvFile,
           hasSoul: hasSoul,
           skillCount,
