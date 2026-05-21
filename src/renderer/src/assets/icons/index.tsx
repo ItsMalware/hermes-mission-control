@@ -15,6 +15,7 @@ export {
   Layers,
   Monitor,
   Moon,
+  Pin,
   Plus,
   Puzzle,
   Search,

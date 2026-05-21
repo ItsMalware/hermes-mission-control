@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import Chat, { ChatMessage } from "../Chat/Chat";
 import Sessions from "../Sessions/Sessions";
 import Agents from "../Agents/Agents";
@@ -33,6 +33,7 @@ import {
   Kanban as KanbanIcon,
   Download,
   Plus,
+  Pin,
   X,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
@@ -76,6 +77,7 @@ interface ConversationState {
   title: string;
   sessionId: string | null;
   messages: ChatMessage[];
+  pinned: boolean;
 }
 
 function createConversation(
@@ -88,6 +90,7 @@ function createConversation(
     title: partial.title || "New chat",
     sessionId: partial.sessionId ?? null,
     messages: partial.messages || [],
+    pinned: partial.pinned ?? false,
   };
 }
 
@@ -200,6 +203,19 @@ function Layout({
     conversations.find((c) => c.id === activeConversationId) ||
     conversations[0];
   const currentSessionId = activeConversation?.sessionId ?? null;
+  const visibleConversations = useMemo(
+    () =>
+      conversations
+        .map((conversation, index) => ({ conversation, index }))
+        .sort((a, b) => {
+          if (a.conversation.pinned !== b.conversation.pinned) {
+            return a.conversation.pinned ? -1 : 1;
+          }
+          return a.index - b.index;
+        })
+        .map(({ conversation }) => conversation),
+    [conversations],
+  );
 
   const setActiveMessages = useCallback(
     (update: React.SetStateAction<ChatMessage[]>) => {
@@ -255,6 +271,7 @@ function Layout({
     (conversationId: string) => {
       setConversations((prev) => {
         const closing = prev.find((c) => c.id === conversationId);
+        if (closing?.pinned) return prev;
         if (closing) window.hermesAPI.abortChat(closing.id);
         const next = prev.filter((c) => c.id !== conversationId);
         if (next.length === 0) {
@@ -269,6 +286,19 @@ function Layout({
       });
     },
     [activeConversationId],
+  );
+
+  const handleTogglePinnedConversation = useCallback(
+    (conversationId: string) => {
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, pinned: !conversation.pinned }
+            : conversation,
+        ),
+      );
+    },
+    [],
   );
 
   // Listen for menu IPC events (Cmd+N, Cmd+K from app menu)
@@ -387,17 +417,35 @@ function Layout({
         )}
         <div style={paneStyle("chat")}>
           <div className="conversation-tabs">
-            {conversations.map((conversation) => (
+            {visibleConversations.map((conversation) => (
               <button
                 key={conversation.id}
                 className={`conversation-tab${
                   conversation.id === activeConversationId ? " active" : ""
-                }`}
+                }${conversation.pinned ? " pinned" : ""}`}
                 onClick={() => setActiveConversationId(conversation.id)}
-                title={conversation.title}
+                title={
+                  conversation.pinned
+                    ? `${conversation.title} (pinned)`
+                    : conversation.title
+                }
               >
+                <span
+                  className="conversation-tab-pin"
+                  role="button"
+                  aria-label={
+                    conversation.pinned ? "Unpin chat tab" : "Pin chat tab"
+                  }
+                  title={conversation.pinned ? "Unpin chat tab" : "Pin chat tab"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleTogglePinnedConversation(conversation.id);
+                  }}
+                >
+                  <Pin size={11} />
+                </span>
                 <span>{conversation.title}</span>
-                {conversations.length > 1 && (
+                {conversations.length > 1 && !conversation.pinned && (
                   <span
                     className="conversation-tab-close"
                     onClick={(event) => {

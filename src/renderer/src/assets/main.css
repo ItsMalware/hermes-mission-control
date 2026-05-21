@@ -1121,6 +1121,33 @@ body {
   border-color: var(--border-bright);
 }
 
+.conversation-tab.pinned {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+.conversation-tab-pin {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--text-muted);
+  opacity: 0.72;
+  flex: 0 0 auto;
+}
+
+.conversation-tab.pinned .conversation-tab-pin {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.conversation-tab-pin:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  opacity: 1;
+}
+
 .conversation-tab-add {
   width: 34px;
   justify-content: center;
