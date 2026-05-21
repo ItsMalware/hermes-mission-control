@@ -418,45 +418,51 @@ function Layout({
         <div style={paneStyle("chat")}>
           <div className="conversation-tabs">
             {visibleConversations.map((conversation) => (
-              <button
+              <div
                 key={conversation.id}
                 className={`conversation-tab${
                   conversation.id === activeConversationId ? " active" : ""
                 }${conversation.pinned ? " pinned" : ""}`}
-                onClick={() => setActiveConversationId(conversation.id)}
                 title={
                   conversation.pinned
                     ? `${conversation.title} (pinned)`
                     : conversation.title
                 }
               >
-                <span
+                <button
                   className="conversation-tab-pin"
-                  role="button"
                   aria-label={
                     conversation.pinned ? "Unpin chat tab" : "Pin chat tab"
                   }
                   title={conversation.pinned ? "Unpin chat tab" : "Pin chat tab"}
-                  onClick={(event) => {
-                    event.stopPropagation();
+                  type="button"
+                  onClick={() => {
                     handleTogglePinnedConversation(conversation.id);
                   }}
                 >
                   <Pin size={11} />
-                </span>
-                <span>{conversation.title}</span>
+                </button>
+                <button
+                  className="conversation-tab-label"
+                  type="button"
+                  onClick={() => setActiveConversationId(conversation.id)}
+                >
+                  {conversation.title}
+                </button>
                 {conversations.length > 1 && !conversation.pinned && (
-                  <span
+                  <button
                     className="conversation-tab-close"
-                    onClick={(event) => {
-                      event.stopPropagation();
+                    type="button"
+                    aria-label="Close chat tab"
+                    title="Close chat tab"
+                    onClick={() => {
                       handleCloseConversation(conversation.id);
                     }}
                   >
                     <X size={12} />
-                  </span>
+                  </button>
                 )}
-              </button>
+              </div>
             ))}
             <button
               className="conversation-tab conversation-tab-add"
