@@ -431,6 +431,7 @@ function Layout({
               >
                 <button
                   className="conversation-tab-pin"
+                  aria-pressed={conversation.pinned}
                   aria-label={
                     conversation.pinned ? "Unpin chat tab" : "Pin chat tab"
                   }

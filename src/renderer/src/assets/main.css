@@ -1090,10 +1090,14 @@ body {
   padding: 10px 16px 0;
   overflow-x: auto;
   flex-shrink: 0;
+  position: relative;
+  z-index: 1001;
+  -webkit-app-region: no-drag;
 }
 
 .conversation-tab {
   height: 30px;
+  min-width: 0;
   max-width: 210px;
   display: inline-flex;
   align-items: center;
@@ -1109,6 +1113,7 @@ body {
 }
 
 .conversation-tab-label {
+  flex: 1 1 auto;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -1136,6 +1141,7 @@ body {
 
 .conversation-tab.pinned {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent-subtle) 45%, var(--panel-bg));
 }
 
 .conversation-tab-pin {
@@ -1147,14 +1153,14 @@ body {
   border-radius: 999px;
   border: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   cursor: pointer;
-  opacity: 0.72;
+  opacity: 0.9;
   flex: 0 0 auto;
 }
 
 .conversation-tab.pinned .conversation-tab-pin {
-  color: var(--accent);
+  color: var(--accent-text);
   opacity: 1;
 }
 
