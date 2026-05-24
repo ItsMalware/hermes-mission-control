@@ -3,6 +3,7 @@ export default {
   sections: {
     hermesAgent: "Hermes Agent",
     appearance: "Appearance",
+    privacy: "Privacy",
     fallbackModel: "Fallback Model",
     credentialPool: "Credential Pool",
   },
@@ -21,6 +22,20 @@ export default {
     chinese: "中文",
     portuguese: "Portuguese",
     hint: "Choose the interface language",
+  },
+  analytics: {
+    label: "Send anonymous usage analytics",
+    hint: "Helps improve Hermes Desktop by sending anonymous, aggregated usage data to the project's PostHog instance. You can turn this off at any time.",
+    disclosure: {
+      uuid: "A random per-install identifier stored only on this device (no name, email, or account info).",
+      platform: "Your operating system, Electron version, and Node.js version.",
+      navigation:
+        "Which screens you visit inside the app (e.g. Chat, Sessions, Settings). No chat content, prompts, model responses, or file contents are collected.",
+      endpoint:
+        "Data is sent to us.i.posthog.com (PostHog US cloud). Session recordings and pageview auto-capture are disabled.",
+      notCollected:
+        "Never collected: chat messages, file paths, API keys, model configuration, account credentials.",
+    },
   },
   notDetected: "Not detected",
   updatedSuccessfully: "Updated successfully!",
@@ -50,9 +65,6 @@ export default {
   discoveryError:
     "Couldn't reach the provider's model list — you can still type a model name",
   customBaseUrlHint: "OpenAI-compatible API endpoint",
-  noFallback: "No fallback",
-  fallbackHint:
-    "Tried automatically if the primary model/provider cannot authenticate or fails.",
   poolHint:
     "Add multiple API Keys for the same provider for automatic rotation and load balancing. Hermes will cycle through them.",
   add: "Add",

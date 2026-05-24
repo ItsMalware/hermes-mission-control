@@ -170,6 +170,7 @@ import soulPtPt from "./locales/pt-PT/soul";
 import memoryPtPt from "./locales/pt-PT/memory";
 import installPtPt from "./locales/pt-PT/install";
 import constantsPtPt from "./locales/pt-PT/constants";
+import kanbanPtPt from "./locales/pt-PT/kanban";
 
 export const resources = {
   en: {
@@ -342,6 +343,7 @@ export const resources = {
       memory: memoryPtPt,
       install: installPtPt,
       constants: constantsPtPt,
+      kanban: kanbanPtPt,
     },
   },
   ja: {

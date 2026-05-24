@@ -100,15 +100,6 @@ interface KanbanTaskDetail {
   latest_summary: string | null;
 }
 
-interface SecretSummary {
-  key: string;
-  profile: string;
-  source: string;
-  category: string;
-  maskedValue: string;
-  length: number;
-}
-
 interface KanbanCreateTaskInput {
   title: string;
   body?: string;
@@ -126,6 +117,14 @@ interface HermesAPI {
   checkInstall: () => Promise<InstallStatus>;
   verifyInstall: () => Promise<boolean>;
   startInstall: () => Promise<{ success: boolean; error?: string }>;
+  inspectInstallTarget: () => Promise<{
+    hermesHome: string;
+    repoPath: string;
+    state: "fresh" | "update" | "replace";
+  }>;
+  validateHermesHome: (dir: string) => Promise<boolean>;
+  adoptHermesHome: (dir: string) => Promise<boolean>;
+  quitApp: () => Promise<void>;
   onInstallProgress: (
     callback: (progress: InstallProgress) => void,
   ) => () => void;
@@ -140,12 +139,31 @@ interface HermesAPI {
   checkOpenClaw: () => Promise<{ found: boolean; path: string | null }>;
   runClawMigrate: () => Promise<{ success: boolean; error?: string }>;
 
+  // OAuth provider sign-in
+  oauthLogin: (
+    provider: string,
+    profile?: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  cancelOAuthLogin: () => Promise<boolean>;
+  onOAuthLoginProgress: (callback: (chunk: string) => void) => () => void;
+
   getLocale: () => Promise<AppLocale>;
   setLocale: (locale: AppLocale) => Promise<AppLocale>;
 
   // Configuration (profile-aware)
   getEnv: (profile?: string) => Promise<Record<string, string>>;
-  listProfileSecrets: (profile?: string) => Promise<SecretSummary[]>;
+  listProfileSecrets: (
+    profile?: string,
+  ) => Promise<
+    Array<{
+      key: string;
+      profile: string;
+      source: string;
+      category: string;
+      maskedValue: string;
+      length: number;
+    }>
+  >;
   getEnvValue: (key: string, profile?: string) => Promise<string>;
   setEnv: (key: string, value: string, profile?: string) => Promise<boolean>;
   getConfig: (key: string, profile?: string) => Promise<string | null>;
@@ -218,8 +236,24 @@ interface HermesAPI {
     history?: Array<{ role: string; content: string }>,
     requestId?: string,
     attachments?: Attachment[],
+    contextFolder?: string,
   ) => Promise<{ response: string; sessionId?: string }>;
   abortChat: (requestId?: string) => Promise<void>;
+  copyToClipboard: (text: string) => Promise<void>;
+  onContextMenuCopyChat: (
+    callback: (format: "text" | "markdown") => void,
+  ) => () => void;
+  onContextMenuSelectBubble: (
+    callback: (point: { x: number; y: number }) => void,
+  ) => () => void;
+  readMediaFile: (filePath: string) => Promise<string | null>;
+  saveMediaFile: (src: string, name: string) => Promise<boolean>;
+  mediaFileExists: (filePath: string) => Promise<boolean>;
+  showMediaMenu: (
+    src: string,
+    name: string,
+    labels: { open: string; saveAs: string },
+  ) => void;
   getPathForFile: (file: File) => string;
   stageAttachment: (
     sessionId: string,
@@ -268,12 +302,6 @@ interface HermesAPI {
   stopGateway: () => Promise<boolean>;
   gatewayStatus: () => Promise<boolean>;
 
-  // Hermes dashboard / dashboard plugins
-  getDashboardUrl: (path?: string) => Promise<string>;
-  startDashboard: () => Promise<boolean>;
-  stopDashboard: () => Promise<boolean>;
-  dashboardStatus: () => Promise<boolean>;
-
   // Platform toggles
   getPlatformEnabled: (profile?: string) => Promise<Record<string, boolean>>;
   setPlatformEnabled: (
@@ -286,7 +314,6 @@ interface HermesAPI {
   listSessions: (
     limit?: number,
     offset?: number,
-    profile?: string,
   ) => Promise<
     Array<{
       id: string;
@@ -303,13 +330,47 @@ interface HermesAPI {
     sessionId: string,
     profile?: string,
   ) => Promise<
-    Array<{
-      id: number;
-      role: "user" | "assistant";
-      content: string;
-      timestamp: number;
-      attachments?: Attachment[];
-    }>
+    Array<
+      | {
+          kind: "user";
+          id: number;
+          content: string;
+          timestamp: number;
+          attachments?: Attachment[];
+        }
+      | {
+          kind: "assistant";
+          id: number;
+          content: string;
+          timestamp: number;
+          attachments?: Attachment[];
+        }
+      | {
+          kind: "reasoning";
+          id: number;
+          assistantId: number;
+          text: string;
+          timestamp: number;
+        }
+      | {
+          kind: "tool_call";
+          id: number;
+          assistantId: number;
+          callId: string;
+          name: string;
+          args: string;
+          timestamp: number;
+        }
+      | {
+          kind: "tool_result";
+          id: number;
+          callId: string;
+          name: string;
+          content: string;
+          timestamp: number;
+          attachments?: Attachment[];
+        }
+    >
   >;
 
   // Profiles
@@ -425,7 +486,9 @@ interface HermesAPI {
       model: string;
     }>
   >;
-  syncSessionCache: (profile?: string) => Promise<
+  syncSessionCache: (
+    profile?: string,
+  ) => Promise<
     Array<{
       id: string;
       title: string;
@@ -458,22 +521,6 @@ interface HermesAPI {
       snippet: string;
     }>
   >;
-  getSessionTodoState: (profile?: string) => Promise<{
-    sessionId: string;
-    updatedAt: number;
-    todos: Array<{
-      id: string;
-      content: string;
-      status: string;
-    }>;
-    summary: {
-      total: number;
-      pending: number;
-      in_progress: number;
-      completed: number;
-      cancelled: number;
-    };
-  } | null>;
 
   // Credential Pool (profile-aware)
   getCredentialPool: (
@@ -618,7 +665,12 @@ interface HermesAPI {
   kanbanListBoards: (
     includeArchived?: boolean,
     profile?: string,
-  ) => Promise<{ success: boolean; data?: KanbanBoard[]; error?: string }>;
+  ) => Promise<{
+    success: boolean;
+    data?: KanbanBoard[];
+    error?: string;
+    unsupportedMode?: boolean;
+  }>;
   kanbanCurrentBoard: (
     profile?: string,
   ) => Promise<{ success: boolean; data?: string; error?: string }>;
@@ -694,6 +746,11 @@ interface HermesAPI {
     dryRun?: boolean,
     profile?: string,
   ) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  kanbanListClaw3dHqTasks: () => Promise<{
+    success: boolean;
+    data?: KanbanTask[];
+    error?: string;
+  }>;
 
   // Shell
   openExternal: (url: string) => Promise<void>;

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback, memo } from "react";
 import { Plus, Search, X, ChatBubble } from "../../assets/icons";
 import { useI18n } from "../../components/useI18n";
 
@@ -149,6 +149,11 @@ const SessionCard = memo(function SessionCard({
   );
 });
 
+// How often the Sessions tab re-syncs from state.db while it is open, so
+// sessions created in the background (cron jobs, gateway platforms, another
+// device) surface without the user navigating away and back. (refs #322)
+export const SESSIONS_REFRESH_MS = 30_000;
+
 function Sessions({
   onResumeSession,
   onNewChat,
@@ -162,34 +167,34 @@ function Sessions({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(50);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const loadSeqRef = useRef(0);
+
+  // Quiet re-sync from state.db — refreshes the list WITHOUT flipping the
+  // loading state, so it can run on a timer or on focus with no spinner flash.
+  const refreshSessions = useCallback(async (): Promise<void> => {
+    const synced = await window.hermesAPI.syncSessionCache(profile);
+    setSessions(synced.slice(0, 50));
+  }, [profile]);
 
   const loadSessions = useCallback(async (): Promise<void> => {
-    const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
       const cached = await window.hermesAPI.listCachedSessions(50, 0, profile);
-      if (seq !== loadSeqRef.current) return;
-      setSessions(cached);
-      setLoading(false);
-    } catch {
-      if (seq !== loadSeqRef.current) return;
-      setLoading(false);
-    }
+      if (cached.length > 0) {
+        setSessions(cached);
+      }
 
-    try {
       const synced = await window.hermesAPI.syncSessionCache(profile);
-      if (seq !== loadSeqRef.current) return;
-      setSessions(synced);
-    } catch {
-      // Keep the cached/empty state visible instead of trapping the view in a spinner.
+      setSessions(synced.slice(0, 50));
+    } catch (error) {
+      console.error("Failed to load sessions", error);
     } finally {
-      if (seq === loadSeqRef.current) setLoading(false);
+      setLoading(false);
     }
-  }, [profile]);
+    await refreshSessions();
+    setLoading(false);
+  }, [refreshSessions]);
 
   useEffect(() => {
     loadSessions();
@@ -205,6 +210,26 @@ function Sessions({
     }
   }, [visible, loadSessions]);
 
+  // While the Sessions tab is actually showing, periodically re-sync so
+  // sessions created in the background — cron jobs, gateway platforms, or
+  // another device writing the same state.db — surface even if the user
+  // just leaves this tab open. Also refresh when the window regains focus.
+  // Gated on `visible`: no timer and no DB reads while another screen shows.
+  useEffect(() => {
+    if (!visible) return;
+    const timer = setInterval(() => {
+      void refreshSessions();
+    }, SESSIONS_REFRESH_MS);
+    const onFocus = (): void => {
+      void refreshSessions();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [visible, refreshSessions]);
+
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (!searchQuery.trim()) {
@@ -216,7 +241,7 @@ function Sessions({
     searchTimer.current = setTimeout(async () => {
       const results = await window.hermesAPI.searchSessions(
         searchQuery,
-        20,
+        undefined,
         profile,
       );
       setSearchResults(results);
@@ -228,12 +253,7 @@ function Sessions({
   }, [searchQuery, profile]);
 
   const isShowingSearch = searchQuery.trim().length > 0;
-  const visibleSessions = useMemo(
-    () => sessions.slice(0, visibleCount),
-    [sessions, visibleCount],
-  );
-  const grouped = groupSessions(visibleSessions);
-  const hasMoreSessions = visibleCount < sessions.length;
+  const grouped = groupSessions(sessions);
 
   return (
     <div className="sessions-container">
@@ -354,14 +374,6 @@ function Sessions({
               ))}
             </div>
           ))}
-          {hasMoreSessions && (
-            <button
-              className="btn btn-secondary sessions-load-more"
-              onClick={() => setVisibleCount((count) => count + 50)}
-            >
-              {t("sessions.loadMore")}
-            </button>
-          )}
         </div>
       )}
     </div>

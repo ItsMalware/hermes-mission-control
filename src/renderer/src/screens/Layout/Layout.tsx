@@ -9,10 +9,10 @@ import Memory from "../Memory/Memory";
 import Tools from "../Tools/Tools";
 import Gateway from "../Gateway/Gateway";
 import Office from "../Office/Office";
-import Kanban from "../Kanban/Kanban";
 import Models from "../Models/Models";
 import Providers from "../Providers/Providers";
 import Schedules from "../Schedules/Schedules";
+import Kanban from "../Kanban/Kanban";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
 import hermeslogo from "../../assets/hermes.png";
@@ -44,7 +44,6 @@ type View =
   | "sessions"
   | "agents"
   | "office"
-  | "kanban"
   | "models"
   | "providers"
   | "skills"
@@ -52,6 +51,7 @@ type View =
   | "memory"
   | "tools"
   | "schedules"
+  | "kanban"
   | "gateway"
   | "settings";
 
@@ -71,6 +71,12 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
   { view: "settings", icon: SettingsIcon, labelKey: "navigation.settings" },
 ];
+
+interface LayoutProps {
+  verifyWarning?: boolean;
+  onReinstall?: () => void;
+  onDismissVerifyWarning?: () => void;
+}
 
 interface ConversationState {
   id: string;
@@ -95,15 +101,14 @@ function createConversation(
 }
 
 function titleFromMessages(messages: ChatMessage[]): string {
-  const firstUser = messages.find((m) => m.role === "user")?.content.trim();
+  const firstUser = messages
+    .find(
+      (m): m is ChatMessage & { content: string } =>
+        m.role === "user" && "content" in m && typeof m.content === "string",
+    )
+    ?.content.trim();
   if (!firstUser) return "New chat";
   return firstUser.replace(/\s+/g, " ").slice(0, 42);
-}
-
-interface LayoutProps {
-  verifyWarning?: boolean;
-  onReinstall?: () => void;
-  onDismissVerifyWarning?: () => void;
 }
 
 function Layout({
@@ -272,7 +277,7 @@ function Layout({
       setConversations((prev) => {
         const closing = prev.find((c) => c.id === conversationId);
         if (closing?.pinned) return prev;
-        if (closing) window.hermesAPI.abortChat(closing.id);
+        if (closing) void window.hermesAPI.abortChat(closing.id);
         const next = prev.filter((c) => c.id !== conversationId);
         if (next.length === 0) {
           const replacement = createConversation();
@@ -324,18 +329,64 @@ function Layout({
 
   const handleResumeSession = useCallback(
     async (sessionId: string) => {
-      const dbMessages = await window.hermesAPI.getSessionMessages(
+      const items = await window.hermesAPI.getSessionMessages(
         sessionId,
         activeProfile,
       );
-      const chatMessages: ChatMessage[] = dbMessages.map((m) => ({
-        id: `db-${m.id}`,
-        role: m.role === "user" ? "user" : "agent",
-        content: m.content,
-        ...(m.attachments && m.attachments.length > 0
-          ? { attachments: m.attachments }
-          : {}),
-      }));
+      const chatMessages: ChatMessage[] = items
+        .map((it): ChatMessage | null => {
+          switch (it.kind) {
+            case "user":
+              return {
+                id: `db-${it.id}`,
+                role: "user",
+                content: it.content,
+                ...(it.attachments && it.attachments.length > 0
+                  ? { attachments: it.attachments }
+                  : {}),
+              };
+            case "assistant":
+              return {
+                id: `db-${it.id}`,
+                role: "agent",
+                content: it.content,
+                ...(it.attachments && it.attachments.length > 0
+                  ? { attachments: it.attachments }
+                  : {}),
+              };
+            case "reasoning":
+              return {
+                id: `db-r-${it.id}`,
+                kind: "reasoning",
+                role: "agent",
+                text: it.text,
+              };
+            case "tool_call":
+              return {
+                id: `db-tc-${it.id}-${it.callId || "x"}`,
+                kind: "tool_call",
+                role: "agent",
+                callId: it.callId,
+                name: it.name,
+                args: it.args,
+              };
+            case "tool_result":
+              return {
+                id: `db-tr-${it.id}`,
+                kind: "tool_result",
+                role: "agent",
+                callId: it.callId,
+                name: it.name,
+                content: it.content,
+                ...(it.attachments && it.attachments.length > 0
+                  ? { attachments: it.attachments }
+                  : {}),
+              };
+            default:
+              return null;
+          }
+        })
+        .filter((m): m is ChatMessage => m !== null);
       const existing = conversations.find((c) => c.sessionId === sessionId);
       if (existing) {
         setActiveConversationId(existing.id);
@@ -524,16 +575,6 @@ function Layout({
           </div>
         )}
 
-        {visitedViews.has("kanban") && (
-          <div style={paneStyle("kanban")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Kanban" />
-            ) : (
-              <Kanban visible={view === "kanban"} profile={activeProfile} />
-            )}
-          </div>
-        )}
-
         {visitedViews.has("models") && (
           <div style={paneStyle("models")}>
             <Models visible={view === "models"} />
@@ -596,6 +637,16 @@ function Layout({
         {visitedViews.has("schedules") && (
           <div style={paneStyle("schedules")}>
             <Schedules profile={activeProfile} />
+          </div>
+        )}
+
+        {visitedViews.has("kanban") && (
+          <div style={paneStyle("kanban")}>
+            {remoteMode ? (
+              <RemoteNotice feature="Kanban" />
+            ) : (
+              <Kanban profile={activeProfile} visible={view === "kanban"} />
+            )}
           </div>
         )}
 

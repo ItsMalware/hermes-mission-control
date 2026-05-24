@@ -3,8 +3,20 @@ export default {
   sections: {
     hermesAgent: "Hermes Agent",
     appearance: "Apariencia",
+    privacy: "Privacidad",
     fallbackModel: "Modelo de respaldo",
     credentialPool: "Grupo de credenciales",
+  },
+  analytics: {
+    label: "Enviar analíticas de uso anónimas",
+    hint: "Ayuda a mejorar Hermes enviando datos de uso anónimos y agregados a la instancia PostHog del proyecto (alojada en la UE). Puedes desactivarlo en cualquier momento.",
+    disclosure: {
+      uuid: "Un identificador aleatorio por instalación almacenado únicamente en este dispositivo (sin nombre, correo electrónico ni datos de cuenta).",
+      platform: "Tu sistema operativo, versión de Electron y versión de Node.js.",
+      navigation: "Qué pantallas visitas dentro de la aplicación (p. ej. Chat, Sesiones, Configuración). No se recopila contenido de chats, prompts, respuestas del modelo ni contenido de archivos.",
+      endpoint: "Los datos se envían a eu.i.posthog.com (nube europea de PostHog). Las grabaciones de sesión y la captura automática de páginas vistas están desactivadas.",
+      notCollected: "Nunca se recopila: mensajes de chat, rutas de archivos, claves de API, configuración del modelo, credenciales de cuenta.",
+    },
   },
   theme: {
     label: "Tema",
@@ -45,15 +57,13 @@ export default {
     "Nombre del modelo predeterminado (déjalo en blanco para usar el valor predeterminado del proveedor)",
   refreshModels: "Actualizar lista de modelos",
   discoveringModels: "Cargando modelos disponibles…",
-  discoveredCount: "{{count}} modelos disponibles — empieza a escribir para filtrar",
+  discoveredCount:
+    "{{count}} modelos disponibles — empieza a escribir para filtrar",
   discoveryNoKey:
     "Define la API key de este proveedor en .env para cargar la lista de modelos disponibles",
   discoveryError:
     "No se pudo acceder a la lista de modelos del proveedor — aún puedes escribir un nombre de modelo",
   customBaseUrlHint: "Endpoint de API compatible con OpenAI",
-  noFallback: "Sin respaldo",
-  fallbackHint:
-    "Se intenta automáticamente si el modelo o proveedor principal falla o no puede autenticarse.",
   poolHint:
     "Agrega varias API keys para el mismo proveedor para la rotación automática y el equilibrio de carga. Hermes alternará entre ellas.",
   add: "Agregar",

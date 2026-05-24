@@ -30,6 +30,47 @@ export interface SessionMessage {
   attachments?: Attachment[];
 }
 
+export type HistoryItem =
+  | {
+      kind: "user";
+      id: number;
+      content: string;
+      timestamp: number;
+      attachments?: Attachment[];
+    }
+  | {
+      kind: "assistant";
+      id: number;
+      content: string;
+      timestamp: number;
+      attachments?: Attachment[];
+    }
+  | {
+      kind: "reasoning";
+      id: number;
+      assistantId: number;
+      text: string;
+      timestamp: number;
+    }
+  | {
+      kind: "tool_call";
+      id: number;
+      assistantId: number;
+      callId: string;
+      name: string;
+      args: string;
+      timestamp: number;
+    }
+  | {
+      kind: "tool_result";
+      id: number;
+      callId: string;
+      name: string;
+      content: string;
+      timestamp: number;
+      attachments?: Attachment[];
+    };
+
 interface DecodedContent {
   text: string;
   attachments: Attachment[];
@@ -256,42 +297,181 @@ export function searchSessions(
   }
 }
 
+export function pickReasoning(row: {
+  reasoning: string | null;
+  reasoning_content: string | null;
+  reasoning_details: string | null;
+}): string {
+  const direct = (row.reasoning || "").trim();
+  if (direct) return direct;
+  const legacy = (row.reasoning_content || "").trim();
+  if (legacy) return legacy;
+  const details = (row.reasoning_details || "").trim();
+  if (!details) return "";
+  try {
+    const parsed = JSON.parse(details);
+    if (typeof parsed === "string") return parsed;
+    if (Array.isArray(parsed)) {
+      const texts: string[] = [];
+      for (const entry of parsed) {
+        if (!entry || typeof entry !== "object") continue;
+        const e = entry as Record<string, unknown>;
+        if (typeof e.text === "string" && e.text) texts.push(e.text);
+        else if (typeof e.thinking === "string" && e.thinking)
+          texts.push(e.thinking);
+      }
+      if (texts.length) return texts.join("\n\n");
+    }
+  } catch {
+    // fall through
+  }
+  return "";
+}
+
+export function parseToolCalls(
+  raw: string | null,
+): Array<{ callId: string; name: string; args: string }> {
+  if (!raw || !raw.trim()) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const out: Array<{ callId: string; name: string; args: string }> = [];
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== "object") continue;
+    const e = entry as Record<string, unknown>;
+    const fn = (e.function || {}) as Record<string, unknown>;
+    const name = typeof fn.name === "string" ? fn.name : "";
+    if (!name) continue;
+    const callId =
+      (typeof e.call_id === "string" && e.call_id) ||
+      (typeof e.id === "string" && e.id) ||
+      "";
+    const rawArgs = typeof fn.arguments === "string" ? fn.arguments : "";
+    let args = rawArgs;
+    try {
+      args = JSON.stringify(JSON.parse(rawArgs), null, 2);
+    } catch {
+      // arguments was not JSON; leave it as-is.
+    }
+    out.push({ callId, name, args });
+  }
+  return out;
+}
+
+export interface RawMessageRow {
+  id: number;
+  role: string;
+  content: string | null;
+  timestamp: number;
+  tool_call_id: string | null;
+  tool_calls: string | null;
+  tool_name: string | null;
+  reasoning: string | null;
+  reasoning_content: string | null;
+  reasoning_details: string | null;
+}
+
+export function expandRowsToHistory(rows: RawMessageRow[]): HistoryItem[] {
+  const items: HistoryItem[] = [];
+  for (const r of rows) {
+    const decoded = decodeContent(r.content || "", r.id);
+
+    if (r.role === "user") {
+      if (!decoded.text && decoded.attachments.length === 0) continue;
+      items.push({
+        kind: "user",
+        id: r.id,
+        content: decoded.text,
+        timestamp: r.timestamp,
+        ...(decoded.attachments.length > 0
+          ? { attachments: decoded.attachments }
+          : {}),
+      });
+      continue;
+    }
+
+    if (r.role === "assistant") {
+      const reasoningText = pickReasoning(r);
+      if (reasoningText) {
+        items.push({
+          kind: "reasoning",
+          id: r.id,
+          assistantId: r.id,
+          text: reasoningText,
+          timestamp: r.timestamp,
+        });
+      }
+
+      if (decoded.text || decoded.attachments.length > 0) {
+        items.push({
+          kind: "assistant",
+          id: r.id,
+          content: decoded.text,
+          timestamp: r.timestamp,
+          ...(decoded.attachments.length > 0
+            ? { attachments: decoded.attachments }
+            : {}),
+        });
+      }
+
+      for (const tc of parseToolCalls(r.tool_calls)) {
+        items.push({
+          kind: "tool_call",
+          id: r.id,
+          assistantId: r.id,
+          callId: tc.callId,
+          name: tc.name,
+          args: tc.args,
+          timestamp: r.timestamp,
+        });
+      }
+      continue;
+    }
+
+    if (r.role === "tool") {
+      const name = r.tool_name || "tool";
+      items.push({
+        kind: "tool_result",
+        id: r.id,
+        callId: r.tool_call_id || "",
+        name,
+        content: decoded.text,
+        timestamp: r.timestamp,
+        ...(decoded.attachments.length > 0
+          ? { attachments: decoded.attachments }
+          : {}),
+      });
+    }
+  }
+  return items;
+}
+
 export function getSessionMessages(
   sessionId: string,
   profile?: string,
-): SessionMessage[] {
+): HistoryItem[] {
   const db = getDb(profile);
   if (!db) return getFileSessionMessages(sessionId, profile);
 
   try {
     const rows = db
       .prepare(
-        `SELECT id, role, content, timestamp
+        `SELECT id, role, content, timestamp,
+                tool_call_id, tool_calls, tool_name,
+                reasoning, reasoning_content, reasoning_details
          FROM messages
-         WHERE session_id = ? AND role IN ('user', 'assistant') AND content IS NOT NULL
+         WHERE session_id = ? AND role IN ('user', 'assistant', 'tool')
          ORDER BY timestamp, id`,
       )
-      .all(sessionId) as Array<{
-      id: number;
-      role: string;
-      content: string;
-      timestamp: number;
-    }>;
+      .all(sessionId) as RawMessageRow[];
 
-    const messages = rows.map((r) => {
-      const decoded = decodeContent(r.content, r.id);
-      return {
-        id: r.id,
-        role: r.role as "user" | "assistant",
-        content: decoded.text,
-        timestamp: r.timestamp,
-        ...(decoded.attachments.length > 0
-          ? { attachments: decoded.attachments }
-          : {}),
-      };
-    });
-    return messages.length > 0
-      ? messages
+    const items = expandRowsToHistory(rows);
+    return items.length > 0
+      ? items
       : getFileSessionMessages(sessionId, profile);
   } finally {
     db.close();
@@ -301,7 +481,7 @@ export function getSessionMessages(
 function getFileSessionMessages(
   sessionId: string,
   profile?: string,
-): SessionMessage[] {
+): HistoryItem[] {
   const SESSIONS_DIR = sessionsDir(profile);
   const file = join(SESSIONS_DIR, `session_${sessionId}.json`);
   if (!existsSync(file)) return [];
@@ -312,21 +492,22 @@ function getFileSessionMessages(
     const baseTimestamp = Number.isFinite(startedAt) ? startedAt : 0;
     const rows = Array.isArray(payload.messages) ? payload.messages : [];
     return rows
-      .map((m, index) => ({
-        id: index + 1,
-        role: m?.role,
-        content: typeof m?.content === "string" ? m.content : "",
-        timestamp: baseTimestamp + index,
-      }))
-      .filter(
-        (m): m is SessionMessage =>
-          (m.role === "user" || m.role === "assistant") && m.content.length > 0,
-      );
+      .map((m, index): HistoryItem | null => {
+        if (m?.role !== "user" && m?.role !== "assistant") return null;
+        const content = typeof m?.content === "string" ? m.content : "";
+        if (!content) return null;
+        return {
+          kind: m.role === "user" ? "user" : "assistant",
+          id: index + 1,
+          content,
+          timestamp: baseTimestamp + index,
+        };
+      })
+      .filter((m): m is HistoryItem => m !== null);
   } catch {
     return [];
   }
 }
-
 export function deleteSession(sessionId: string): void {
   const db = getDb(undefined, false);
   if (!db) return;
