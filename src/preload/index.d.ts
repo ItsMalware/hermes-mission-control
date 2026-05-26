@@ -133,6 +133,110 @@ interface KanbanCreateTaskInput {
   maxRetries?: number;
 }
 
+type MissionControlStatusState =
+  | "LIVE"
+  | "BUSY"
+  | "DEGRADED"
+  | "OFFLINE"
+  | "UNKNOWN";
+
+interface MissionControlSubsystem {
+  id: string;
+  label: string;
+  state: MissionControlStatusState;
+  detail: string;
+  count?: number;
+  updatedAt: number;
+}
+
+interface MissionControlStatus {
+  generatedAt: number;
+  app: { name: string; version: string; isLab: boolean };
+  paths: {
+    hermesHome: string;
+    hermesRuntime: string;
+    hermesConfig: string;
+    profiles: string;
+    projectRoom: string;
+  };
+  subsystems: MissionControlSubsystem[];
+  profiles: Array<{
+    name: string;
+    role: string;
+    state: MissionControlStatusState;
+    provider: string;
+    model: string;
+    hasEnv: boolean;
+    hasSoul: boolean;
+    skillCount: number;
+    gatewayRunning: boolean;
+  }>;
+  teams: Array<{
+    key: string;
+    label: string;
+    directors: string[];
+    members: number;
+    goal: string;
+    state: MissionControlStatusState;
+  }>;
+  secrets: {
+    total: number;
+    present: number;
+    missing: number;
+    duplicate: number;
+    items: Array<{
+      key: string;
+      category: string;
+      status: "present" | "missing" | "duplicate";
+      profiles: string[];
+      sources: string[];
+    }>;
+  };
+  sessions: {
+    totalCached: number;
+    activeEstimate: number;
+    latest: Array<{
+      id: string;
+      title: string;
+      messageCount: number;
+      model: string;
+      startedAt: number;
+    }>;
+  };
+  kanban: {
+    boardCount: number;
+    currentBoard: string | null;
+    counts: Record<string, number>;
+    topItems: Array<{
+      id: string;
+      title: string;
+      status: string;
+      priority: number;
+      assignee: string | null;
+    }>;
+  };
+  projectRoom: {
+    pointer: string;
+    target: string | null;
+    exists: boolean;
+    state: MissionControlStatusState;
+  };
+  connection: {
+    mode: "local" | "remote" | "ssh";
+    remoteUrl: string;
+    hasApiKey: boolean;
+    apiKeyLength: number;
+    ssh: {
+      host: string;
+      port: number;
+      username: string;
+      keyPath: string;
+      remotePort: number;
+      localPort: number;
+    };
+  };
+}
+
 interface HermesAPI {
   // Installation
   checkInstall: () => Promise<InstallStatus>;
@@ -819,6 +923,9 @@ interface HermesAPI {
   ) => Promise<
     Array<{ name: string; type: string; enabled: boolean; detail: string }>
   >;
+
+  // Mission Control
+  missionControlGetStatus: () => Promise<MissionControlStatus>;
 
   // Log viewer
   readLogs: (

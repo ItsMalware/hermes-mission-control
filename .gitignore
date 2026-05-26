@@ -6,6 +6,7 @@ node_modules/
 
 # Build output
 dist/
+dist-lab/
 out/
 
 # TypeScript incremental build info

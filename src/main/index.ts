@@ -116,6 +116,7 @@ import {
   updateSessionTitle,
 } from "./session-cache";
 import { listModels, addModel, removeModel, updateModel } from "./models";
+import { getMissionControlStatus } from "./mission-control";
 import {
   listProfiles,
   createProfile,
@@ -1346,6 +1347,9 @@ function setupIPC(): void {
     if (conn.mode === "ssh" && conn.ssh) return sshListModels(conn.ssh);
     return listModels();
   });
+  ipcMain.handle("mission-control-get-status", () =>
+    getMissionControlStatus(),
+  );
   ipcMain.handle(
     "add-model",
     (

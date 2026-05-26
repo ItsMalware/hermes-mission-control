@@ -1097,6 +1097,10 @@ const hermesAPI = {
     Array<{ name: string; type: string; enabled: boolean; detail: string }>
   > => ipcRenderer.invoke("list-mcp-servers", profile),
 
+  // Mission Control
+  missionControlGetStatus: () =>
+    ipcRenderer.invoke("mission-control-get-status"),
+
   // Log viewer
   readLogs: (
     logFile?: string,

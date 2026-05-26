@@ -57,6 +57,7 @@ async function readProfileConfig(profilePath: string): Promise<{
   provider: string;
   description: string;
   workerPoolPath: string;
+  role: string;
 }> {
   const configFile = join(profilePath, "config.yaml");
   try {
@@ -71,14 +72,18 @@ async function readProfileConfig(profilePath: string): Promise<{
     const workerPoolMatch = content.match(
       /^\s*WORKER_POOL_PATH:\s*["']?([^"'\n#]+)["']?/m,
     );
+    const roleMatch = content.match(
+      /^role:\s*["']?([^"'\n#]+)["']?/m,
+    );
     return {
       model: modelMatch ? modelMatch[1].trim() : "",
       provider: providerMatch ? providerMatch[1].trim() : "auto",
       description: descriptionMatch ? descriptionMatch[1].trim() : "",
       workerPoolPath: workerPoolMatch ? workerPoolMatch[1].trim() : "",
+      role: roleMatch ? roleMatch[1].trim() : "",
     };
   } catch {
-    return { model: "", provider: "", description: "", workerPoolPath: "" };
+    return { model: "", provider: "", description: "", workerPoolPath: "", role: "" };
   }
 }
 
@@ -91,6 +96,14 @@ function classifyProfileRole(name: string): ProfileRole {
   if (lower.includes("worker") || lower.includes("dev")) return "worker";
   if (lower.includes("assistant")) return "assistant";
   return "specialist";
+}
+
+const VALID_ROLES: ReadonlySet<string> = new Set<ProfileRole>([
+  "director", "worker", "assistant", "specialist", "general",
+]);
+
+function isValidRole(value: string): value is ProfileRole {
+  return VALID_ROLES.has(value.toLowerCase());
 }
 
 function teamKeyForName(name: string): string {
@@ -315,7 +328,9 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
             countSkills(profilePath),
             isGatewayRunning(profilePath),
           ]);
-        const role = classifyProfileRole(name);
+        const role = (config.role && isValidRole(config.role))
+          ? config.role as ProfileRole
+          : classifyProfileRole(name);
         const teamMembers =
           role === "director"
             ? await listTeamMembersFromWorkerPool(config.workerPoolPath, name)

@@ -20,6 +20,7 @@
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:unpack:local": "CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && npm run rebuild:native && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
+    "build:unpack:lab": "CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && npm run rebuild:native && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config electron-builder.lab.yml --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:linux": "electron-vite build && electron-builder --linux",

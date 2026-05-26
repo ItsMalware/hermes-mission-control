@@ -1,4 +1,5 @@
 export default {
+  missionControl: "Mission Control",
   chat: "Chat",
   sessions: "Sessions",
   agents: "Teams",

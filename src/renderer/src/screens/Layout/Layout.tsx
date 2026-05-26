@@ -4,6 +4,7 @@ import {
   dbItemsToChatMessages,
   type DbHistoryItem,
 } from "../Chat/sessionHistory";
+import MissionControl from "../MissionControl/MissionControl";
 import Sessions from "../Sessions/Sessions";
 import Agents from "../Agents/Agents";
 import Settings from "../Settings/Settings";
@@ -32,6 +33,7 @@ import {
   Signal,
   Building,
   Layers,
+  Monitor,
   KeyRound,
   Timer,
   Kanban as KanbanIcon,
@@ -43,7 +45,42 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
+// ─── Pinned-tab persistence ────────────────────────────────────────────────
+const PINNED_TABS_KEY = "hermes-pinned-tabs";
+
+interface PinnedTabEntry {
+  sessionId: string;
+  title: string;
+}
+
+function loadPinnedTabs(): PinnedTabEntry[] {
+  try {
+    const raw = localStorage.getItem(PINNED_TABS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (e): e is PinnedTabEntry =>
+        e && typeof e.sessionId === "string" && typeof e.title === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+function savePinnedTabs(conversations: ConversationState[]): void {
+  const entries: PinnedTabEntry[] = conversations
+    .filter((c) => c.pinned && c.sessionId)
+    .map((c) => ({ sessionId: c.sessionId!, title: c.title }));
+  try {
+    localStorage.setItem(PINNED_TABS_KEY, JSON.stringify(entries));
+  } catch {
+    // localStorage unavailable (private mode, quota) — silently ignore
+  }
+}
+
 type View =
+  | "mission-control"
   | "chat"
   | "sessions"
   | "agents"
@@ -60,6 +97,11 @@ type View =
   | "settings";
 
 const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
+  {
+    view: "mission-control",
+    icon: Monitor,
+    labelKey: "navigation.missionControl",
+  },
   { view: "chat", icon: ChatBubble, labelKey: "navigation.chat" },
   { view: "sessions", icon: Clock, labelKey: "navigation.sessions" },
   { view: "agents", icon: Users, labelKey: "navigation.agents" },
@@ -121,18 +163,32 @@ function Layout({
   onDismissVerifyWarning,
 }: LayoutProps = {}): React.JSX.Element {
   const { t } = useI18n();
-  const [view, setView] = useState<View>("chat");
-  const [conversations, setConversations] = useState<ConversationState[]>(() => [
-    createConversation(),
-  ]);
+  const [view, setView] = useState<View>("mission-control");
+  const [conversations, setConversations] = useState<ConversationState[]>(() => {
+    // Restore pinned tabs from localStorage as skeleton conversations.
+    // Their messages will be hydrated in the useEffect below.
+    const pinned = loadPinnedTabs().map((entry) =>
+      createConversation({
+        title: entry.title,
+        sessionId: entry.sessionId,
+        pinned: true,
+      }),
+    );
+    const fresh = createConversation();
+    return pinned.length > 0 ? [...pinned, fresh] : [fresh];
+  });
   const [activeConversationId, setActiveConversationId] = useState<string>(
-    () => conversations[0].id,
+    () => {
+      // Default to the first non-pinned (fresh) conversation
+      const unpinned = conversations.find((c) => !c.pinned);
+      return unpinned ? unpinned.id : conversations[0].id;
+    },
   );
   const [activeProfile, setActiveProfile] = useState("default");
   // Tabs lazy-mount on first visit, then stay mounted (display:none toggle).
   // Keeps IPC refetch / DOM rebuild off the tab-switch hot path.
   const [visitedViews, setVisitedViews] = useState<Set<View>>(
-    () => new Set<View>(["chat"]),
+    () => new Set<View>(["mission-control", "chat"]),
   );
   // Remote-only mode — SSH tunnel has full access; only pure HTTP remote mode restricts screens
   const [remoteMode, setRemoteMode] = useState(false);
@@ -291,6 +347,7 @@ function Layout({
         if (conversationId === activeConversationId) {
           setActiveConversationId(next[next.length - 1].id);
         }
+        savePinnedTabs(next);
         return next;
       });
     },
@@ -299,16 +356,104 @@ function Layout({
 
   const handleTogglePinnedConversation = useCallback(
     (conversationId: string) => {
-      setConversations((prev) =>
-        prev.map((conversation) =>
+      setConversations((prev) => {
+        const next = prev.map((conversation) =>
           conversation.id === conversationId
             ? { ...conversation, pinned: !conversation.pinned }
             : conversation,
-        ),
-      );
+        );
+        savePinnedTabs(next);
+        return next;
+      });
     },
     [],
   );
+
+  // Hydrate pinned-tab messages from session store on first mount
+  useEffect(() => {
+    let cancelled = false;
+    const pinnedWithSessions = conversations.filter(
+      (c) => c.pinned && c.sessionId && c.messages.length === 0,
+    );
+    if (pinnedWithSessions.length === 0) return;
+
+    Promise.all(
+      pinnedWithSessions.map(async (c) => {
+        const items = await window.hermesAPI.getSessionMessages(
+          c.sessionId!,
+          activeProfile,
+        );
+        return { id: c.id, items };
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      setConversations((prev) =>
+        prev.map((conversation) => {
+          const match = results.find((r) => r.id === conversation.id);
+          if (!match || match.items.length === 0) return conversation;
+          const chatMessages: ChatMessage[] = match.items
+            .map((it): ChatMessage | null => {
+              switch (it.kind) {
+                case "user":
+                  return {
+                    id: `db-${it.id}`,
+                    role: "user",
+                    content: it.content,
+                    ...(it.attachments && it.attachments.length > 0
+                      ? { attachments: it.attachments }
+                      : {}),
+                  };
+                case "assistant":
+                  return {
+                    id: `db-${it.id}`,
+                    role: "agent",
+                    content: it.content,
+                    ...(it.attachments && it.attachments.length > 0
+                      ? { attachments: it.attachments }
+                      : {}),
+                  };
+                case "reasoning":
+                  return {
+                    id: `db-r-${it.id}`,
+                    kind: "reasoning",
+                    role: "agent",
+                    text: it.text,
+                  };
+                case "tool_call":
+                  return {
+                    id: `db-tc-${it.id}-${it.callId || "x"}`,
+                    kind: "tool_call",
+                    role: "agent",
+                    callId: it.callId,
+                    name: it.name,
+                    args: it.args,
+                  };
+                case "tool_result":
+                  return {
+                    id: `db-tr-${it.id}`,
+                    kind: "tool_result",
+                    role: "agent",
+                    callId: it.callId,
+                    name: it.name,
+                    content: it.content,
+                    ...(it.attachments && it.attachments.length > 0
+                      ? { attachments: it.attachments }
+                      : {}),
+                  };
+                default:
+                  return null;
+              }
+            })
+            .filter((m): m is ChatMessage => m !== null);
+          return { ...conversation, messages: chatMessages };
+        }),
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- one-time hydration on mount
 
   // Listen for menu IPC events (Cmd+N, Cmd+K from app menu)
   useEffect(() => {
@@ -417,6 +562,9 @@ function Layout({
             onDismiss={onDismissVerifyWarning}
           />
         )}
+        <div style={paneStyle("mission-control")}>
+          <MissionControl onNavigate={goTo} />
+        </div>
         <div style={paneStyle("chat")}>
           <div className="conversation-tabs">
             {visibleConversations.map((conversation) => (
