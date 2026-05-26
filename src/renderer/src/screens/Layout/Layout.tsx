@@ -163,7 +163,7 @@ function Layout({
   onDismissVerifyWarning,
 }: LayoutProps = {}): React.JSX.Element {
   const { t } = useI18n();
-  const [view, setView] = useState<View>("mission-control");
+  const [view, setView] = useState<View>("chat");
   const [conversations, setConversations] = useState<ConversationState[]>(() => {
     // Restore pinned tabs from localStorage as skeleton conversations.
     // Their messages will be hydrated in the useEffect below.
@@ -188,7 +188,7 @@ function Layout({
   // Tabs lazy-mount on first visit, then stay mounted (display:none toggle).
   // Keeps IPC refetch / DOM rebuild off the tab-switch hot path.
   const [visitedViews, setVisitedViews] = useState<Set<View>>(
-    () => new Set<View>(["mission-control", "chat"]),
+    () => new Set<View>(["chat"]),
   );
   // Remote-only mode — SSH tunnel has full access; only pure HTTP remote mode restricts screens
   const [remoteMode, setRemoteMode] = useState(false);
