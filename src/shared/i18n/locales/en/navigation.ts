@@ -11,6 +11,7 @@ export default {
   soul: "Persona",
   memory: "Memory",
   tools: "Tools",
+  toolkit: "Toolkit",
   schedules: "Schedules",
   gateway: "Gateway",
   settings: "Settings",

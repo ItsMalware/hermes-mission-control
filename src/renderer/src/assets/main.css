@@ -7109,3 +7109,20 @@ body {
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* ── Toolkit pane (Tools + Skills combined) ── */
+.toolkit-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.toolkit-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 24px 0;
+  flex-shrink: 0;
+}
+

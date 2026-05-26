@@ -26,7 +26,6 @@ import {
   Clock,
   Users,
   Settings as SettingsIcon,
-  Puzzle,
   Brain,
   Wrench,
   Signal,
@@ -84,7 +83,6 @@ type View =
   | "agents"
   | "office"
   | "providers"
-  | "skills"
   | "memory"
   | "tools"
   | "schedules"
@@ -104,9 +102,8 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "office", icon: Building, labelKey: "navigation.office" },
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
   { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
-  { view: "skills", icon: Puzzle, labelKey: "navigation.skills" },
   { view: "memory", icon: Brain, labelKey: "navigation.memory" },
-  { view: "tools", icon: Wrench, labelKey: "navigation.tools" },
+  { view: "tools", icon: Wrench, labelKey: "navigation.toolkit" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
   { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
   { view: "settings", icon: SettingsIcon, labelKey: "navigation.settings" },
@@ -684,15 +681,6 @@ function Layout({
           </div>
         )}
 
-        {visitedViews.has("skills") && (
-          <div style={paneStyle("skills")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Skills" />
-            ) : (
-              <Skills profile={activeProfile} />
-            )}
-          </div>
-        )}
 
 
         {visitedViews.has("memory") && (
@@ -708,9 +696,13 @@ function Layout({
         {visitedViews.has("tools") && (
           <div style={paneStyle("tools")}>
             {remoteMode ? (
-              <RemoteNotice feature="Tools" />
+              <RemoteNotice feature="Toolkit" />
             ) : (
-              <Tools profile={activeProfile} />
+              <div className="toolkit-pane">
+                <Tools profile={activeProfile} />
+                <div className="toolkit-divider" />
+                <Skills profile={activeProfile} />
+              </div>
             )}
           </div>
         )}

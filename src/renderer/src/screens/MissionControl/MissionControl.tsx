@@ -23,7 +23,6 @@ type MissionDestination =
   | "sessions"
   | "kanban"
   | "agents"
-  | "models"
   | "providers"
   | "memory"
   | "tools"
@@ -162,9 +161,9 @@ function MissionControl({
           <div className="mission-eyebrow">
             <span>IV.</span>
             <i />
-            <strong>Agent - Hermes</strong>
+            <strong>Hermes OS</strong>
           </div>
-          <h1>Hermes</h1>
+          <h1>Hermes OS</h1>
           <p>
             Nous Research agent. Sessions, skills, kanban, profiles, and a chat
             line.
@@ -341,7 +340,7 @@ function MissionControl({
                 <strong>Teams</strong>
                 <span>{status?.teams.length ?? 0} teams</span>
               </button>
-              <button onClick={() => go("models")}>
+              <button onClick={() => go("providers")}>
                 <Brain size={15} />
                 <strong>Models</strong>
                 <span>Routes and saved models</span>
