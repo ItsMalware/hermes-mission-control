@@ -447,7 +447,7 @@ function setupIPC(): void {
         event.sender.send("install-progress", {
           step: 1,
           totalSteps: 1,
-          title: "Updating remote Hermes Agent",
+          title: "Updating remote Hermes OS",
           detail: "Running hermes update over SSH...",
           log: "Running hermes update over SSH...\n",
         });
@@ -908,7 +908,7 @@ function setupIPC(): void {
                 .trim()
                 .slice(0, 80);
               new Notification({
-                title: "Hermes Agent",
+                title: "Hermes OS",
                 body: preview || "Response ready",
               }).show();
             }
@@ -923,7 +923,7 @@ function setupIPC(): void {
             // Notify on error too if window not focused
             if (mainWindow && !mainWindow.isFocused()) {
               new Notification({
-                title: "Hermes Agent — Error",
+                title: "Hermes OS — Error",
                 body: error.slice(0, 100),
               }).show();
             }
@@ -1705,7 +1705,7 @@ function buildMenu(): void {
       label: "Help",
       submenu: [
         {
-          label: "Hermes Agent on GitHub",
+          label: "Hermes OS on GitHub",
           click: (): void => {
             openExternalUrl("https://github.com/NousResearch/hermes-agent/");
           },

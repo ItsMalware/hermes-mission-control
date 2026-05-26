@@ -54,7 +54,7 @@ export const ChatEmptyState = memo(function ChatEmptyState({
   return (
     <div className="chat-empty">
       <div className="chat-empty-icon">
-        <img src={icon} width={64} height={64} alt="" />
+        <img src={icon} height={120} style={{ objectFit: "contain" }} alt="" />
       </div>
       <div className="chat-empty-text">{t("chat.emptyTitle")}</div>
       <div className="chat-empty-hint">{t("chat.emptyHint")}</div>

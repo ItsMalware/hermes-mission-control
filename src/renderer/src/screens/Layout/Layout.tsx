@@ -9,7 +9,7 @@ import Sessions from "../Sessions/Sessions";
 import Agents from "../Agents/Agents";
 import Settings from "../Settings/Settings";
 import Skills from "../Skills/Skills";
-import Soul from "../Soul/Soul";
+
 import Memory from "../Memory/Memory";
 import Tools from "../Tools/Tools";
 import Gateway from "../Gateway/Gateway";
@@ -20,19 +20,17 @@ import Schedules from "../Schedules/Schedules";
 import Kanban from "../Kanban/Kanban";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
-import hermeslogo from "../../assets/hermes.png";
+import hermesBanner from "../../assets/hermes-banner.jpg";
 import {
   ChatBubble,
   Clock,
   Users,
   Settings as SettingsIcon,
   Puzzle,
-  Sparkles,
   Brain,
   Wrench,
   Signal,
   Building,
-  Layers,
   Monitor,
   KeyRound,
   Timer,
@@ -85,10 +83,8 @@ type View =
   | "sessions"
   | "agents"
   | "office"
-  | "models"
   | "providers"
   | "skills"
-  | "soul"
   | "memory"
   | "tools"
   | "schedules"
@@ -107,10 +103,8 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "agents", icon: Users, labelKey: "navigation.agents" },
   { view: "office", icon: Building, labelKey: "navigation.office" },
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
-  { view: "models", icon: Layers, labelKey: "navigation.models" },
   { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
   { view: "skills", icon: Puzzle, labelKey: "navigation.skills" },
-  { view: "soul", icon: Sparkles, labelKey: "navigation.soul" },
   { view: "memory", icon: Brain, labelKey: "navigation.memory" },
   { view: "tools", icon: Wrench, labelKey: "navigation.tools" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
@@ -504,7 +498,7 @@ function Layout({
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <img src={hermeslogo} height={30} alt="" />
+          <img src={hermesBanner} height={42} alt="Hermes OS" style={{ borderRadius: 6 }} />
         </div>
 
         <nav className="sidebar-nav">
@@ -674,21 +668,18 @@ function Layout({
           </div>
         )}
 
-        {visitedViews.has("models") && (
-          <div style={paneStyle("models")}>
-            <Models visible={view === "models"} />
-          </div>
-        )}
-
         {visitedViews.has("providers") && (
           <div style={paneStyle("providers")}>
             {remoteMode ? (
               <RemoteNotice feature="Providers" />
             ) : (
-              <Providers
-                profile={activeProfile}
-                visible={view === "providers"}
-              />
+              <>
+                <Providers
+                  profile={activeProfile}
+                  visible={view === "providers"}
+                />
+                <Models visible={view === "providers"} />
+              </>
             )}
           </div>
         )}
@@ -703,15 +694,6 @@ function Layout({
           </div>
         )}
 
-        {visitedViews.has("soul") && (
-          <div style={paneStyle("soul")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Persona" />
-            ) : (
-              <Soul profile={activeProfile} />
-            )}
-          </div>
-        )}
 
         {visitedViews.has("memory") && (
           <div style={paneStyle("memory")}>

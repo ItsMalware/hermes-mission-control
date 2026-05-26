@@ -1,5 +1,5 @@
 export default {
-  title: "Agent Teams",
+  title: "Teams",
   subtitle:
     "Review Hermes profiles, inferred teams, and masked secrets across workspaces",
   newAgent: "New Agent",

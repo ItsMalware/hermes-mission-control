@@ -637,6 +637,18 @@ export const GATEWAY_SECTIONS: SectionDef[] = [
         hint: "constants.signalPhoneHint",
       },
       {
+        key: "SIGNAL_HTTP_URL",
+        label: "constants.signalHttpUrl",
+        type: "text",
+        hint: "constants.signalHttpUrlHint",
+      },
+      {
+        key: "SIGNAL_ACCOUNT",
+        label: "constants.signalAccount",
+        type: "text",
+        hint: "constants.signalAccountHint",
+      },
+      {
         key: "MATRIX_HOMESERVER",
         label: "constants.matrixHomeserver",
         type: "text",
@@ -832,7 +844,7 @@ export const GATEWAY_PLATFORMS: PlatformDef[] = [
     key: "signal",
     label: "constants.platformSignal",
     description: "constants.platformSignalDesc",
-    fields: ["SIGNAL_PHONE_NUMBER"],
+    fields: ["SIGNAL_PHONE_NUMBER", "SIGNAL_HTTP_URL", "SIGNAL_ACCOUNT"],
   },
   {
     key: "matrix",

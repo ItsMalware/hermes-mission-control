@@ -156,7 +156,7 @@ async function withTimeout<T>(
 
 function teamKey(profileName: string): string {
   return profileName
-    .replace(/-(director|manager|lead|dev|worker|review)$/i, "")
+    .replace(/-(director|manager|lead|dev|worker|review|researcher|content|analyst|librarian|ai-engineer|code-reviewer|bug-hunter|ux-guardian|ui-designer|repo-cleanup|content-strategist|brainstormer|signal-scout|fragrance-analyst|art-curator|neuroarts-editor|managing-editor|claim-guard|issue-architect)$/i, "")
     .replace(/[_\s]+/g, "-")
     .toLowerCase();
 }
@@ -327,7 +327,7 @@ export async function getMissionControlStatus(): Promise<MissionControlStatus> {
   }));
   const teams = [...profiles.filter((profile) => profile.role === "director")]
     .reduce<Map<string, MissionControlStatus["teams"][number]>>((map, profile) => {
-      const key = teamKey(profile.name);
+      const key = profile.team || teamKey(profile.name);
       const existing =
         map.get(key) ||
         {
@@ -352,7 +352,7 @@ export async function getMissionControlStatus(): Promise<MissionControlStatus> {
   // Count profile-based workers (e.g. contract-hub-dev) into their teams
   for (const profile of profiles) {
     if (profile.role === "director" || profile.role === "general") continue;
-    const key = teamKey(profile.name);
+    const key = profile.team || teamKey(profile.name);
     const team = teams.get(key);
     if (team) {
       team.members += 1;

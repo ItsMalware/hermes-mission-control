@@ -1,7 +1,7 @@
 export default {
   title: "Settings",
   sections: {
-    hermesAgent: "Hermes Agent",
+    hermesAgent: "Hermes OS",
     appearance: "Appearance",
     privacy: "Privacy",
     fallbackModel: "Fallback Model",
@@ -25,7 +25,7 @@ export default {
   },
   analytics: {
     label: "Send anonymous usage analytics",
-    hint: "Helps improve Hermes Desktop by sending anonymous, aggregated usage data to the project's PostHog instance. You can turn this off at any time.",
+    hint: "Helps improve Hermes OS by sending anonymous, aggregated usage data to the project's PostHog instance. You can turn this off at any time.",
     disclosure: {
       uuid: "A random per-install identifier stored only on this device (no name, email, or account info).",
       platform: "Your operating system, Electron version, and Node.js version.",

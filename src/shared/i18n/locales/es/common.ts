@@ -1,5 +1,5 @@
 export default {
-  appName: "Hermes Agent",
+  appName: "Hermes OS",
   continue: "Continuar",
   cancel: "Cancelar",
   retry: "Reintentar",

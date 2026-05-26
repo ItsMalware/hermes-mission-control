@@ -1,7 +1,7 @@
 export default {
   title: "Configurações",
   sections: {
-    hermesAgent: "Hermes Agent",
+    hermesAgent: "Hermes OS",
     appearance: "Aparência",
     privacy: "Privacidade",
     fallbackModel: "Modelo de fallback",

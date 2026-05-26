@@ -1,7 +1,7 @@
 export default {
   title: "设置",
   sections: {
-    hermesAgent: "Hermes Agent",
+    hermesAgent: "Hermes OS",
     appearance: "外观",
     privacy: "隐私",
     fallbackModel: "备用模型",

@@ -17,7 +17,9 @@ export interface TeamProfileInfo {
   name: string;
   isDefault: boolean;
   provider: string;
+  description?: string;
   role?: ProfileRole;
+  team?: string;
   teamMembers?: TeamMemberInfo[];
 }
 
@@ -67,13 +69,14 @@ export function roleLabel(role: ProfileRole): string {
 export function teamKeyForProfile(name: string): string {
   let key = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
+  // Strip common role suffixes to extract the team key
   while (
-    /(?:^|-)(director|manager|lead|owner|worker|dev|assistant|specialist|agent)$/.test(
+    /(?:^|-)(director|manager|lead|owner|worker|dev|assistant|specialist|agent|researcher|analyst|content|review)$/.test(
       key,
     )
   ) {
     key = key.replace(
-      /(?:^|-)(director|manager|lead|owner|worker|dev|assistant|specialist|agent)$/,
+      /(?:^|-)(director|manager|lead|owner|worker|dev|assistant|specialist|agent|researcher|analyst|content|review)$/,
       "",
     );
   }
@@ -86,12 +89,7 @@ export function teamLabelFromKey(key: string): string {
   return key
     .split("-")
     .filter(Boolean)
-    .map((part) => {
-      if (part === "mcp") return "MCP";
-      if (part === "govcon") return "GovCon";
-      if (part === "cozyhub") return "CozyHub";
-      return part.charAt(0).toUpperCase() + part.slice(1);
-    })
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 }
 
@@ -104,14 +102,15 @@ export function buildDirectorTeamGroups(
 
   const assignedProfileNames = new Set<string>();
   const teams = directors.map((director) => {
-    const key = teamKeyForProfile(director.name);
+    const key = director.team || teamKeyForProfile(director.name);
     assignedProfileNames.add(director.name);
 
     const profileMembers = profiles
       .filter((profile) => {
         if (profile.name === director.name) return false;
         if (inferProfileRole(profile) === "director") return false;
-        return teamKeyForProfile(profile.name).startsWith(key);
+        const memberKey = profile.team || teamKeyForProfile(profile.name);
+        return memberKey === key;
       })
       .sort((a, b) => {
         const roleDelta =

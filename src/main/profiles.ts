@@ -29,6 +29,7 @@ export interface ProfileInfo {
   model: string;
   provider: string;
   role: ProfileRole;
+  team: string;
   workerPoolPath: string;
   teamMembers: TeamMemberInfo[];
   hasEnv: boolean;
@@ -58,6 +59,7 @@ async function readProfileConfig(profilePath: string): Promise<{
   description: string;
   workerPoolPath: string;
   role: string;
+  team: string;
 }> {
   const configFile = join(profilePath, "config.yaml");
   try {
@@ -75,15 +77,19 @@ async function readProfileConfig(profilePath: string): Promise<{
     const roleMatch = content.match(
       /^role:\s*["']?([^"'\n#]+)["']?/m,
     );
+    const teamMatch = content.match(
+      /^team:\s*["']?([^"'\n#]+)["']?/m,
+    );
     return {
       model: modelMatch ? modelMatch[1].trim() : "",
       provider: providerMatch ? providerMatch[1].trim() : "auto",
       description: descriptionMatch ? descriptionMatch[1].trim() : "",
       workerPoolPath: workerPoolMatch ? workerPoolMatch[1].trim() : "",
       role: roleMatch ? roleMatch[1].trim() : "",
+      team: teamMatch ? teamMatch[1].trim() : "",
     };
   } catch {
-    return { model: "", provider: "", description: "", workerPoolPath: "", role: "" };
+    return { model: "", provider: "", description: "", workerPoolPath: "", role: "", team: "" };
   }
 }
 
@@ -345,6 +351,7 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
           model: config.model,
           provider: config.provider,
           role,
+          team: config.team,
           workerPoolPath: config.workerPoolPath,
           teamMembers,
           hasEnv: hasEnvFile,

@@ -4066,6 +4066,30 @@ body {
   text-align: center;
 }
 
+.agents-team-goal {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  padding: 0 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.agents-team-member-count {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.agents-unassigned-section {
+  margin-top: 16px;
+  opacity: 0.7;
+}
+
 .agents-team-members {
   display: flex;
   flex-direction: column;
@@ -4145,6 +4169,74 @@ body {
 .agents-secret-meta {
   color: var(--text-muted);
   font-size: 11px;
+}
+
+/* Persona editor (inline in Teams tab) */
+.agents-persona-section {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.agents-persona-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.agents-persona-toggle:hover {
+  background: var(--accent-subtle);
+}
+
+.agents-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agents-persona-saved {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--success, #34d399);
+  animation: fadeIn 0.2s;
+}
+
+.agents-persona-chevron {
+  transition: transform 0.2s ease;
+  color: var(--text-muted);
+}
+
+.agents-persona-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.agents-persona-editor {
+  width: 100%;
+  min-height: 220px;
+  max-height: 400px;
+  padding: 12px 14px;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
 }
 
 .agents-secrets-table {
