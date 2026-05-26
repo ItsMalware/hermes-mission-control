@@ -165,12 +165,41 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
     setFormError("");
 
     if (editingModel) {
+      // Detect whether this edit is hitting the *currently active* model
+      // before the library write — if it is, the user's intent is to
+      // update that active configuration too. Without this sync, edits
+      // to the active model only land in `models.json` and the next chat
+      // still uses the stale `model:` block in `config.yaml` (e.g. with
+      // a stale `base_url` from a previous selection). The user has to
+      // open Chat, switch model away, switch back — and only that round
+      // trip refreshes `config.yaml`. Library edits should "take" on
+      // the active configuration when the entry being edited IS the
+      // active one.
+      const activeBefore = await window.hermesAPI.getModelConfig();
+      const editedWasActive =
+        activeBefore.provider === editingModel.provider &&
+        activeBefore.model === editingModel.model;
+
       await window.hermesAPI.updateModel(editingModel.id, {
         name,
         provider: formProvider,
         model,
         baseUrl: formBaseUrl.trim(),
       });
+
+      // Mirror the new values into config.yaml when this edit affects
+      // the active model. The empty-baseUrl case is handled by
+      // setModelConfig itself (substitutes the canonical URL for
+      // built-in providers — see `provider-registry.ts`).
+      if (editedWasActive) {
+        const effectiveBaseUrl =
+          formProvider === "custom" ? formBaseUrl.trim() : "";
+        await window.hermesAPI.setModelConfig(
+          formProvider,
+          model,
+          effectiveBaseUrl,
+        );
+      }
     } else {
       await window.hermesAPI.addModel(
         name,
@@ -414,9 +443,20 @@ function Models({ visible }: ModelsProps = {}): React.JSX.Element {
                 </div>
                 {discovery.models.length > 0 && (
                   <datalist id={modelDiscoveryListId}>
-                    {discovery.models.map((m) => (
-                      <option key={m} value={m} />
-                    ))}
+                    {discovery.models.map((m) => {
+                      // Surface free vs paid in the autocomplete —
+                      // Nous Portal flags this in its catalog (#367).
+                      // The browser's datalist renders the `label`
+                      // attribute as a grey suffix next to the value.
+                      const isFree = discovery.freeModels?.includes(m);
+                      return (
+                        <option
+                          key={m}
+                          value={m}
+                          label={isFree ? t("models.freeBadge") : undefined}
+                        />
+                      );
+                    })}
                   </datalist>
                 )}
                 {discovery.status !== "idle" &&

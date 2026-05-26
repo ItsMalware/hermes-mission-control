@@ -2,6 +2,25 @@ import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AppLocale } from "../shared/i18n/types";
 import type { Attachment } from "../shared/attachments";
 
+/**
+ * Mirror of the renderer-side `CredentialPoolEntry` ambient type
+ * (src/preload/index.d.ts) — preload is type-checked under
+ * tsconfig.node.json which doesn't include the .d.ts. See #367.
+ */
+interface CredentialPoolEntry {
+  id?: string;
+  label?: string;
+  auth_type?: "api_key" | "oauth_device_code" | string;
+  priority?: number;
+  source?: string;
+  access_token?: string;
+  refresh_token?: string;
+  api_key?: string;
+  base_url?: string;
+  request_count?: number;
+  key?: string;
+}
+
 const electronAPI = {
   process: {
     platform: process.platform,
@@ -92,10 +111,8 @@ const hermesAPI = {
   cancelOAuthLogin: (): Promise<boolean> =>
     ipcRenderer.invoke("oauth-login-cancel"),
   onOAuthLoginProgress: (callback: (chunk: string) => void): (() => void) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      chunk: unknown,
-    ): void => callback(String(chunk));
+    const handler = (_event: Electron.IpcRendererEvent, chunk: unknown): void =>
+      callback(String(chunk));
     ipcRenderer.on("oauth-login-progress", handler);
     return () => ipcRenderer.removeListener("oauth-login-progress", handler);
   },
@@ -254,6 +271,12 @@ const hermesAPI = {
   abortChat: (requestId?: string): Promise<void> =>
     ipcRenderer.invoke("abort-chat", requestId),
 
+  getApiServerKeyStatus: (profile?: string): Promise<{ hasKey: boolean }> =>
+    ipcRenderer.invoke("get-api-server-key-status", profile),
+
+  generateApiServerKey: (profile?: string): Promise<{ key: string }> =>
+    ipcRenderer.invoke("generate-api-server-key", profile),
+
   copyToClipboard: (text: string): Promise<void> =>
     ipcRenderer.invoke("copy-to-clipboard", text),
 
@@ -302,6 +325,10 @@ const hermesAPI = {
     models: string[];
     status: "ok" | "no-key" | "unsupported" | "unknown-host";
     cached: boolean;
+    /** Subset of `models` flagged as free per the provider catalog
+     *  (Nous Portal today). Optional — providers without pricing
+     *  metadata return undefined. Issue #367. */
+    freeModels?: string[];
   }> =>
     ipcRenderer.invoke(
       "discover-provider-models",
@@ -326,6 +353,26 @@ const hermesAPI = {
     };
     ipcRenderer.on("chat-chunk", handler);
     return () => ipcRenderer.removeListener("chat-chunk", handler);
+  },
+
+  /** Streaming reasoning / thinking tokens — separate from `onChatChunk`
+   *  so the renderer can render a "thinking" bubble that grows
+   *  independently of the assistant's content (#352). */
+  onChatReasoningChunk: (
+    callback: (payload: { requestId?: string; chunk: string }) => void,
+  ): (() => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      payload: unknown,
+    ): void => {
+      if (typeof payload === "string") {
+        callback({ chunk: payload });
+        return;
+      }
+      callback(payload as { requestId?: string; chunk: string });
+    };
+    ipcRenderer.on("chat-reasoning-chunk", handler);
+    return () => ipcRenderer.removeListener("chat-reasoning-chunk", handler);
   },
 
   onChatDone: (
@@ -700,16 +747,35 @@ const hermesAPI = {
 
   // Credential Pool (profile-aware: reads/writes the named profile's
   // auth.json; defaults to the currently active profile when omitted)
+  //
+  // Pool entries follow the upstream engine schema (issue #367) —
+  // `access_token` for the secret, `auth_type` to distinguish OAuth
+  // from API key, plus `id`/`priority`/`source` for rotation.
   getCredentialPool: (
     profile?: string,
-  ): Promise<Record<string, Array<{ key: string; label: string }>>> =>
+  ): Promise<Record<string, Array<CredentialPoolEntry>>> =>
     ipcRenderer.invoke("get-credential-pool", profile),
   setCredentialPool: (
     provider: string,
-    entries: Array<{ key: string; label: string }>,
+    entries: Array<CredentialPoolEntry>,
     profile?: string,
   ): Promise<boolean> =>
     ipcRenderer.invoke("set-credential-pool", provider, entries, profile),
+  // Add a manually-typed key as a properly-shaped pool entry. Returns
+  // the updated entries list for the provider.
+  addCredentialPoolEntry: (
+    provider: string,
+    apiKey: string,
+    label: string,
+    profile?: string,
+  ): Promise<Array<CredentialPoolEntry>> =>
+    ipcRenderer.invoke(
+      "add-credential-pool-entry",
+      provider,
+      apiKey,
+      label,
+      profile,
+    ),
 
   // Models
   listModels: (): Promise<

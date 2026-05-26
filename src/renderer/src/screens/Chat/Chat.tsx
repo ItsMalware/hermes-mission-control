@@ -12,7 +12,13 @@ import { useFastMode } from "./hooks/useFastMode";
 import { useLocalCommands } from "./hooks/useLocalCommands";
 import { useI18n } from "../../components/useI18n";
 import { buildChatTranscript } from "./transcriptUtils";
+import type { Attachment } from "../../../../shared/attachments";
 import type { ChatMessage, UsageState } from "./types";
+
+interface QueuedMessage {
+  text: string;
+  attachments: Attachment[];
+}
 
 export type { ChatMessage } from "./types";
 
@@ -49,6 +55,8 @@ function Chat({
   const [contextFolder, setContextFolder] = useState<string | null>(null);
   const dragCounter = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
+  const queueRef = useRef<QueuedMessage[]>([]);
+  const [queuedCount, setQueuedCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,10 +92,10 @@ function Chat({
   // remount would discard unrelated local state (model picker, etc.).
   useEffect(() => {
     if (messages.length === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHermesSessionId(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setContextFolder(null);
+      queueRef.current = [];
+      setQueuedCount(0);
     }
   }, [messages]);
 
@@ -96,10 +104,10 @@ function Chat({
   // issue #276) and the per-conversation context folder (issue #27). Chat is
   // not remounted on session switch, so this must be done explicitly.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHermesSessionId(sessionId);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setContextFolder(null);
+    queueRef.current = [];
+    setQueuedCount(0);
   }, [sessionId]);
 
   // Cmd/Ctrl+N → new chat
@@ -167,6 +175,8 @@ function Chat({
     setContextFolder(null);
     setUsage(null);
     setToolProgress(null);
+    queueRef.current = [];
+    setQueuedCount(0);
   }, [isLoading, requestId, hermesSessionId, sessionId, setMessages]);
 
   const localCommands = useLocalCommands({
@@ -191,6 +201,39 @@ function Chat({
     localCommands,
     contextFolder,
   });
+
+  // Stable ref to handleSend so the drain effect doesn't re-trigger on
+  // identity changes (regression #5 from PR #315).
+  const handleSendRef = useRef(actions.handleSend);
+  useEffect(() => {
+    handleSendRef.current = actions.handleSend;
+  });
+
+  // Drain queued messages one at a time when the agent finishes.
+  useEffect(() => {
+    if (isLoading) return;
+    const next = queueRef.current.shift();
+    if (!next) return;
+    setQueuedCount(queueRef.current.length);
+    handleSendRef.current(next.text, next.attachments, true).catch(() => {
+      // Put the message back at the front so it isn't silently lost if
+      // the send fails (e.g. IPC error before onChatError fires).
+      queueRef.current.unshift(next);
+      setQueuedCount(queueRef.current.length);
+    });
+  }, [isLoading]);
+
+  const handleSubmitOrQueue = useCallback(
+    (text: string, attachments: Attachment[]) => {
+      if (isLoading) {
+        queueRef.current.push({ text, attachments });
+        setQueuedCount(queueRef.current.length);
+        return;
+      }
+      void handleSendRef.current(text, attachments);
+    },
+    [isLoading],
+  );
 
   const handleSuggestion = useCallback((text: string) => {
     chatInputRef.current?.setText(text);
@@ -291,6 +334,11 @@ function Chat({
         <div ref={bottomRef} />
       </div>
 
+      {queuedCount > 0 && (
+        <div className="chat-queue-indicator">
+          {t("chat.queued", { count: queuedCount })}
+        </div>
+      )}
       <div className="chat-input-area">
         <ChatInput
           ref={chatInputRef}
@@ -298,7 +346,7 @@ function Chat({
           hasSession={!!hermesSessionId}
           sessionId={hermesSessionId}
           remoteMode={remoteMode}
-          onSubmit={actions.handleSend}
+          onSubmit={handleSubmitOrQueue}
           onQuickAsk={actions.handleQuickAsk}
           onAbort={actions.handleAbort}
         />

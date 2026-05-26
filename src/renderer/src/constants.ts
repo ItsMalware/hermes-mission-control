@@ -219,7 +219,11 @@ export const OAUTH_PROVIDERS: OAuthProviderDef[] = [
     name: "ChatGPT (Codex Plan)",
     desc: "providers.oauth.codexDesc",
   },
-  { id: "xai-oauth", name: "xAI Grok (OAuth)", desc: "providers.oauth.xaiDesc" },
+  {
+    id: "xai-oauth",
+    name: "xAI Grok (OAuth)",
+    desc: "providers.oauth.xaiDesc",
+  },
   { id: "qwen-oauth", name: "Qwen (OAuth)", desc: "providers.oauth.qwenDesc" },
   {
     id: "google-gemini-cli",
@@ -230,6 +234,15 @@ export const OAUTH_PROVIDERS: OAuthProviderDef[] = [
     id: "minimax-oauth",
     name: "MiniMax (OAuth)",
     desc: "providers.oauth.minimaxDesc",
+  },
+  // Nous Portal OAuth — issue #367 Bug 2. The engine's
+  // PROVIDER_REGISTRY registers `nous` with auth_type="oauth_device_code";
+  // without this card the only way to trigger the sign-in flow was
+  // `hermes auth add nous --type oauth` from PowerShell.
+  {
+    id: "nous",
+    name: "Nous Portal (OAuth)",
+    desc: "providers.oauth.nousDesc",
   },
 ];
 
@@ -367,6 +380,15 @@ export const SETTINGS_SECTIONS: SectionDef[] = [
         label: "constants.minimaxApiKey",
         type: "password",
         hint: "constants.minimaxHint",
+      },
+      // Nous Portal API-key variant — the OAuth variant has its own
+      // card in the OAuth section below. Missing-API-key-card was
+      // issue #367 Bug 1.
+      {
+        key: "NOUS_API_KEY",
+        label: "constants.nousApiKey",
+        type: "password",
+        hint: "constants.nousHint",
       },
       {
         key: "MINIMAX_CN_API_KEY",

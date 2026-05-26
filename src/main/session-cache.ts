@@ -201,12 +201,11 @@ export function syncSessionCache(profile?: string): CachedSession[] {
         existing.startedAt = row.started_at;
         existing.source = row.source;
         existing.messageCount = row.message_count;
-        existing.model = row.model || "";
+        if (row.model) existing.model = row.model;
         if (row.title) existing.title = row.title;
         continue;
       }
 
-      // Generate title from first user message
       let title = row.title || "";
       if (!title) {
         const firstMessage = firstMessages.get(row.id);
@@ -263,17 +262,14 @@ export function syncSessionCache(profile?: string): CachedSession[] {
     // Merge DB-backed sessions with legacy file-backed transcripts.
     const dbIds = new Set(rows.map((row) => row.id));
     const fileSessions = readFileBackedSessions(dbIds, profile);
-    const fileIds = new Set(fileSessions.map((s) => s.id));
-    const retainedSessions = cache.sessions.filter(
-      (s) => dbIds.has(s.id) || fileIds.has(s.id),
-    );
-    const retainedIds = new Set(retainedSessions.map((s) => s.id));
-    const allSessions = [
-      ...newSessions,
-      ...fileSessions.filter((s) => !retainedIds.has(s.id)),
-      ...retainedSessions,
-    ];
-    // Sort by startedAt descending
+    // Merge via Map to prevent duplicates: existing sessions (already
+    // mutated in-place above), newly discovered sessions, and legacy
+    // file-backed transcripts.
+    const merged = new Map<string, CachedSession>();
+    for (const s of cache.sessions) merged.set(s.id, s);
+    for (const s of newSessions) merged.set(s.id, s);
+    for (const s of fileSessions) merged.set(s.id, s);
+    const allSessions = Array.from(merged.values());
     allSessions.sort((a, b) => b.startedAt - a.startedAt);
 
     const updated: CacheData = {

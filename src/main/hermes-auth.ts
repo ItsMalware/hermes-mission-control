@@ -13,9 +13,13 @@ import { stripAnsi } from "./utils";
 /**
  * Provider identifiers that authenticate via an interactive OAuth flow
  * (`hermes auth add <provider> --type oauth`) rather than a static API
- * key. Mirrors hermes-agent's `_OAUTH_CAPABLE_PROVIDERS` set, minus the
- * API-key-capable `anthropic`/`nous` which the desktop sets up through
- * the normal key flow.
+ * key. Mirrors hermes-agent's `_OAUTH_CAPABLE_PROVIDERS` set.
+ *
+ * `nous` is included even though it also has an API-key variant — the
+ * Providers UI now offers both surfaces (an API Key card and an
+ * OAuth Sign-in card, issue #367), and the OAuth path goes through
+ * this gate. The desktop previously excluded `nous` here on the
+ * (incorrect) assumption that it used the normal key flow only.
  */
 export const OAUTH_LOGIN_PROVIDERS = [
   "openai-codex",
@@ -23,11 +27,14 @@ export const OAUTH_LOGIN_PROVIDERS = [
   "qwen-oauth",
   "google-gemini-cli",
   "minimax-oauth",
+  "nous",
 ] as const;
 
 export type OAuthLoginProvider = (typeof OAUTH_LOGIN_PROVIDERS)[number];
 
-export function isOAuthLoginProvider(value: string): value is OAuthLoginProvider {
+export function isOAuthLoginProvider(
+  value: string,
+): value is OAuthLoginProvider {
   return (OAUTH_LOGIN_PROVIDERS as readonly string[]).includes(value);
 }
 
@@ -83,7 +90,10 @@ export function runHermesAuthLogin(
 ): Promise<OAuthLoginResult> {
   return new Promise((resolve) => {
     if (!isOAuthLoginProvider(provider)) {
-      resolve({ success: false, error: `Unsupported OAuth provider: ${provider}` });
+      resolve({
+        success: false,
+        error: `Unsupported OAuth provider: ${provider}`,
+      });
       return;
     }
     if (activeProc) {
@@ -133,7 +143,10 @@ export function runHermesAuthLogin(
     proc.stderr?.on("data", (data: Buffer) => emit(stripAnsi(data.toString())));
 
     proc.on("error", (err) => {
-      finish({ success: false, error: `Failed to start sign-in: ${err.message}` });
+      finish({
+        success: false,
+        error: `Failed to start sign-in: ${err.message}`,
+      });
     });
 
     proc.on("close", (code, signal) => {
