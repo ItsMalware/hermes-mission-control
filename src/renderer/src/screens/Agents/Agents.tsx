@@ -41,7 +41,7 @@ interface AgentsProps {
 function Agents({
   activeProfile,
   onSelectProfile,
-  onChatWith,
+  onChatWith: _onChatWith,
 }: AgentsProps): React.JSX.Element {
   const { t } = useI18n();
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);

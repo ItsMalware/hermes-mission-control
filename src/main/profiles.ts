@@ -301,6 +301,7 @@ export async function listProfiles(): Promise<ProfileInfo[]> {
     model: defaultConfig.model,
     provider: defaultConfig.provider,
     role: "general",
+    team: "",
     workerPoolPath: defaultConfig.workerPoolPath,
     teamMembers: [],
     hasEnv: defaultHasEnv,

@@ -46,7 +46,7 @@ const modeItems: Array<{
   icon: LucideIcon;
 }> = [
   { id: "chat", label: "Chat", icon: ChatBubble },
-  { id: "goal", label: "Goal Mode", icon: Sparkles },
+  { id: "goal", label: "Goals", icon: Sparkles },
   { id: "workspace", label: "Workspace", icon: Brain },
   { id: "control", label: "Control Room", icon: LayoutDashboard },
 ];
@@ -142,13 +142,12 @@ function MissionControl({
     };
   }, [status]);
 
-  const kanbanCounts = Object.entries(status?.kanban.counts ?? {}) as Array<
-    [string, number]
-  >;
   const topSubsystems = (status?.subsystems ?? []).slice(0, 7);
-  const topProfiles = (status?.profiles ?? [])
-    .filter((profile) => profile.role === "director")
-    .slice(0, 7);
+
+  // Active API keys from the secrets inventory
+  const activeKeys = useMemo(() => {
+    return (status?.secrets.items ?? []).filter((s) => s.status === "present");
+  }, [status]);
 
   function go(destination: MissionDestination): void {
     onNavigate?.(destination);
@@ -269,23 +268,44 @@ function MissionControl({
       {mode === "goal" && (
         <div className="mission-goal-layout">
           <Panel
-            kicker="Hermes - Goal Mode"
-            title="Set the target. Walk away."
+            kicker={`Teams - ${status?.teams.length ?? 0}`}
+            title="Team goals & objectives"
             action={
-              <button className="mission-link-button" onClick={() => go("chat")}>
-                Open /goal
+              <button
+                className="mission-link-button"
+                onClick={() => go("agents")}
+              >
+                Open teams
               </button>
             }
           >
-            <div className="mission-goal-card">
-              <Sparkles size={26} />
-              <div>
-                <strong>Use `/goal` in Chat for standing objectives.</strong>
-                <span>
-                  Hand Hermes a long-horizon goal, then track the work through
-                  sessions and Kanban.
-                </span>
-              </div>
+            <div className="mission-list">
+              {(status?.teams ?? []).map((team) => (
+                <div className="mission-row mission-team-row" key={team.key}>
+                  <div>
+                    <strong>{team.label}</strong>
+                    {team.goal ? (
+                      <span className="mission-team-goal">{team.goal}</span>
+                    ) : (
+                      <span className="mission-team-goal mission-text-muted">
+                        No goal set
+                      </span>
+                    )}
+                    <span>
+                      {team.directors.join(", ")} —{" "}
+                      {team.members > 0
+                        ? `${team.members} workers`
+                        : "No workers"}
+                    </span>
+                  </div>
+                  <StatusPill state={team.state} />
+                </div>
+              ))}
+              {(status?.teams ?? []).length === 0 && (
+                <div className="mission-empty">
+                  No teams found. Create director profiles to define teams.
+                </div>
+              )}
             </div>
           </Panel>
           <Panel
@@ -323,8 +343,13 @@ function MissionControl({
 
       {mode === "workspace" && (
         <div className="mission-workspace">
-          <Panel kicker="Buckets - 7" title="Workspace map">
+          <Panel kicker="Quick launch" title="Workspace map">
             <div className="mission-bucket-grid">
+              <button onClick={() => go("chat")}>
+                <ChatBubble size={15} />
+                <strong>Chat</strong>
+                <span>New conversation</span>
+              </button>
               <button onClick={() => go("sessions")}>
                 <Clock size={15} />
                 <strong>Sessions</strong>
@@ -341,48 +366,57 @@ function MissionControl({
                 <span>{status?.teams.length ?? 0} teams</span>
               </button>
               <button onClick={() => go("providers")}>
-                <Brain size={15} />
-                <strong>Models</strong>
-                <span>Routes and saved models</span>
-              </button>
-              <button onClick={() => go("providers")}>
                 <KeyRound size={15} />
                 <strong>Providers</strong>
-                <span>Credentials and fallbacks</span>
-              </button>
-              <button onClick={() => go("memory")}>
-                <Brain size={15} />
-                <strong>Project Room</strong>
-                <span>{status?.projectRoom.exists ? "Linked" : "Needs link"}</span>
+                <span>{activeKeys.length} keys active</span>
               </button>
               <button onClick={() => go("tools")}>
                 <LayoutDashboard size={15} />
-                <strong>Tools</strong>
-                <span>Toolsets and MCP</span>
+                <strong>Toolkit</strong>
+                <span>Skills & tools</span>
               </button>
             </div>
           </Panel>
-          <Panel kicker="Preview" title="Current focus">
-            <div className="mission-preview">
-              <div className="mission-preview-banner">
-                <span />
+          <Panel kicker="At a glance" title="System overview">
+            <div className="mission-glance">
+              <div className="mission-glance-health">
+                <span className={`mission-glance-dot ${systemTotals.review > 0 ? "warn" : "ok"}`} />
                 <strong>
                   {systemTotals.review > 0
-                    ? `${systemTotals.review} systems need review`
-                    : "Hermes core systems are live"}
+                    ? `${systemTotals.review} of ${systemTotals.total} systems need review`
+                    : `All ${systemTotals.total} systems live`}
                 </strong>
               </div>
-              <div className="mission-kanban-counts">
-                {kanbanCounts.slice(0, 6).map(([key, value]) => (
-                  <div key={key}>
-                    <span>{titleCase(key)}</span>
-                    <strong>{value}</strong>
-                  </div>
-                ))}
-                {kanbanCounts.length === 0 && (
-                  <div className="mission-empty">No Kanban counts available.</div>
-                )}
+              <div className="mission-glance-stats">
+                <div>
+                  <span>Connection</span>
+                  <strong>{titleCase(status?.connection?.mode ?? "local")}</strong>
+                </div>
+                <div>
+                  <span>Profiles</span>
+                  <strong>{status?.profiles?.length ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Teams</span>
+                  <strong>{status?.teams?.length ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Sessions</span>
+                  <strong>{status?.sessions.totalCached ?? 0}</strong>
+                </div>
               </div>
+              {activeKeys.length > 0 && (
+                <div className="mission-glance-keys">
+                  <span className="mission-glance-keys-label">Active keys</span>
+                  <div className="mission-glance-key-tags">
+                    {activeKeys.map((k) => (
+                      <span key={k.key} className="mission-key-tag">
+                        {k.key.replace(/_API_KEY|_TOKEN/g, "").replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </Panel>
         </div>
@@ -417,7 +451,7 @@ function MissionControl({
             </div>
           </Panel>
           <Panel
-            kicker={`Directors - ${topProfiles.length}`}
+            kicker={`Teams - ${(status?.teams ?? []).length}`}
             title="Agent teams"
             action={
               <button

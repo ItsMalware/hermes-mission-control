@@ -516,6 +516,7 @@ interface HermesAPI {
       model: string;
       provider: string;
       role: "director" | "worker" | "assistant" | "specialist" | "general";
+      team: string;
       workerPoolPath: string;
       teamMembers: Array<{
         id: string;
