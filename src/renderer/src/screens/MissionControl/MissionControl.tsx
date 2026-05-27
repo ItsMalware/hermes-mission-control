@@ -144,9 +144,9 @@ function MissionControl({
 
   const topSubsystems = (status?.subsystems ?? []).slice(0, 7);
 
-  // Active API keys from the secrets inventory
+  // Active API keys from the secrets inventory (present OR duplicate = key exists)
   const activeKeys = useMemo(() => {
-    return (status?.secrets.items ?? []).filter((s) => s.status === "present");
+    return (status?.secrets.items ?? []).filter((s) => s.status !== "missing");
   }, [status]);
 
   function go(destination: MissionDestination): void {

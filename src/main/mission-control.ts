@@ -373,7 +373,7 @@ export async function getMissionControlStatus(): Promise<MissionControlStatus> {
     (tasksResult.ok && !tasksResult.value.success && tasksResult.value.error) ||
     "";
 
-  return {
+  const result: MissionControlStatus = {
     generatedAt,
     app: {
       name: app.getName(),
@@ -478,4 +478,6 @@ export async function getMissionControlStatus(): Promise<MissionControlStatus> {
     projectRoom,
     connection: getPublicConnectionConfig(),
   };
+
+  return result;
 }
