@@ -297,12 +297,17 @@ export async function getMissionControlStatus(): Promise<MissionControlStatus> {
   const profiles = profilesResult.ok ? profilesResult.value : [];
   const models = readModels();
   const sessions = listCachedSessions(200, 0);
-  const boardsResult = await withTimeout("kanban boards", 2500, () =>
+  const boardsResult = await withTimeout("kanban boards", 8000, () =>
     listBoards(false),
   );
-  const tasksResult = await withTimeout("kanban tasks", 2500, () =>
+  const tasksResult = await withTimeout("kanban tasks", 8000, () =>
     listTasks({}),
   );
+  if (!boardsResult.ok) {
+    console.warn("[MC] kanban boards failed:", boardsResult.error);
+  } else if (!boardsResult.value.success) {
+    console.warn("[MC] kanban boards CLI error:", boardsResult.value.error);
+  }
   const boards =
     boardsResult.ok && boardsResult.value.success && boardsResult.value.data
       ? boardsResult.value.data

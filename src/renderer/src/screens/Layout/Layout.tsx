@@ -554,7 +554,7 @@ function Layout({
           />
         )}
         <div style={paneStyle("mission-control")}>
-          <MissionControl onNavigate={goTo} />
+          <MissionControl onNavigate={goTo} visible={view === "mission-control"} />
         </div>
         <div style={paneStyle("chat")}>
           <div className="conversation-tabs">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Brain,
@@ -30,6 +30,7 @@ type MissionDestination =
 
 interface MissionControlProps {
   onNavigate?: (view: MissionDestination) => void;
+  visible?: boolean;
 }
 
 const statusLabels: Record<Status, string> = {
@@ -109,11 +110,13 @@ function titleCase(value: string): string {
 
 function MissionControl({
   onNavigate,
-}: MissionControlProps = {}): React.JSX.Element {
+  visible = true,
+}: MissionControlProps): React.JSX.Element {
   const [status, setStatus] = useState<MissionControlStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<MissionMode>("workspace");
+  const prevVisible = useRef(false);
 
   async function loadStatus(): Promise<void> {
     setLoading(true);
@@ -127,9 +130,13 @@ function MissionControl({
     }
   }
 
+  // Re-fetch every time the tab becomes visible
   useEffect(() => {
-    void loadStatus();
-  }, []);
+    if (visible && !prevVisible.current) {
+      void loadStatus();
+    }
+    prevVisible.current = visible;
+  }, [visible]);
 
   const systemTotals = useMemo(() => {
     const subsystems = status?.subsystems ?? [];
