@@ -40,7 +40,7 @@ Add a default Mission Control area to Hermes Desktop. The first screen should an
 - Do not delete, rename, or overwrite user Hermes configs.
 - Do not display raw secret values by default.
 - Do not merge GPT fallback back into automatic routing unless explicitly requested.
-- Keep `<local-hermes-desktop-repo>`, `/Applications/Hermes Agent.app`, `/Applications/Hermes Mission Control Lab.app`, and `<user-home>/.hermes/hermes-agent` as separate systems.
+- Keep the source checkout, installed app, lab app, and Hermes runtime as separate systems.
 - Preserve current Kanban, multi-tab chat, session sync, provider/model routing, and background/theme work.
 - Prefer read-only inventory endpoints first, then add write actions after UI safety is clear.
 - Keep changes scoped and upstreamable where possible.
@@ -320,4 +320,3 @@ Success criteria:
 6. Integrate Kanban summary.
 7. Add Project Room panels.
 8. Add Notion summary sync after the local UI is truthful.
-
