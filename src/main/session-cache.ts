@@ -20,15 +20,30 @@ interface CacheData {
 }
 
 function cacheFile(profile?: string): string {
-  return join(profileHome(profile), "desktop", "sessions.json");
+  const profilePath = join(profileHome(profile), "desktop", "sessions.json");
+  // Fall back to root home if profile-specific cache doesn't exist
+  if (profile && profile !== "default" && !existsSync(profilePath)) {
+    return join(profileHome(), "desktop", "sessions.json");
+  }
+  return profilePath;
 }
 
 function dbPath(profile?: string): string {
-  return join(profileHome(profile), "state.db");
+  const profileDb = join(profileHome(profile), "state.db");
+  // Fall back to root home if profile-specific DB doesn't exist
+  if (profile && profile !== "default" && !existsSync(profileDb)) {
+    return join(profileHome(), "state.db");
+  }
+  return profileDb;
 }
 
 function sessionsDir(profile?: string): string {
-  return join(profileHome(profile), "sessions");
+  const profileDir = join(profileHome(profile), "sessions");
+  // Fall back to root home if profile-specific sessions dir doesn't exist
+  if (profile && profile !== "default" && !existsSync(profileDir)) {
+    return join(profileHome(), "sessions");
+  }
+  return profileDir;
 }
 
 // Generate a short, readable title from the first user message (like ChatGPT/Claude)

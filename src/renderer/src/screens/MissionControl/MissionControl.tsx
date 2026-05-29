@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Brain,
@@ -30,6 +30,7 @@ type MissionDestination =
 
 interface MissionControlProps {
   onNavigate?: (view: MissionDestination) => void;
+  onChatWith?: (profileName: string) => void;
   visible?: boolean;
 }
 
@@ -110,6 +111,7 @@ function titleCase(value: string): string {
 
 function MissionControl({
   onNavigate,
+  onChatWith,
   visible = true,
 }: MissionControlProps): React.JSX.Element {
   const [status, setStatus] = useState<MissionControlStatus | null>(null);
@@ -299,7 +301,19 @@ function MissionControl({
                       </span>
                     )}
                     <span>
-                      {team.directors.join(", ")} —{" "}
+                      {team.directors.map((d, i) => (
+                        <React.Fragment key={d}>
+                          {i > 0 && ", "}
+                          <span
+                            className="mission-director-link"
+                            onDoubleClick={() => onChatWith?.(d)}
+                            title="Double-click to chat"
+                          >
+                            {d}
+                          </span>
+                        </React.Fragment>
+                      ))}
+                      {" "}&mdash;{" "}
                       {team.members > 0
                         ? `${team.members} workers`
                         : "No workers"}
@@ -478,7 +492,19 @@ function MissionControl({
                       <span className="mission-team-goal">{team.goal}</span>
                     )}
                     <span>
-                      {team.directors.join(", ")} —{" "}
+                      {team.directors.map((d, i) => (
+                        <React.Fragment key={d}>
+                          {i > 0 && ", "}
+                          <span
+                            className="mission-director-link"
+                            onDoubleClick={() => onChatWith?.(d)}
+                            title="Double-click to chat"
+                          >
+                            {d}
+                          </span>
+                        </React.Fragment>
+                      ))}
+                      {" "}&mdash;{" "}
                       {team.members > 0
                         ? `${team.members} workers`
                         : "No workers"}

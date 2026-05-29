@@ -293,7 +293,7 @@ function summarizeKanban(
 export async function getMissionControlStatus(): Promise<MissionControlStatus> {
   const generatedAt = now();
   const projectRoom = getProjectRoomStatus();
-  const profilesResult = await withTimeout("profiles", 2500, listProfiles);
+  const profilesResult = await withTimeout("profiles", 5000, listProfiles);
   const profiles = profilesResult.ok ? profilesResult.value : [];
   const models = readModels();
   const sessions = listCachedSessions(200, 0);

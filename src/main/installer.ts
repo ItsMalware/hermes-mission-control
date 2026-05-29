@@ -442,9 +442,19 @@ export function checkInstallStatus(): InstallStatus {
   // latency, so it now lives in `verifyInstall()` and is invoked lazily
   // by the renderer after the main UI is mounted.
   const installed = existsSync(HERMES_PYTHON) && existsSync(HERMES_SCRIPT);
-  const envFile = activeEnvFile(activeProfile);
+  let envFile = activeEnvFile(activeProfile);
   const authFile = activeAuthFile(activeProfile);
-  const configured = existsSync(envFile) || existsSync(authFile);
+  let configured = existsSync(envFile) || existsSync(authFile);
+  // Fall back to default profile credentials if active profile has none
+  if (!configured && activeProfile && activeProfile !== "default") {
+    const defaultEnv = activeEnvFile("default");
+    const defaultAuth = activeAuthFile("default");
+    configured = existsSync(defaultEnv) || existsSync(defaultAuth);
+    // Point envFile at the default so the hasApiKey scan below can read it
+    if (existsSync(defaultEnv)) {
+      envFile = defaultEnv;
+    }
+  }
   let hasApiKey = false;
   const verified = installed;
 

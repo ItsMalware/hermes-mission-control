@@ -35,9 +35,9 @@ function TypingIndicator({
 }
 
 /**
- * Bubble messages are filtered to "has content". History items (reasoning,
- * tool_call, tool_result) are *always* shown — they're collapsed by default
- * and the user opens them. Filtering them by content would defeat the point.
+ * Bubble messages are filtered to "has content". Tool history rows stay
+ * available collapsed for debugging, but reasoning/thinking rows are hidden
+ * from the main transcript so task results remain readable.
  */
 function isBubble(m: ChatMessage): m is import("./types").ChatBubbleMessage {
   // Bubble messages have no `kind` field (or kind === "user"/"assistant").
@@ -58,6 +58,7 @@ export const MessageList = memo(function MessageList({
   const visibleMessages = useMemo(
     () =>
       messages.filter((m) => {
+        if ((m as { kind?: string }).kind === "reasoning") return false;
         if (!isBubble(m)) return true;
         return ((m.content as string) || "").trim().length > 0;
       }),

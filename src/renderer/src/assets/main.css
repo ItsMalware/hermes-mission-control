@@ -1466,6 +1466,17 @@ body {
   opacity: 0.85;
 }
 
+.mission-director-link {
+  cursor: pointer;
+  border-bottom: 1px dashed var(--accent-text);
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.mission-director-link:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+
 .mission-callout,
 .mission-goal-card {
   min-height: 112px;

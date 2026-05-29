@@ -1352,9 +1352,20 @@ function setupIPC(): void {
     if (conn.mode === "ssh" && conn.ssh) return sshListModels(conn.ssh);
     return listModels();
   });
-  ipcMain.handle("mission-control-get-status", () =>
-    getMissionControlStatus(),
-  );
+  ipcMain.handle("mission-control-get-status", () => {
+    const conn = getConnectionConfig();
+    if (conn.mode === "ssh" || conn.mode === "remote") {
+      // TODO: Mission Control reads the local filesystem only — profiles,
+      // config, sessions, kanban, etc. will reflect the *local* machine,
+      // not the remote host.  A future sshGetMissionControlStatus() would
+      // need to gather the same data over SSH.  For now, warn and return
+      // local data so the dashboard isn't completely blank.
+      console.warn(
+        `[MC] mission-control-get-status called in ${conn.mode} mode; returning local data`,
+      );
+    }
+    return getMissionControlStatus();
+  });
   ipcMain.handle(
     "add-model",
     (
