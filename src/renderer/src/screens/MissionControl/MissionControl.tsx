@@ -17,14 +17,14 @@ type MissionControlStatus = Awaited<
   ReturnType<Window["hermesAPI"]["missionControlGetStatus"]>
 >;
 type Status = MissionControlStatus["subsystems"][number]["state"];
-type MissionMode = "chat" | "goal" | "workspace" | "control";
+type MissionMode = "chat" | "goal" | "kanban" | "workspace" | "control";
 type MissionDestination =
   | "chat"
   | "sessions"
   | "kanban"
   | "agents"
   | "providers"
-  | "memory"
+  | "self"
   | "tools"
   | "settings";
 
@@ -49,6 +49,7 @@ const modeItems: Array<{
 }> = [
   { id: "chat", label: "Chat", icon: ChatBubble },
   { id: "goal", label: "Goals", icon: Sparkles },
+  { id: "kanban", label: "Kanban", icon: KanbanIcon },
   { id: "workspace", label: "Workspace", icon: Brain },
   { id: "control", label: "Control Room", icon: LayoutDashboard },
 ];
@@ -109,6 +110,169 @@ function titleCase(value: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function KanbanChart({
+  counts = {},
+}: {
+  counts?: Record<string, number>;
+}): React.JSX.Element {
+  const statuses = ["done", "running", "blocked", "ready", "todo", "triage"];
+  const colors: Record<string, string> = {
+    done: "var(--success)",
+    running: "var(--accent-text)",
+    blocked: "var(--jewel-ruby)",
+    ready: "var(--jewel-gold)",
+    todo: "var(--jewel-amethyst)",
+    triage: "var(--text-muted)",
+  };
+
+  const labels: Record<string, string> = {
+    done: "Completed",
+    running: "Running",
+    blocked: "Blocked",
+    ready: "Ready",
+    todo: "Todo",
+    triage: "Triage",
+  };
+
+  const data = statuses.map((status) => ({
+    status,
+    count: counts[status] ?? 0,
+    color: colors[status],
+    label: labels[status],
+  }));
+
+  const total = data.reduce((acc, curr) => acc + curr.count, 0);
+
+  if (total === 0) {
+    return (
+      <div className="mission-kanban-chart-wrapper">
+        <div className="mission-kanban-chart-svg">
+          <svg width="160" height="160" viewBox="0 0 200 200">
+            <circle
+              cx="100"
+              cy="100"
+              r="70"
+              fill="transparent"
+              stroke="var(--bg-tertiary)"
+              strokeWidth="16"
+            />
+            <text
+              x="100"
+              y="95"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill="var(--text-primary)"
+              fontSize="24"
+              fontWeight="bold"
+            >
+              0
+            </text>
+            <text
+              x="100"
+              y="118"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill="var(--text-muted)"
+              fontSize="10"
+              letterSpacing="0.1em"
+              fontWeight="600"
+            >
+              TASKS
+            </text>
+          </svg>
+        </div>
+        <div className="mission-kanban-legend">
+          <div className="mission-empty-legend">No tasks on this board</div>
+        </div>
+      </div>
+    );
+  }
+
+  const r = 70;
+  const circ = 2 * Math.PI * r;
+  let accumulatedCount = 0;
+
+  return (
+    <div className="mission-kanban-chart-wrapper">
+      <div className="mission-kanban-chart-svg">
+        <svg width="160" height="160" viewBox="0 0 200 200">
+          {data.map((item) => {
+            if (item.count === 0) return null;
+            const strokeLength = (item.count / total) * circ;
+            const strokeOffset = (accumulatedCount / total) * circ;
+            accumulatedCount += item.count;
+
+            return (
+              <circle
+                key={item.status}
+                cx="100"
+                cy="100"
+                r={r}
+                fill="transparent"
+                stroke={item.color}
+                strokeWidth="16"
+                strokeDasharray={`${strokeLength} ${circ}`}
+                strokeDashoffset={-strokeOffset}
+                transform="rotate(-90 100 100)"
+                style={{ transition: "stroke-dashoffset 0.3s ease" }}
+              />
+            );
+          })}
+          <text
+            x="100"
+            y="95"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="var(--text-primary)"
+            fontSize="24"
+            fontWeight="bold"
+          >
+            {total}
+          </text>
+          <text
+            x="100"
+            y="118"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="var(--text-muted)"
+            fontSize="10"
+            letterSpacing="0.1em"
+            fontWeight="600"
+          >
+            TOTAL TASKS
+          </text>
+        </svg>
+      </div>
+
+      <div className="mission-kanban-legend">
+        {data.map((item) => {
+          const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
+          return (
+            <div
+              key={item.status}
+              className={`mission-legend-item ${item.count === 0 ? "muted" : ""}`}
+            >
+              <div className="mission-legend-label">
+                <span
+                  className="mission-legend-color"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span>{item.label}</span>
+              </div>
+              <div className="mission-legend-value">
+                <strong>{item.count}</strong>
+                {item.count > 0 && (
+                  <span className="mission-legend-pct">{percentage}%</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MissionControl({
   onNavigate,
   onChatWith,
@@ -166,11 +330,6 @@ function MissionControl({
     <div className="mission-control">
       <header className="mission-hero">
         <div>
-          <div className="mission-eyebrow">
-            <span>IV.</span>
-            <i />
-            <strong>Hermes OS</strong>
-          </div>
           <h1>Hermes OS</h1>
           <p>
             Nous Research agent. Sessions, skills, kanban, profiles, and a chat
@@ -275,7 +434,7 @@ function MissionControl({
       )}
 
       {mode === "goal" && (
-        <div className="mission-goal-layout">
+        <div className="mission-goal-layout mission-goal-layout-single">
           <Panel
             kicker={`Teams - ${status?.teams.length ?? 0}`}
             title="Team goals & objectives"
@@ -328,6 +487,25 @@ function MissionControl({
                 </div>
               )}
             </div>
+          </Panel>
+        </div>
+      )}
+
+      {mode === "kanban" && (
+        <div className="mission-kanban-layout">
+          <Panel
+            kicker="Board Overview"
+            title="Task Distribution"
+            action={
+              <button
+                className="mission-link-button"
+                onClick={() => go("kanban")}
+              >
+                Open Kanban
+              </button>
+            }
+          >
+            <KanbanChart counts={status?.kanban?.counts} />
           </Panel>
           <Panel
             kicker={`Kanban - ${status?.kanban.boardCount ?? 0} boards`}

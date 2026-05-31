@@ -253,8 +253,21 @@ function Agents({
                   <span>{team.owner.name}</span>
                   <span>{roleLabel(inferProfileRole(team.owner))}</span>
                 </button>
+                {team.coDirectors.map((director) => (
+                  <button
+                    key={director.name}
+                    className={`agents-team-member agents-team-owner ${
+                      activeProfile === director.name ? "active" : ""
+                    }`}
+                    onClick={() => handleSelect(director.name)}
+                  >
+                    <span>{director.name}</span>
+                    <span>{roleLabel(inferProfileRole(director))}</span>
+                  </button>
+                ))}
                 {team.profileMembers.length === 0 &&
-                  team.workerPoolMembers.length === 0 && (
+                  team.workerPoolMembers.length === 0 &&
+                  team.coDirectors.length === 0 && (
                     <div className="agents-team-empty">
                       No visible members yet.
                     </div>
