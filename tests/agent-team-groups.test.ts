@@ -51,6 +51,43 @@ describe("agent team grouping", () => {
     ]);
   });
 
+  it("collapses duplicate director profiles that declare the same team", () => {
+    const result = buildDirectorTeamGroups([
+      {
+        name: "osmara-director",
+        isDefault: false,
+        provider: "google-gemini-cli",
+        role: "director",
+        team: "osmara",
+      },
+      {
+        name: "osmara-intel",
+        isDefault: false,
+        provider: "google-gemini-cli",
+        role: "director",
+        team: "osmara",
+      },
+      {
+        name: "osmara-signal-scout",
+        isDefault: false,
+        provider: "google-gemini-cli",
+        role: "specialist",
+        team: "osmara",
+      },
+    ]);
+
+    expect(result.teams).toHaveLength(1);
+    expect(result.teams[0].label).toBe("Osmara");
+    expect(result.teams[0].owner.name).toBe("osmara-director");
+    expect(result.teams[0].coDirectors.map((director) => director.name)).toEqual(
+      ["osmara-intel"],
+    );
+    expect(result.teams[0].profileMembers.map((member) => member.name)).toEqual(
+      ["osmara-signal-scout"],
+    );
+    expect(result.unassignedProfiles).toHaveLength(0);
+  });
+
   it("distinguishes director, worker, assistant, specialist, and general roles", () => {
     expect(
       inferProfileRole({

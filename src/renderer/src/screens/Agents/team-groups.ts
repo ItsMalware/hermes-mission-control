@@ -28,6 +28,7 @@ export interface DirectorTeamGroup {
   key: string;
   label: string;
   owner: TeamProfileInfo;
+  coDirectors: TeamProfileInfo[];
   profileMembers: TeamProfileInfo[];
   workerPoolMembers: TeamMemberInfo[];
 }
@@ -101,13 +102,29 @@ export function buildDirectorTeamGroups(
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const assignedProfileNames = new Set<string>();
-  const teams = directors.map((director) => {
-    const key = director.team || teamKeyForProfile(director.name);
-    assignedProfileNames.add(director.name);
+  const directorsByTeam = directors.reduce<Map<string, TeamProfileInfo[]>>(
+    (map, director) => {
+      const key = director.team || teamKeyForProfile(director.name);
+      const teamDirectors = map.get(key) ?? [];
+      teamDirectors.push(director);
+      map.set(key, teamDirectors);
+      return map;
+    },
+    new Map(),
+  );
+
+  const teams = [...directorsByTeam.entries()].map(([key, teamDirectors]) => {
+    const [owner, ...coDirectors] = teamDirectors;
+    assignedProfileNames.add(owner.name);
+    for (const coDirector of coDirectors) {
+      assignedProfileNames.add(coDirector.name);
+    }
 
     const profileMembers = profiles
       .filter((profile) => {
-        if (profile.name === director.name) return false;
+        if (teamDirectors.some((director) => director.name === profile.name)) {
+          return false;
+        }
         if (inferProfileRole(profile) === "director") return false;
         const memberKey = profile.team || teamKeyForProfile(profile.name);
         return memberKey === key;
@@ -123,12 +140,15 @@ export function buildDirectorTeamGroups(
     }
 
     return {
-      id: director.name,
+      id: owner.name,
       key,
       label: teamLabelFromKey(key),
-      owner: director,
+      owner,
+      coDirectors,
       profileMembers,
-      workerPoolMembers: director.teamMembers ?? [],
+      workerPoolMembers: teamDirectors.flatMap(
+        (director) => director.teamMembers ?? [],
+      ),
     };
   });
 

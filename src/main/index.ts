@@ -116,6 +116,7 @@ import {
   updateSessionTitle,
 } from "./session-cache";
 import { listModels, addModel, removeModel, updateModel } from "./models";
+import { listAiClis } from "./ai-clis";
 import { getMissionControlStatus } from "./mission-control";
 import {
   listProfiles,
@@ -1366,6 +1367,7 @@ function setupIPC(): void {
     }
     return getMissionControlStatus();
   });
+  ipcMain.handle("list-ai-clis", () => listAiClis());
   ipcMain.handle(
     "add-model",
     (

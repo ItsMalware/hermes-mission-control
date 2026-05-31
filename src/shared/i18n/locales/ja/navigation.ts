@@ -1,5 +1,7 @@
 export default {
   chat: "チャット",
+  aiClis: "AI CLIs",
+  self: "Self",
   sessions: "セッション",
   agents: "プロファイル",
   office: "オフィス",

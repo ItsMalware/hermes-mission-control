@@ -928,6 +928,21 @@ interface HermesAPI {
   // Mission Control
   missionControlGetStatus: () => Promise<MissionControlStatus>;
 
+  // AI CLI inventory
+  listAiClis: () => Promise<
+    Array<{
+      id: string;
+      name: string;
+      command: string;
+      installed: boolean;
+      path: string | null;
+      version: string | null;
+      status: "ONLINE" | "OFFLINE" | "DEGRADED";
+      description: string;
+      error?: string;
+    }>
+  >;
+
   // Log viewer
   readLogs: (
     logFile?: string,

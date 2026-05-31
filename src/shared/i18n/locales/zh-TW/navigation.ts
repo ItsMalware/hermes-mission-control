@@ -1,5 +1,7 @@
 export default {
   chat: "聊天",
+  aiClis: "AI CLIs",
+  self: "Self",
   sessions: "工作階段",
   agents: "檔案",
   office: "工作區",

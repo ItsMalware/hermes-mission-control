@@ -1,6 +1,8 @@
 export default {
   missionControl: "Mission Control",
   chat: "Chat",
+  aiClis: "AI CLIs",
+  self: "Self",
   sessions: "Sessions",
   agents: "Teams",
   office: "Office",

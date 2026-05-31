@@ -1,5 +1,7 @@
 export default {
   chat: "Chat",
+  aiClis: "AI CLIs",
+  self: "Self",
   sessions: "Sesiones",
   agents: "Perfiles",
   office: "Office",

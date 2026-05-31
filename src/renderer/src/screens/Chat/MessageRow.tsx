@@ -30,6 +30,106 @@ export const HermesAvatar = memo(function HermesAvatar({
   );
 });
 
+/* ── Thinking / Reasoning parser helper ─────────────────────────────── */
+
+export function parseThinkingTags(content: string): { thinking: string; cleanContent: string } {
+  if (!content) return { thinking: "", cleanContent: "" };
+
+  const tags = ["think", "thinking", "reasoning", "thought", "REASONING_SCRATCHPAD"];
+  const regex = new RegExp(
+    `<(?:${tags.join("|")})(?:\\s[^>]*)?>([\\s\\S]*?)(?:</(?:${tags.join("|")})>|$)`,
+    "gi"
+  );
+
+  let thinking = "";
+  const cleanContent = content.replace(regex, (_, g1) => {
+    thinking += (thinking ? "\n" : "") + g1.trim();
+    return "";
+  });
+
+  return {
+    thinking: thinking.trim(),
+    cleanContent: cleanContent
+  };
+}
+
+/* ── Collapsible primitives duplicated from HistoryRow.tsx ─────────── */
+
+const Chevron = memo(function Chevron({
+  open,
+}: {
+  open: boolean;
+}): React.JSX.Element {
+  return (
+    <span
+      className={`chat-history-chevron ${
+        open ? "chat-history-chevron--open" : ""
+      }`}
+      aria-hidden="true"
+    >
+      ▸
+    </span>
+  );
+});
+
+interface CollapsibleSectionProps {
+  variant: "reasoning" | "tool-call" | "tool-result";
+  header: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+const CollapsibleSection = memo(function CollapsibleSection({
+  variant,
+  header,
+  defaultOpen = false,
+  children,
+}: CollapsibleSectionProps): React.JSX.Element {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <details
+      className={`chat-history chat-history--${variant}`}
+      open={open}
+      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
+    >
+      <summary className="chat-history-header">
+        <Chevron open={open} />
+        {header}
+      </summary>
+      <div className="chat-history-body">{children}</div>
+    </details>
+  );
+});
+
+const InlineThinking = memo(function InlineThinking({
+  text,
+  defaultOpen,
+}: {
+  text: string;
+  defaultOpen: boolean;
+}): React.JSX.Element {
+  const { t } = useI18n();
+  const lineCount = text.split("\n").length;
+  return (
+    <div style={{ marginBottom: "12px", width: "100%" }}>
+      <CollapsibleSection
+        variant="reasoning"
+        defaultOpen={defaultOpen}
+        header={
+          <span className="chat-history-label">
+            <span className="chat-history-title">{t("chat.thinking")}</span>
+            <span className="chat-history-meta">
+              {lineCount} {lineCount === 1 ? "line" : "lines"}
+            </span>
+          </span>
+        }
+      >
+        <pre className="chat-history-pre">{text}</pre>
+      </CollapsibleSection>
+    </div>
+  );
+});
+
 interface MessageRowProps {
   msg: ChatMessage;
   isLast: boolean;
@@ -57,15 +157,23 @@ export const MessageRow = memo(function MessageRow({
   // Only agent bubbles need media parsing — user bubbles render content
   // verbatim — so this is gated on the role to skip the work entirely for
   // user rows. (Follow-up item from PR #303 review.)
-  const bubbleContent = isChatBubbleMessage(msg)
+  const rawContent = isChatBubbleMessage(msg)
     ? (msg as ChatBubbleMessage).content
     : null;
+
+  const { thinking, cleanContent } = useMemo(() => {
+    if (msg.role !== "agent" || !rawContent) {
+      return { thinking: "", cleanContent: rawContent || "" };
+    }
+    return parseThinkingTags(rawContent);
+  }, [msg.role, rawContent]);
+
   const segments = useMemo(
     () =>
-      msg.role === "agent" && bubbleContent
-        ? parseMediaTokens(bubbleContent)
+      msg.role === "agent" && cleanContent
+        ? parseMediaTokens(cleanContent)
         : null,
-    [msg.role, bubbleContent],
+    [msg.role, cleanContent],
   );
 
   // Only chat bubble messages have content/attachments
@@ -84,7 +192,7 @@ export const MessageRow = memo(function MessageRow({
     msg.role === "agent" &&
     !isLoading &&
     isLast &&
-    APPROVAL_RE.test(msg.content);
+    APPROVAL_RE.test(cleanContent || "");
   const hasAttachments = !!msg.attachments && msg.attachments.length > 0;
 
   return (
@@ -106,7 +214,13 @@ export const MessageRow = memo(function MessageRow({
             ))}
           </div>
         )}
-        {msg.content &&
+        {thinking && (
+          <InlineThinking
+            text={thinking}
+            defaultOpen={isLoading && isLast}
+          />
+        )}
+        {cleanContent &&
           (msg.role === "agent" && segments
             ? segments.map((segment) =>
                 segment.type === "text" ? (
@@ -129,7 +243,7 @@ export const MessageRow = memo(function MessageRow({
                   />
                 ),
               )
-            : msg.content)}
+            : cleanContent)}
       </div>
       {showApprovalBar && (
         <div className="chat-approval-bar">

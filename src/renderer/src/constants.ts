@@ -50,7 +50,6 @@ export const PROVIDERS = {
     // not repeated here to avoid a duplicate <option> value.
     { value: "xai-oauth", label: "xAI Grok (OAuth)" },
     { value: "qwen-oauth", label: "Qwen (OAuth)" },
-    { value: "google-gemini-cli", label: "Gemini (CLI OAuth)" },
     { value: "minimax-oauth", label: "MiniMax (OAuth)" },
     { value: "kimi-coding", label: "Kimi (Coding Plan)" },
     // Catch-all for any other OpenAI-compatible endpoint or local LLM

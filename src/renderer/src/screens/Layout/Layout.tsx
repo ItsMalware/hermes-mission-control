@@ -5,12 +5,13 @@ import {
   type DbHistoryItem,
 } from "../Chat/sessionHistory";
 import MissionControl from "../MissionControl/MissionControl";
+import AiClis from "../AiClis/AiClis";
+import Self from "../Self/Self";
 import Sessions from "../Sessions/Sessions";
 import Agents from "../Agents/Agents";
 import Settings from "../Settings/Settings";
 import Skills from "../Skills/Skills";
 
-import Memory from "../Memory/Memory";
 import Tools from "../Tools/Tools";
 import Gateway from "../Gateway/Gateway";
 import Office from "../Office/Office";
@@ -35,6 +36,7 @@ import {
   Timer,
   Kanban as KanbanIcon,
   Download,
+  Bot,
   Plus,
   Pin,
   X,
@@ -78,12 +80,13 @@ function savePinnedTabs(conversations: ConversationState[]): void {
 
 type View =
   | "mission-control"
+  | "ai-clis"
+  | "self"
   | "chat"
   | "sessions"
   | "agents"
   | "office"
   | "providers"
-  | "memory"
   | "tools"
   | "schedules"
   | "kanban"
@@ -97,12 +100,13 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
     labelKey: "navigation.missionControl",
   },
   { view: "chat", icon: ChatBubble, labelKey: "navigation.chat" },
+  { view: "ai-clis", icon: Bot, labelKey: "navigation.aiClis" },
+  { view: "self", icon: Brain, labelKey: "navigation.self" },
   { view: "sessions", icon: Clock, labelKey: "navigation.sessions" },
   { view: "agents", icon: Users, labelKey: "navigation.agents" },
   { view: "office", icon: Building, labelKey: "navigation.office" },
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
   { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
-  { view: "memory", icon: Brain, labelKey: "navigation.memory" },
   { view: "tools", icon: Wrench, labelKey: "navigation.toolkit" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
   { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
@@ -633,6 +637,22 @@ function Layout({
           />
         </div>
 
+        {visitedViews.has("ai-clis") && (
+          <div style={paneStyle("ai-clis")}>
+            <AiClis />
+          </div>
+        )}
+
+        {visitedViews.has("self") && (
+          <div style={paneStyle("self")}>
+            {remoteMode ? (
+              <RemoteNotice feature="Self" />
+            ) : (
+              <Self profile={activeProfile} />
+            )}
+          </div>
+        )}
+
         {visitedViews.has("sessions") && (
           <div style={paneStyle("sessions")}>
             {remoteMode ? (
@@ -684,18 +704,6 @@ function Layout({
                 />
                 <Models visible={view === "providers"} />
               </>
-            )}
-          </div>
-        )}
-
-
-
-        {visitedViews.has("memory") && (
-          <div style={paneStyle("memory")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Memory" />
-            ) : (
-              <Memory profile={activeProfile} />
             )}
           </div>
         )}
