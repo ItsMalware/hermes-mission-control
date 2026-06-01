@@ -6,7 +6,6 @@ import {
 } from "../Chat/sessionHistory";
 import MissionControl from "../MissionControl/MissionControl";
 import AiClis from "../AiClis/AiClis";
-import Self from "../Self/Self";
 import Sessions from "../Sessions/Sessions";
 import Agents from "../Agents/Agents";
 import Settings from "../Settings/Settings";
@@ -82,7 +81,6 @@ function savePinnedTabs(conversations: ConversationState[]): void {
 type View =
   | "mission-control"
   | "ai-clis"
-  | "self"
   | "chat"
   | "sessions"
   | "agents"
@@ -104,7 +102,6 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   },
   { view: "chat", icon: ChatBubble, labelKey: "navigation.chat" },
   { view: "ai-clis", icon: Bot, labelKey: "navigation.aiClis" },
-  { view: "self", icon: Brain, labelKey: "navigation.self" },
   { view: "sessions", icon: Clock, labelKey: "navigation.sessions" },
   { view: "agents", icon: Users, labelKey: "navigation.agents" },
   { view: "office", icon: Building, labelKey: "navigation.office" },
@@ -476,6 +473,15 @@ function Layout({
     setActiveConversationId(conversation.id);
   }, []);
 
+  const handleChatWithProfile = useCallback(
+    async (name: string) => {
+      await window.hermesAPI.setActiveProfile(name);
+      handleSelectProfile(name);
+      goTo("chat");
+    },
+    [goTo, handleSelectProfile],
+  );
+
   const handleResumeSession = useCallback(
     async (sessionId: string) => {
       const items = (await window.hermesAPI.getSessionMessages(
@@ -565,10 +571,8 @@ function Layout({
         <div style={paneStyle("mission-control")}>
           <MissionControl
             onNavigate={goTo}
-            onChatWith={(name: string) => {
-              handleSelectProfile(name);
-              goTo("chat");
-            }}
+            onChatWith={handleChatWithProfile}
+            profile={activeProfile}
             visible={view === "mission-control"}
           />
         </div>
@@ -648,15 +652,6 @@ function Layout({
           </div>
         )}
 
-        {visitedViews.has("self") && (
-          <div style={paneStyle("self")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Self" />
-            ) : (
-              <Self profile={activeProfile} />
-            )}
-          </div>
-        )}
 
         {visitedViews.has("sessions") && (
           <div style={paneStyle("sessions")}>
@@ -682,10 +677,7 @@ function Layout({
               <Agents
                 activeProfile={activeProfile}
                 onSelectProfile={handleSelectProfile}
-                onChatWith={(name: string) => {
-                  handleSelectProfile(name);
-                  goTo("chat");
-                }}
+                onChatWith={handleChatWithProfile}
               />
             )}
           </div>

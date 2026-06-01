@@ -118,6 +118,13 @@ import {
 } from "./session-cache";
 import { listModels, addModel, removeModel, updateModel } from "./models";
 import { listAiClis } from "./ai-clis";
+import {
+  getSelfWorkspace,
+  readSelfNote,
+  setSelfVaultRoot,
+  writeSelfNote,
+  type SelfNoteKind,
+} from "./self";
 import { getMissionControlStatus } from "./mission-control";
 import {
   listProfiles,
@@ -1369,6 +1376,19 @@ function setupIPC(): void {
     return getMissionControlStatus();
   });
   ipcMain.handle("list-ai-clis", () => listAiClis());
+  ipcMain.handle("self-get-workspace", () => getSelfWorkspace());
+  ipcMain.handle("self-set-vault-root", (_event, vaultRoot: string) =>
+    setSelfVaultRoot(vaultRoot),
+  );
+  ipcMain.handle(
+    "self-read-note",
+    (_event, kind: SelfNoteKind, date?: string) => readSelfNote(kind, date),
+  );
+  ipcMain.handle(
+    "self-write-note",
+    (_event, kind: SelfNoteKind, date: string | undefined, content: string) =>
+      writeSelfNote(kind, date, content),
+  );
   ipcMain.handle(
     "add-model",
     (

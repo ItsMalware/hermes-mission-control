@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Plus,
   ChevronDown,
+  ChatBubble,
 } from "../../assets/icons";
 import { useI18n } from "../../components/useI18n";
 import {
@@ -33,7 +34,7 @@ interface ProfileInfo {
 interface AgentsProps {
   activeProfile: string;
   onSelectProfile: (name: string) => void;
-  onChatWith: (name: string) => void;
+  onChatWith: (name: string) => void | Promise<void>;
 }
 
 
@@ -41,7 +42,7 @@ interface AgentsProps {
 function Agents({
   activeProfile,
   onSelectProfile,
-  onChatWith: _onChatWith,
+  onChatWith,
 }: AgentsProps): React.JSX.Element {
   const { t } = useI18n();
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
@@ -105,6 +106,11 @@ function Agents({
   async function handleSelect(name: string): Promise<void> {
     await window.hermesAPI.setActiveProfile(name);
     onSelectProfile(name);
+    loadProfiles();
+  }
+
+  async function handleChat(name: string): Promise<void> {
+    await onChatWith(name);
     loadProfiles();
   }
 
@@ -244,26 +250,45 @@ function Agents({
                 <div className="agents-team-goal">{team.owner.description}</div>
               )}
               <div className="agents-team-members">
-                <button
-                  className={`agents-team-member agents-team-owner ${
-                    activeProfile === team.owner.name ? "active" : ""
-                  }`}
-                  onClick={() => handleSelect(team.owner.name)}
-                >
-                  <span>{team.owner.name}</span>
-                  <span>{roleLabel(inferProfileRole(team.owner))}</span>
-                </button>
-                {team.coDirectors.map((director) => (
+                <div className="agents-team-director-row">
                   <button
-                    key={director.name}
                     className={`agents-team-member agents-team-owner ${
-                      activeProfile === director.name ? "active" : ""
+                      activeProfile === team.owner.name ? "active" : ""
                     }`}
-                    onClick={() => handleSelect(director.name)}
+                    onClick={() => handleSelect(team.owner.name)}
                   >
-                    <span>{director.name}</span>
-                    <span>{roleLabel(inferProfileRole(director))}</span>
+                    <span>{team.owner.name}</span>
+                    <span>{roleLabel(inferProfileRole(team.owner))}</span>
                   </button>
+                  <button
+                    className="btn btn-secondary btn-sm agents-team-chat-btn"
+                    onClick={() => handleChat(team.owner.name)}
+                    title={`Chat with ${team.owner.name}`}
+                  >
+                    <ChatBubble size={13} />
+                    Chat
+                  </button>
+                </div>
+                {team.coDirectors.map((director) => (
+                  <div key={director.name} className="agents-team-director-row">
+                    <button
+                      className={`agents-team-member agents-team-owner ${
+                        activeProfile === director.name ? "active" : ""
+                      }`}
+                      onClick={() => handleSelect(director.name)}
+                    >
+                      <span>{director.name}</span>
+                      <span>{roleLabel(inferProfileRole(director))}</span>
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm agents-team-chat-btn"
+                      onClick={() => handleChat(director.name)}
+                      title={`Chat with ${director.name}`}
+                    >
+                      <ChatBubble size={13} />
+                      Chat
+                    </button>
+                  </div>
                 ))}
                 {team.profileMembers.length === 0 &&
                   team.workerPoolMembers.length === 0 &&

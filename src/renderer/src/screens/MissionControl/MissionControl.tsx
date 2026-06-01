@@ -3,15 +3,18 @@ import {
   Alert,
   Brain,
   ChatBubble,
+  Check,
   Clock,
   KeyRound,
   Kanban as KanbanIcon,
   LayoutDashboard,
   Refresh,
   Sparkles,
+  Timer,
   Users,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
+import Memory from "../Memory/Memory";
 
 type MissionControlStatus = Awaited<
   ReturnType<Window["hermesAPI"]["missionControlGetStatus"]>
@@ -24,7 +27,6 @@ type MissionDestination =
   | "kanban"
   | "agents"
   | "providers"
-  | "self"
   | "tools"
   | "settings";
 
@@ -32,6 +34,7 @@ interface MissionControlProps {
   onNavigate?: (view: MissionDestination) => void;
   onChatWith?: (profileName: string) => void;
   visible?: boolean;
+  profile?: string;
 }
 
 const statusLabels: Record<Status, string> = {
@@ -47,11 +50,11 @@ const modeItems: Array<{
   label: string;
   icon: LucideIcon;
 }> = [
+  { id: "control", label: "Control Room", icon: LayoutDashboard },
   { id: "chat", label: "Chat", icon: ChatBubble },
   { id: "goal", label: "Goals", icon: Sparkles },
   { id: "kanban", label: "Kanban", icon: KanbanIcon },
   { id: "workspace", label: "Workspace", icon: Brain },
-  { id: "control", label: "Control Room", icon: LayoutDashboard },
 ];
 
 function StatusPill({ state }: { state: Status }): React.JSX.Element {
@@ -272,16 +275,80 @@ function KanbanChart({
     </div>
   );
 }
+type ControlTab = "system" | "journal" | "vault-memory" | "daily-review";
 
+const CONTROL_TABS: Array<{
+  id: ControlTab;
+  label: string;
+  icon: LucideIcon;
+  summary: string;
+}> = [
+  {
+    id: "system",
+    label: "System Status",
+    icon: LayoutDashboard,
+    summary: "Subsystems, teams, and credentials.",
+  },
+  {
+    id: "journal",
+    label: "Journal",
+    icon: Clock,
+    summary: "Daily notes for Obsidian vault.",
+  },
+  {
+    id: "vault-memory",
+    label: "Vault Memory",
+    icon: Brain,
+    summary: "Hermes memory and recall.",
+  },
+  {
+    id: "daily-review",
+    label: "Daily Review",
+    icon: Timer,
+    summary: "Compact operating check.",
+  },
+];
+
+function PlaceholderPanel({
+  title,
+  kicker,
+  body,
+  checks,
+}: {
+  title: string;
+  kicker: string;
+  body: string;
+  checks: string[];
+}): React.JSX.Element {
+  return (
+    <section className="self-panel" style={{ width: "100%", boxSizing: "border-box" }}>
+      <div className="self-panel-header">
+        <span>{kicker}</span>
+        <h2>{title}</h2>
+        <p>{body}</p>
+      </div>
+      <div className="self-checklist">
+        {checks.map((check) => (
+          <div key={check} className="self-check">
+            <Check size={14} />
+            <span>{check}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 function MissionControl({
   onNavigate,
   onChatWith,
   visible = true,
+  profile,
 }: MissionControlProps): React.JSX.Element {
   const [status, setStatus] = useState<MissionControlStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<MissionMode>("workspace");
+  const [mode, setMode] = useState<MissionMode>("control");
+  const [controlTab, setControlTab] = useState<ControlTab>("system");
   const prevVisible = useRef(false);
 
   async function loadStatus(): Promise<void> {
@@ -459,7 +526,7 @@ function MissionControl({
                         No goal set
                       </span>
                     )}
-                    <span>
+                    <span className="mission-director-list">
                       {team.directors.map((d, i) => (
                         <React.Fragment key={d}>
                           {i > 0 && ", "}
@@ -470,9 +537,19 @@ function MissionControl({
                           >
                             {d}
                           </span>
+                          <button
+                            className="mission-director-chat-btn"
+                            onClick={() => onChatWith?.(d)}
+                            title={`Chat with ${d}`}
+                            type="button"
+                          >
+                            Chat
+                          </button>
                         </React.Fragment>
                       ))}
-                      {" "}&mdash;{" "}
+                      <span className="mission-director-separator">
+                        {" "}&mdash;{" "}
+                      </span>
                       {team.members > 0
                         ? `${team.members} workers`
                         : "No workers"}
@@ -622,98 +699,159 @@ function MissionControl({
       )}
 
       {mode === "control" && (
-        <div className="mission-control-room">
-          <Panel
-            kicker={`${systemTotals.live}/${systemTotals.total} live`}
-            title="System status"
-            action={
+        <div className="mission-control-container" style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
+          <nav className="self-tool-tabs" aria-label="Control Room tools">
+            {CONTROL_TABS.map(({ id, label, icon: Icon, summary }) => (
               <button
-                className="mission-link-button"
-                onClick={() => void loadStatus()}
-                disabled={loading}
+                key={id}
+                className={controlTab === id ? "active" : ""}
+                type="button"
+                onClick={() => setControlTab(id)}
               >
-                <Refresh size={13} />
-                {loading ? "Refreshing" : "Refresh"}
+                <Icon size={15} />
+                <span>{label}</span>
+                <small>{summary}</small>
               </button>
-            }
-          >
-            <div className="mission-list">
-              {topSubsystems.map((subsystem) => (
-                <div className="mission-row" key={subsystem.id}>
-                  <div>
-                    <strong>{subsystem.label}</strong>
-                    <span>{subsystem.detail}</span>
-                  </div>
-                  <StatusPill state={subsystem.state} />
+            ))}
+          </nav>
+
+          {controlTab === "system" && (
+            <div className="mission-control-room">
+              <Panel
+                kicker={`${systemTotals.live}/${systemTotals.total} live`}
+                title="System status"
+                action={
+                  <button
+                    className="mission-link-button"
+                    onClick={() => void loadStatus()}
+                    disabled={loading}
+                  >
+                    <Refresh size={13} />
+                    {loading ? "Refreshing" : "Refresh"}
+                  </button>
+                }
+              >
+                <div className="mission-list">
+                  {topSubsystems.map((subsystem) => (
+                    <div className="mission-row" key={subsystem.id}>
+                      <div>
+                        <strong>{subsystem.label}</strong>
+                        <span>{subsystem.detail}</span>
+                      </div>
+                      <StatusPill state={subsystem.state} />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </Panel>
-          <Panel
-            kicker={`Teams - ${(status?.teams ?? []).length}`}
-            title="Agent teams"
-            action={
-              <button
-                className="mission-link-button"
-                onClick={() => go("agents")}
+              </Panel>
+              <Panel
+                kicker={`Teams - ${(status?.teams ?? []).length}`}
+                title="Agent teams"
+                action={
+                  <button
+                    className="mission-link-button"
+                    onClick={() => go("agents")}
+                  >
+                    Open teams
+                  </button>
+                }
               >
-                Open teams
-              </button>
-            }
-          >
-            <div className="mission-list">
-              {(status?.teams ?? []).map((team) => (
-                <div className="mission-row mission-team-row" key={team.key}>
-                  <div>
-                    <strong>{team.label}</strong>
-                    {team.goal && (
-                      <span className="mission-team-goal">{team.goal}</span>
-                    )}
-                    <span>
-                      {team.directors.map((d, i) => (
-                        <React.Fragment key={d}>
-                          {i > 0 && ", "}
-                          <span
-                            className="mission-director-link"
-                            onDoubleClick={() => onChatWith?.(d)}
-                            title="Double-click to chat"
-                          >
-                            {d}
+                <div className="mission-list">
+                  {(status?.teams ?? []).map((team) => (
+                    <div className="mission-row mission-team-row" key={team.key}>
+                      <div>
+                        <strong>{team.label}</strong>
+                        {team.goal && (
+                          <span className="mission-team-goal">{team.goal}</span>
+                        )}
+                        <span className="mission-director-list">
+                          {team.directors.map((d, i) => (
+                            <React.Fragment key={d}>
+                              {i > 0 && ", "}
+                              <span
+                                className="mission-director-link"
+                                onDoubleClick={() => onChatWith?.(d)}
+                                title="Double-click to chat"
+                              >
+                                {d}
+                              </span>
+                              <button
+                                className="mission-director-chat-btn"
+                                onClick={() => onChatWith?.(d)}
+                                title={`Chat with ${d}`}
+                                type="button"
+                              >
+                                Chat
+                              </button>
+                            </React.Fragment>
+                          ))}
+                          <span className="mission-director-separator">
+                            {" "}&mdash;{" "}
                           </span>
-                        </React.Fragment>
-                      ))}
-                      {" "}&mdash;{" "}
-                      {team.members > 0
-                        ? `${team.members} workers`
-                        : "No workers"}
-                    </span>
-                  </div>
-                  <StatusPill state={team.state} />
+                          {team.members > 0
+                            ? `${team.members} workers`
+                            : "No workers"}
+                        </span>
+                      </div>
+                      <StatusPill state={team.state} />
+                    </div>
+                  ))}
+                  {(status?.teams ?? []).length === 0 && (
+                    <div className="mission-empty">No director teams found.</div>
+                  )}
                 </div>
-              ))}
-              {(status?.teams ?? []).length === 0 && (
-                <div className="mission-empty">No director teams found.</div>
-              )}
-            </div>
-          </Panel>
-          <Panel
-            kicker={`Secrets - ${status?.secrets.total ?? 0}`}
-            title="Credential inventory"
-          >
-            <div className="mission-secret-meter">
-              <span>Present {status?.secrets.present ?? 0}</span>
-              <span>Missing {status?.secrets.missing ?? 0}</span>
-              <span>Duplicate {status?.secrets.duplicate ?? 0}</span>
-            </div>
-            <div className="mission-token-list">
-              {(status?.secrets.items ?? []).slice(0, 8).map((secret) => (
-                <div className="mission-token" key={secret.key}>
-                  <span>{secret.key}</span>
-                  <em>{secret.status}</em>
+              </Panel>
+              <Panel
+                kicker={`Secrets - ${status?.secrets.total ?? 0}`}
+                title="Credential inventory"
+              >
+                <div className="mission-secret-meter">
+                  <span>Present {status?.secrets.present ?? 0}</span>
+                  <span>Missing {status?.secrets.missing ?? 0}</span>
+                  <span>Duplicate {status?.secrets.duplicate ?? 0}</span>
                 </div>
-              ))}
+                <div className="mission-token-list">
+                  {(status?.secrets.items ?? []).slice(0, 8).map((secret) => (
+                    <div className="mission-token" key={secret.key}>
+                      <span>{secret.key}</span>
+                      <em>{secret.status}</em>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
             </div>
-          </Panel>
+          )}
+
+          {controlTab === "journal" && (
+            <PlaceholderPanel
+              title="Journal"
+              kicker="Daily notes"
+              body="This will be the daily writing surface for check-ins, decisions, and short reflections."
+              checks={[
+                "One note per day",
+                "Small entries first, structure second",
+                "Keep private notes out of agent runtime config",
+              ]}
+            />
+          )}
+
+          {controlTab === "vault-memory" && (
+            <div className="self-memory-pane" style={{ border: "1px solid var(--panel-border)", borderRadius: "var(--radius-md)" }}>
+              <Memory profile={profile} />
+            </div>
+          )}
+
+          {controlTab === "daily-review" && (
+            <PlaceholderPanel
+              title="Daily Review"
+              kicker="Operating check"
+              body="This will pull together goals, open sessions, Kanban status, and notes that need follow-up."
+              checks={[
+                "What moved today?",
+                "What is blocked?",
+                "What should Hermes remember for tomorrow?",
+              ]}
+            />
+          )}
         </div>
       )}
     </div>

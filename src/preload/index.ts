@@ -1130,6 +1130,38 @@ const hermesAPI = {
     }>
   > => ipcRenderer.invoke("list-ai-clis"),
 
+  // Self workspace
+  selfGetWorkspace: (): Promise<{
+    vaultRoot: string;
+    baseDir: string;
+    detected: boolean;
+  }> => ipcRenderer.invoke("self-get-workspace"),
+  selfSetVaultRoot: (
+    vaultRoot: string,
+  ): Promise<{ vaultRoot: string; baseDir: string; detected: boolean }> =>
+    ipcRenderer.invoke("self-set-vault-root", vaultRoot),
+  selfReadNote: (
+    kind: "journal" | "daily-review",
+    date?: string,
+  ): Promise<{
+    kind: "journal" | "daily-review";
+    date: string;
+    path: string;
+    content: string;
+    exists: boolean;
+  }> => ipcRenderer.invoke("self-read-note", kind, date),
+  selfWriteNote: (
+    kind: "journal" | "daily-review",
+    date: string | undefined,
+    content: string,
+  ): Promise<{
+    kind: "journal" | "daily-review";
+    date: string;
+    path: string;
+    content: string;
+    exists: boolean;
+  }> => ipcRenderer.invoke("self-write-note", kind, date, content),
+
   // Log viewer
   readLogs: (
     logFile?: string,

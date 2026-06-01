@@ -952,6 +952,37 @@ interface HermesAPI {
     }>
   >;
 
+  // Self workspace
+  selfGetWorkspace: () => Promise<{
+    vaultRoot: string;
+    baseDir: string;
+    detected: boolean;
+  }>;
+  selfSetVaultRoot: (
+    vaultRoot: string,
+  ) => Promise<{ vaultRoot: string; baseDir: string; detected: boolean }>;
+  selfReadNote: (
+    kind: "journal" | "daily-review",
+    date?: string,
+  ) => Promise<{
+    kind: "journal" | "daily-review";
+    date: string;
+    path: string;
+    content: string;
+    exists: boolean;
+  }>;
+  selfWriteNote: (
+    kind: "journal" | "daily-review",
+    date: string | undefined,
+    content: string,
+  ) => Promise<{
+    kind: "journal" | "daily-review";
+    date: string;
+    path: string;
+    content: string;
+    exists: boolean;
+  }>;
+
   // Log viewer
   readLogs: (
     logFile?: string,
