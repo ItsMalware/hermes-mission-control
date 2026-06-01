@@ -11,7 +11,7 @@ import Sessions from "../Sessions/Sessions";
 import Agents from "../Agents/Agents";
 import Settings from "../Settings/Settings";
 import Skills from "../Skills/Skills";
-
+import Memory from "../Memory/Memory";
 import Tools from "../Tools/Tools";
 import Gateway from "../Gateway/Gateway";
 import Office from "../Office/Office";
@@ -27,6 +27,7 @@ import {
   Clock,
   Users,
   Settings as SettingsIcon,
+  Puzzle,
   Brain,
   Wrench,
   Signal,
@@ -87,6 +88,8 @@ type View =
   | "agents"
   | "office"
   | "providers"
+  | "skills"
+  | "memory"
   | "tools"
   | "schedules"
   | "kanban"
@@ -108,6 +111,8 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
   { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
   { view: "tools", icon: Wrench, labelKey: "navigation.toolkit" },
+  { view: "skills", icon: Puzzle, labelKey: "navigation.skills" },
+  { view: "memory", icon: Brain, labelKey: "navigation.memory" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
   { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
   { view: "settings", icon: SettingsIcon, labelKey: "navigation.settings" },
@@ -704,6 +709,26 @@ function Layout({
                 />
                 <Models visible={view === "providers"} />
               </>
+            )}
+          </div>
+        )}
+
+        {visitedViews.has("skills") && (
+          <div style={paneStyle("skills")}>
+            {remoteMode ? (
+              <RemoteNotice feature="Skills" />
+            ) : (
+              <Skills profile={activeProfile} />
+            )}
+          </div>
+        )}
+
+        {visitedViews.has("memory") && (
+          <div style={paneStyle("memory")}>
+            {remoteMode ? (
+              <RemoteNotice feature="Memory" />
+            ) : (
+              <Memory profile={activeProfile} />
             )}
           </div>
         )}

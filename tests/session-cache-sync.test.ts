@@ -325,6 +325,37 @@ describe("syncSessionCache", () => {
     expect(existsSync(CACHE_FILE)).toBe(true);
   });
 
+  it("treats an empty cache with a stale lastSync as a cold cache", () => {
+    const oldStart = Math.floor(Date.now() / 1000) - 86400 * 14;
+    seedDb([
+      {
+        id: "old-hidden-session",
+        started_at: oldStart,
+        message_count: 3,
+        firstUserMessage: "Recover this older session",
+      },
+    ]);
+
+    mkdirSync(join(TEST_HOME, "desktop"), { recursive: true });
+    writeFileSync(
+      CACHE_FILE,
+      JSON.stringify({
+        sessions: [],
+        lastSync: Math.floor(Date.now() / 1000),
+      }),
+      "utf-8",
+    );
+
+    const result = syncSessionCache();
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: "old-hidden-session",
+      messageCount: 3,
+    });
+    expect(result[0].title).toContain("Recover this older session");
+  });
+
   it("updates messageCount on existing sessions without duplicating them (issue #16 regression)", () => {
     // Use a future started_at so the 5-minute incremental sync window
     // (lastSync - 300) still catches the row on the second sync.
