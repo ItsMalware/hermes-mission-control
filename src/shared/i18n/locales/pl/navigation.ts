@@ -1,5 +1,6 @@
 export default {
   chat: "Czat",
+  artifacts: "Artefakty",
   sessions: "Sesje",
   agents: "Profile",
   office: "Biuro",

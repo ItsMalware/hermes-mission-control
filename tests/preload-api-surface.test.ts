@@ -104,6 +104,15 @@ describe("New APIs from v0.8/v0.9 features", () => {
     expect(preloadMethods).toContain("discoverMemoryProviders");
     expect(typeMethods).toContain("discoverMemoryProviders");
   });
+
+  it("has usable AI CLI APIs", () => {
+    expect(preloadMethods).toContain("listAiClis");
+    expect(preloadMethods).toContain("runAiCliPrompt");
+    expect(preloadMethods).toContain("openAiCliTerminal");
+    expect(typeMethods).toContain("listAiClis");
+    expect(typeMethods).toContain("runAiCliPrompt");
+    expect(typeMethods).toContain("openAiCliTerminal");
+  });
 });
 
 // ─── Legacy APIs still present ──────────────────────────

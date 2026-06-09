@@ -10,6 +10,30 @@ import type { ChatBubbleMessage, ChatMessage } from "./types";
 export const APPROVAL_RE =
   /⚠️.*dangerous|requires? (your )?approval|\/approve.*\/deny|do you want (me )?to (proceed|continue|run|execute)/i;
 
+export function parseThinkingTags(content: string): {
+  thinking: string;
+  cleanContent: string;
+} {
+  if (!content) return { thinking: "", cleanContent: "" };
+
+  const thoughts: string[] = [];
+  const cleanContent = content
+    .replace(
+      /<(think|thought|reasoning|thinking|REASONING_SCRATCHPAD)>([\s\S]*?)(?:<\/\1>|$)/gi,
+      (_match, _tag, inner: string) => {
+        const value = inner.trim();
+        if (value) thoughts.push(value);
+        return "";
+      },
+    )
+    .trim();
+
+  return {
+    thinking: thoughts.join("\n"),
+    cleanContent,
+  };
+}
+
 function isChatBubbleMessage(msg: ChatMessage): msg is ChatBubbleMessage {
   return (
     msg.kind === "user" ||
@@ -71,14 +95,18 @@ export const MessageRow = memo(function MessageRow({
   const bubbleContent = isChatBubbleMessage(msg)
     ? (msg as ChatBubbleMessage).content
     : null;
+  const visibleAgentContent = useMemo(() => {
+    if (msg.role !== "agent" || !bubbleContent) return bubbleContent;
+    return parseThinkingTags(cleanLeakedToolTags(bubbleContent)).cleanContent;
+  }, [msg.role, bubbleContent]);
   const segments = useMemo(
     () =>
-      msg.role === "agent" && bubbleContent
+      msg.role === "agent" && visibleAgentContent
         ? // Recover any tool/skill call the model leaked as text (e.g. a raw
           // `<skill_view>{"answer": …}</skill_view>` tag) before tokenizing.
-          parseMediaTokens(cleanLeakedToolTags(bubbleContent))
+          parseMediaTokens(visibleAgentContent)
         : null,
-    [msg.role, bubbleContent],
+    [msg.role, visibleAgentContent],
   );
 
   // Only chat bubble messages have content/attachments
@@ -121,7 +149,7 @@ export const MessageRow = memo(function MessageRow({
             ))}
           </div>
         )}
-        {msg.content &&
+        {visibleAgentContent &&
           (msg.role === "agent" && segments
             ? segments.map((segment) =>
                 segment.type === "text" ? (
@@ -144,7 +172,7 @@ export const MessageRow = memo(function MessageRow({
                   />
                 ),
               )
-            : msg.content)}
+            : visibleAgentContent)}
       </div>
       {showApprovalBar && (
         <div className="chat-approval-bar">

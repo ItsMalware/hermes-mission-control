@@ -4,6 +4,9 @@ import {
   dbItemsToChatMessages,
   type DbHistoryItem,
 } from "../Chat/sessionHistory";
+import MissionControl from "../MissionControl/MissionControl";
+import AiClis from "../AiClis/AiClis";
+import Artifacts from "../Artifacts/Artifacts";
 import Sessions from "../Sessions/Sessions";
 import Agents from "../Agents/Agents";
 import Discover from "../Discover/Discover";
@@ -25,12 +28,14 @@ import {
   ChatBubble,
   Clock,
   Compass,
+  Bot,
   Settings as SettingsIcon,
   Brain,
   Wrench,
   Signal,
   Building,
   Layers,
+  Monitor,
   KeyRound,
   Timer,
   Kanban as KanbanIcon,
@@ -42,6 +47,9 @@ import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
 type View =
+  | "mission-control"
+  | "ai-clis"
+  | "artifacts"
   | "chat"
   | "sessions"
   | "discover"
@@ -58,7 +66,14 @@ type View =
   | "settings";
 
 const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
+  {
+    view: "mission-control",
+    icon: Monitor,
+    labelKey: "navigation.missionControl",
+  },
   { view: "chat", icon: ChatBubble, labelKey: "navigation.chat" },
+  { view: "ai-clis", icon: Bot, labelKey: "navigation.aiClis" },
+  { view: "artifacts", icon: Layers, labelKey: "navigation.artifacts" },
   { view: "sessions", icon: Clock, labelKey: "navigation.sessions" },
   { view: "discover", icon: Compass, labelKey: "navigation.discover" },
   // "agents" (Profiles) is reached from the sidebar-footer ProfileSwitcher's
@@ -382,6 +397,32 @@ function Layout({
             onOpenDiagnose={() => goTo("settings")}
           />
         </div>
+
+        {visitedViews.has("mission-control") && (
+          <div style={paneStyle("mission-control")}>
+            {remoteMode ? (
+              <RemoteNotice feature="Mission Control" />
+            ) : (
+              <MissionControl onNavigate={goTo} />
+            )}
+          </div>
+        )}
+
+        {visitedViews.has("ai-clis") && (
+          <div style={paneStyle("ai-clis")}>
+            <AiClis />
+          </div>
+        )}
+
+        {visitedViews.has("artifacts") && (
+          <div style={paneStyle("artifacts")}>
+            {remoteMode ? (
+              <RemoteNotice feature="Artifacts" />
+            ) : (
+              <Artifacts profile={activeProfile} />
+            )}
+          </div>
+        )}
 
         {visitedViews.has("sessions") && (
           <div style={paneStyle("sessions")}>

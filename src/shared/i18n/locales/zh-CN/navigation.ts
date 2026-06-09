@@ -1,6 +1,7 @@
 export default {
   chat: "聊天",
   aiClis: "AI CLIs",
+  artifacts: "产物",
   self: "Self",
   sessions: "会话",
   agents: "档案",

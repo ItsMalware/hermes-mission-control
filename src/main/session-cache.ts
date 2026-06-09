@@ -328,9 +328,9 @@ export function updateSessionTitle(
   }
   // Also persist in state.db so the rename survives cache rebuilds
   try {
-    const dbPath = activeStateDbPath();
-    if (existsSync(dbPath)) {
-      const db = new Database(dbPath);
+    const stateDbPath = dbPath(profile);
+    if (existsSync(stateDbPath)) {
+      const db = new Database(stateDbPath);
       try {
         db.prepare("UPDATE sessions SET title = ? WHERE id = ?").run(
           title,

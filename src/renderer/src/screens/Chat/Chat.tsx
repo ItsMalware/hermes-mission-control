@@ -65,6 +65,9 @@ function Chat({
   const [worktreeVisible, setWorktreeVisible] = useState<boolean>(true);
   const dragCounter = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
+  const requestIdRef = useRef(
+    `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   const queueRef = useRef<QueuedMessage[]>([]);
   const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
 
@@ -299,6 +302,7 @@ function Chat({
 
   const actions = useChatActions({
     profile,
+    requestId: requestIdRef.current,
     hermesSessionId,
     messages,
     isLoading,

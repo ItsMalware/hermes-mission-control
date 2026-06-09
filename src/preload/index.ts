@@ -268,6 +268,7 @@ const hermesAPI = {
     profile?: string,
     resumeSessionId?: string,
     history?: Array<{ role: string; content: string }>,
+    requestId?: string,
     attachments?: Attachment[],
     contextFolder?: string,
   ): Promise<{ response: string; sessionId?: string }> =>
@@ -277,11 +278,13 @@ const hermesAPI = {
       profile,
       resumeSessionId,
       history,
+      requestId,
       attachments,
       contextFolder,
     ),
 
-  abortChat: (): Promise<void> => ipcRenderer.invoke("abort-chat"),
+  abortChat: (requestId?: string): Promise<void> =>
+    ipcRenderer.invoke("abort-chat", requestId),
 
   transcribeAudio: (
     audio: Uint8Array,
@@ -667,6 +670,7 @@ const hermesAPI = {
   listCachedSessions: (
     limit?: number,
     offset?: number,
+    profile?: string,
   ): Promise<
     Array<{
       id: string;
@@ -676,9 +680,11 @@ const hermesAPI = {
       messageCount: number;
       model: string;
     }>
-  > => ipcRenderer.invoke("list-cached-sessions", limit, offset),
+  > => ipcRenderer.invoke("list-cached-sessions", limit, offset, profile),
 
-  syncSessionCache: (): Promise<
+  syncSessionCache: (
+    profile?: string,
+  ): Promise<
     Array<{
       id: string;
       title: string;
@@ -687,10 +693,14 @@ const hermesAPI = {
       messageCount: number;
       model: string;
     }>
-  > => ipcRenderer.invoke("sync-session-cache"),
+  > => ipcRenderer.invoke("sync-session-cache", profile),
 
-  updateSessionTitle: (sessionId: string, title: string): Promise<void> =>
-    ipcRenderer.invoke("update-session-title", sessionId, title),
+  updateSessionTitle: (
+    sessionId: string,
+    title: string,
+    profile?: string,
+  ): Promise<void> =>
+    ipcRenderer.invoke("update-session-title", sessionId, title, profile),
   deleteSession: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke("delete-session", sessionId),
   deleteSessions: (
@@ -702,6 +712,7 @@ const hermesAPI = {
   searchSessions: (
     query: string,
     limit?: number,
+    profile?: string,
   ): Promise<
     Array<{
       sessionId: string;
@@ -712,7 +723,7 @@ const hermesAPI = {
       model: string;
       snippet: string;
     }>
-  > => ipcRenderer.invoke("search-sessions", query, limit),
+  > => ipcRenderer.invoke("search-sessions", query, limit, profile),
 
   // Credential Pool (profile-aware: reads/writes the named profile's
   // auth.json; defaults to the currently active profile when omitted)
@@ -745,6 +756,15 @@ const hermesAPI = {
       label,
       profile,
     ),
+  getFallbackProviders: (
+    profile?: string,
+  ): Promise<Array<{ provider: string; model: string }>> =>
+    ipcRenderer.invoke("get-fallback-providers", profile),
+  setFallbackProviders: (
+    entries: Array<{ provider: string; model: string }>,
+    profile?: string,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("set-fallback-providers", entries, profile),
 
   // Models
   listModels: (): Promise<
@@ -1151,6 +1171,91 @@ const hermesAPI = {
     background?: boolean;
     action?: string;
   }> => ipcRenderer.invoke("install-mcp-catalog-entry", name, env, profile),
+  listAiClis: (): Promise<
+    Array<{
+      id: string;
+      name: string;
+      command: string;
+      installed: boolean;
+      path: string | null;
+      version: string | null;
+      status: "ONLINE" | "OFFLINE" | "DEGRADED";
+      description: string;
+      promptMode: boolean;
+      error?: string;
+    }>
+  > => ipcRenderer.invoke("list-ai-clis"),
+  runAiCliPrompt: (
+    id: string,
+    prompt: string,
+  ): Promise<{
+    id: string;
+    command: string;
+    args: string[];
+    output: string;
+    exitCode: number | null;
+    success: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke("run-ai-cli-prompt", id, prompt),
+  openAiCliTerminal: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke("open-ai-cli-terminal", id),
+  missionControlGetStatus: () =>
+    ipcRenderer.invoke("mission-control-get-status"),
+  selfGetWorkspace: () => ipcRenderer.invoke("self-get-workspace"),
+  selfSetVaultRoot: (vaultRoot: string) =>
+    ipcRenderer.invoke("self-set-vault-root", vaultRoot),
+  selfReadNote: (kind: "journal" | "daily-review", date?: string) =>
+    ipcRenderer.invoke("self-read-note", kind, date),
+  selfWriteNote: (
+    kind: "journal" | "daily-review",
+    date: string | undefined,
+    content: string,
+  ) => ipcRenderer.invoke("self-write-note", kind, date, content),
+
+  // Artifacts / workspace browser
+  listArtifactBuckets: (
+    profile?: string,
+  ): Promise<
+    Array<{
+      id: string;
+      label: string;
+      description: string;
+      roots: string[];
+      fileCount: number;
+      mtime: number;
+    }>
+  > => ipcRenderer.invoke("list-artifact-buckets", profile),
+  listArtifactFiles: (
+    bucketId: string,
+    profile?: string,
+  ): Promise<
+    Array<{
+      name: string;
+      relPath: string;
+      bytes: number;
+      mtime: number;
+      kind: "text" | "image" | "video" | "audio" | "pdf" | "binary";
+      isText: boolean;
+    }>
+  > => ipcRenderer.invoke("list-artifact-files", bucketId, profile),
+  readArtifactText: (
+    bucketId: string,
+    relPath: string,
+    profile?: string,
+  ): Promise<{ content: string; bytes: number; truncated: boolean } | null> =>
+    ipcRenderer.invoke("read-artifact-text", bucketId, relPath, profile),
+  readArtifactDataUrl: (
+    bucketId: string,
+    relPath: string,
+    profile?: string,
+  ): Promise<string | null> =>
+    ipcRenderer.invoke("read-artifact-data-url", bucketId, relPath, profile),
+  showArtifactInFolder: (
+    bucketId: string,
+    relPath: string,
+    profile?: string,
+  ): Promise<boolean> =>
+    ipcRenderer.invoke("show-artifact-in-folder", bucketId, relPath, profile),
 
   // Discover marketplace (community registry)
   fetchRegistry: (force?: boolean) =>

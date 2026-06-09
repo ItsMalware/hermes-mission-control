@@ -1,6 +1,7 @@
 export default {
   chat: "Chat",
   aiClis: "AI CLIs",
+  artifacts: "Artefatos",
   self: "Self",
   sessions: "Sessões",
   agents: "Perfis",

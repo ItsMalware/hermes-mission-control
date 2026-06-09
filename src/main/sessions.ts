@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { existsSync } from "fs";
-import { activeStateDbPath } from "./utils";
+import { activeStateDbPath, profileHome } from "./utils";
 import type { Attachment } from "../shared/attachments";
 import { isImageMime } from "../shared/attachments";
 import { clearStagedAttachments } from "./attachment-staging";
@@ -231,10 +231,10 @@ function highlightSessionMatch(
   return highlightTextMatch(fallbackSessionTitle(sessionId), query);
 }
 
-function getDb(readonly = true): Database.Database | null {
+function getDb(readonly = true, profile?: string): Database.Database | null {
   // Open the active profile's session DB — named profiles keep their
   // sessions under ~/.hermes/profiles/<name>/state.db (issue #311).
-  const dbPath = activeStateDbPath();
+  const dbPath = profile ? `${profileHome(profile)}/state.db` : activeStateDbPath();
   if (!existsSync(dbPath)) return null;
   return new Database(dbPath, readonly ? { readonly: true } : {});
 }
@@ -284,8 +284,12 @@ export function listSessions(limit = 30, offset = 0): SessionSummary[] {
   }
 }
 
-export function searchSessions(query: string, limit = 20): SearchResult[] {
-  const db = getDb();
+export function searchSessions(
+  query: string,
+  limit = 20,
+  profile?: string,
+): SearchResult[] {
+  const db = getDb(true, profile);
   if (!db) return [];
 
   try {

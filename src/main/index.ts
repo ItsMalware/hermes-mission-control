@@ -99,12 +99,12 @@ import {
   stopAdapter,
   startAll as startClaw3dAll,
   stopAll as stopClaw3d,
+  waitForClaw3dReady,
   getClaw3dLogs,
   setClaw3dPort,
   getClaw3dPort,
   setClaw3dWsUrl,
   getClaw3dWsUrl,
-  waitForClaw3dReady,
   Claw3dSetupProgress,
 } from "./claw3d";
 import { startOfficeStack } from "./office-start";
@@ -126,6 +126,8 @@ import {
   getPlatformEnabled,
   setPlatformEnabled,
   getApiServerKey,
+  getFallbackProviders,
+  setFallbackProviders,
 } from "./config";
 import {
   listSessions,
@@ -141,6 +143,22 @@ import {
 } from "./session-cache";
 import { listModels, addModel, removeModel, updateModel } from "./models";
 import { validateChatReadiness } from "./validation";
+import { listAiClis, openAiCliTerminal, runAiCliPrompt } from "./ai-clis";
+import {
+  listArtifactBuckets,
+  listArtifactFiles,
+  readArtifactDataUrl,
+  readArtifactText,
+  showArtifactInFolder,
+} from "./artifacts";
+import { getMissionControlStatus } from "./mission-control";
+import {
+  getSelfWorkspace,
+  readSelfNote,
+  setSelfVaultRoot,
+  type SelfNoteKind,
+  writeSelfNote,
+} from "./self";
 import {
   runConfigHealthCheck,
   autoFixIssue,
@@ -296,6 +314,7 @@ process.on("unhandledRejection", (reason) => {
 
 let mainWindow: BrowserWindow | null = null;
 let currentChatAbort: (() => void) | null = null;
+const chatAbortByRequestId = new Map<string, () => void>();
 
 function openExternalUrl(rawUrl: unknown): void {
   if (!isAllowedExternalUrl(rawUrl)) {
@@ -873,6 +892,7 @@ function setupIPC(): void {
       profile?: string,
       resumeSessionId?: string,
       history?: Array<{ role: string; content: string }>,
+      requestId?: string,
       attachments?: Attachment[],
       contextFolder?: string,
     ) => {
@@ -897,8 +917,12 @@ function setupIPC(): void {
         }
       }
 
-      if (currentChatAbort) {
-        currentChatAbort();
+      const previousAbort = requestId
+        ? chatAbortByRequestId.get(requestId)
+        : currentChatAbort;
+      if (previousAbort) {
+        previousAbort();
+        if (requestId) chatAbortByRequestId.delete(requestId);
       }
 
       let fullResponse = "";
@@ -932,10 +956,13 @@ function setupIPC(): void {
         {
           onChunk: (chunk) => {
             fullResponse += chunk;
-            if (!safeSend("chat-chunk", chunk) && currentChatAbort) {
+            const abort = requestId
+              ? chatAbortByRequestId.get(requestId)
+              : currentChatAbort;
+            if (!safeSend("chat-chunk", chunk) && abort) {
               // Renderer is gone — stop generating and resolve with what we
               // have so the awaiting promise doesn't leak.
-              currentChatAbort();
+              abort();
             }
           },
           onReasoningChunk: (chunk) => {
@@ -943,12 +970,16 @@ function setupIPC(): void {
             // the renderer can render the thinking bubble live during the
             // stream rather than waiting for a focus-change refresh (#352).
             // Same renderer-gone abort guard as the content channel.
-            if (!safeSend("chat-reasoning-chunk", chunk) && currentChatAbort) {
-              currentChatAbort();
+            const abort = requestId
+              ? chatAbortByRequestId.get(requestId)
+              : currentChatAbort;
+            if (!safeSend("chat-reasoning-chunk", chunk) && abort) {
+              abort();
             }
           },
           onDone: (sessionId) => {
-            currentChatAbort = null;
+            if (requestId) chatAbortByRequestId.delete(requestId);
+            else currentChatAbort = null;
             try {
               persistPromptImageAttachments(sessionId, message, attachments);
             } catch (err) {
@@ -976,7 +1007,8 @@ function setupIPC(): void {
             }
           },
           onError: (error) => {
-            currentChatAbort = null;
+            if (requestId) chatAbortByRequestId.delete(requestId);
+            else currentChatAbort = null;
             safeSend("chat-error", error);
             rejectChat(new Error(error));
             // Notify on error too if window not focused
@@ -1007,12 +1039,21 @@ function setupIPC(): void {
         contextFolder,
       );
 
-      currentChatAbort = handle.abort;
+      if (requestId) chatAbortByRequestId.set(requestId, handle.abort);
+      else currentChatAbort = handle.abort;
       return promise;
     },
   );
 
-  ipcMain.handle("abort-chat", () => {
+  ipcMain.handle("abort-chat", (_event, requestId?: string) => {
+    if (requestId) {
+      const abort = chatAbortByRequestId.get(requestId);
+      if (abort) {
+        abort();
+        chatAbortByRequestId.delete(requestId);
+      }
+      return;
+    }
     if (currentChatAbort) {
       currentChatAbort();
       currentChatAbort = null;
@@ -1510,37 +1551,40 @@ function setupIPC(): void {
   // Session cache (fast local cache with generated titles)
   ipcMain.handle(
     "list-cached-sessions",
-    (_event, limit?: number, offset?: number) => {
+    (_event, limit?: number, offset?: number, profile?: string) => {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh)
         return sshListCachedSessions(conn.ssh, limit, offset);
-      return listCachedSessions(limit, offset);
+      return listCachedSessions(limit, offset, profile);
     },
   );
-  ipcMain.handle("sync-session-cache", () => {
+  ipcMain.handle("sync-session-cache", (_event, profile?: string) => {
     const conn = getConnectionConfig();
     if (conn.mode === "ssh" && conn.ssh)
       return sshListCachedSessions(conn.ssh, 50);
     try {
-      return syncSessionCache();
+      return syncSessionCache(profile);
     } catch (error) {
       console.error("sync-session-cache failed; using local cache", error);
-      return listCachedSessions(50);
+      return listCachedSessions(50, 0, profile);
     }
   });
   ipcMain.handle(
     "update-session-title",
-    (_event, sessionId: string, title: string) =>
-      updateSessionTitle(sessionId, title),
+    (_event, sessionId: string, title: string, profile?: string) =>
+      updateSessionTitle(sessionId, title, profile),
   );
 
   // Session search
-  ipcMain.handle("search-sessions", (_event, query: string, limit?: number) => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "ssh" && conn.ssh)
-      return sshSearchSessions(conn.ssh, query, limit);
-    return searchSessions(query, limit);
-  });
+  ipcMain.handle(
+    "search-sessions",
+    (_event, query: string, limit?: number, profile?: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "ssh" && conn.ssh)
+        return sshSearchSessions(conn.ssh, query, limit);
+      return searchSessions(query, limit, profile);
+    },
+  );
 
   // Credential Pool — profile-aware. When `profile` is omitted, the
   // credential pool helpers default to the currently active profile's
@@ -1558,6 +1602,17 @@ function setupIPC(): void {
       profile?: string,
     ) => {
       setCredentialPool(provider, entries, profile);
+      return true;
+    },
+  );
+
+  ipcMain.handle("get-fallback-providers", (_event, profile?: string) =>
+    getFallbackProviders(profile),
+  );
+  ipcMain.handle(
+    "set-fallback-providers",
+    (_event, entries: Array<{ provider: string; model: string }>, profile?: string) => {
+      setFallbackProviders(entries, profile);
       return true;
     },
   );
@@ -1585,6 +1640,63 @@ function setupIPC(): void {
     if (conn.mode === "ssh" && conn.ssh) return sshListModels(conn.ssh);
     return listModels();
   });
+  ipcMain.handle("mission-control-get-status", () => {
+    const conn = getConnectionConfig();
+    if (conn.mode === "ssh" || conn.mode === "remote") {
+      // TODO: Mission Control reads the local filesystem only — profiles,
+      // config, sessions, kanban, etc. will reflect the *local* machine,
+      // not the remote host.  A future sshGetMissionControlStatus() would
+      // need to gather the same data over SSH.  For now, warn and return
+      // local data so the dashboard isn't completely blank.
+      console.warn(
+        `[MC] mission-control-get-status called in ${conn.mode} mode; returning local data`,
+      );
+    }
+    return getMissionControlStatus();
+  });
+  ipcMain.handle("list-ai-clis", () => listAiClis());
+  ipcMain.handle("run-ai-cli-prompt", (_event, id: string, prompt: string) =>
+    runAiCliPrompt(id, prompt),
+  );
+  ipcMain.handle("open-ai-cli-terminal", (_event, id: string) =>
+    openAiCliTerminal(id),
+  );
+  ipcMain.handle("list-artifact-buckets", (_event, profile?: string) =>
+    listArtifactBuckets(profile),
+  );
+  ipcMain.handle(
+    "list-artifact-files",
+    (_event, bucketId: string, profile?: string) =>
+      listArtifactFiles(bucketId, profile),
+  );
+  ipcMain.handle(
+    "read-artifact-text",
+    (_event, bucketId: string, relPath: string, profile?: string) =>
+      readArtifactText(bucketId, relPath, profile),
+  );
+  ipcMain.handle(
+    "read-artifact-data-url",
+    (_event, bucketId: string, relPath: string, profile?: string) =>
+      readArtifactDataUrl(bucketId, relPath, profile),
+  );
+  ipcMain.handle(
+    "show-artifact-in-folder",
+    (_event, bucketId: string, relPath: string, profile?: string) =>
+      showArtifactInFolder(bucketId, relPath, profile),
+  );
+  ipcMain.handle("self-get-workspace", () => getSelfWorkspace());
+  ipcMain.handle("self-set-vault-root", (_event, vaultRoot: string) =>
+    setSelfVaultRoot(vaultRoot),
+  );
+  ipcMain.handle(
+    "self-read-note",
+    (_event, kind: SelfNoteKind, date?: string) => readSelfNote(kind, date),
+  );
+  ipcMain.handle(
+    "self-write-note",
+    (_event, kind: SelfNoteKind, date: string | undefined, content: string) =>
+      writeSelfNote(kind, date, content),
+  );
   ipcMain.handle(
     "add-model",
     (

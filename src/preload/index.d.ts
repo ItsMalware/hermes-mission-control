@@ -78,6 +78,35 @@ interface GatewayStartResult {
   logPath?: string;
 }
 
+type ProfileRole =
+  | "director"
+  | "worker"
+  | "assistant"
+  | "specialist"
+  | "general";
+
+interface TeamMemberInfo {
+  id: string;
+  name: string;
+  role: ProfileRole;
+  source: "worker-pool";
+  path: string;
+}
+
+interface SelfWorkspaceInfo {
+  vaultRoot: string;
+  baseDir: string;
+  detected: boolean;
+}
+
+interface SelfNote {
+  kind: "journal" | "daily-review";
+  date: string;
+  path: string;
+  content: string;
+  exists: boolean;
+}
+
 /**
  * Shape of a credential-pool entry as the upstream engine expects
  * (issue #367). Old entries written by the renderer with just
@@ -181,6 +210,136 @@ interface KanbanCreateTaskInput {
   triage?: boolean;
   skills?: string[];
   maxRetries?: number;
+}
+
+type ArtifactKind = "text" | "image" | "video" | "audio" | "pdf" | "binary";
+
+interface ArtifactBucket {
+  id: string;
+  label: string;
+  description: string;
+  roots: string[];
+  fileCount: number;
+  mtime: number;
+}
+
+interface ArtifactFile {
+  name: string;
+  relPath: string;
+  bytes: number;
+  mtime: number;
+  kind: ArtifactKind;
+  isText: boolean;
+}
+
+interface ArtifactTextPreview {
+  content: string;
+  bytes: number;
+  truncated: boolean;
+}
+
+type MissionControlStatusState =
+  | "LIVE"
+  | "BUSY"
+  | "DEGRADED"
+  | "OFFLINE"
+  | "UNKNOWN";
+
+interface MissionControlSubsystem {
+  id: string;
+  label: string;
+  state: MissionControlStatusState;
+  detail: string;
+  count?: number;
+  updatedAt: number;
+}
+
+interface MissionControlStatus {
+  generatedAt: number;
+  app: { name: string; version: string; isLab: boolean };
+  paths: {
+    hermesHome: string;
+    hermesRuntime: string;
+    hermesConfig: string;
+    profiles: string;
+    projectRoom: string;
+  };
+  subsystems: MissionControlSubsystem[];
+  profiles: Array<{
+    name: string;
+    role: string;
+    state: MissionControlStatusState;
+    provider: string;
+    model: string;
+    hasEnv: boolean;
+    hasSoul: boolean;
+    skillCount: number;
+    gatewayRunning: boolean;
+  }>;
+  teams: Array<{
+    key: string;
+    label: string;
+    directors: string[];
+    members: number;
+    goal: string;
+    state: MissionControlStatusState;
+  }>;
+  secrets: {
+    total: number;
+    present: number;
+    missing: number;
+    duplicate: number;
+    items: Array<{
+      key: string;
+      category: string;
+      status: "present" | "missing" | "duplicate";
+      profiles: string[];
+      sources: string[];
+    }>;
+  };
+  sessions: {
+    totalCached: number;
+    activeEstimate: number;
+    latest: Array<{
+      id: string;
+      title: string;
+      messageCount: number;
+      model: string;
+      startedAt: number;
+    }>;
+  };
+  kanban: {
+    boardCount: number;
+    currentBoard: string | null;
+    counts: Record<string, number>;
+    topItems: Array<{
+      id: string;
+      title: string;
+      status: string;
+      priority: number;
+      assignee: string | null;
+    }>;
+  };
+  projectRoom: {
+    pointer: string;
+    target: string | null;
+    exists: boolean;
+    state: MissionControlStatusState;
+  };
+  connection: {
+    mode: "local" | "remote" | "ssh";
+    remoteUrl: string;
+    hasApiKey: boolean;
+    apiKeyLength: number;
+    ssh: {
+      host: string;
+      port: number;
+      username: string;
+      keyPath: string;
+      remotePort: number;
+      localPort: number;
+    };
+  };
 }
 
 interface HermesAPI {
@@ -307,10 +466,11 @@ interface HermesAPI {
     profile?: string,
     resumeSessionId?: string,
     history?: Array<{ role: string; content: string }>,
+    requestId?: string,
     attachments?: Attachment[],
     contextFolder?: string,
   ) => Promise<{ response: string; sessionId?: string }>;
-  abortChat: () => Promise<void>;
+  abortChat: (requestId?: string) => Promise<void>;
   transcribeAudio: (
     audio: Uint8Array,
     mimeType: string,
@@ -484,6 +644,11 @@ interface HermesAPI {
       hasSoul: boolean;
       skillCount: number;
       gatewayRunning: boolean;
+      description: string;
+      team: string;
+      role: ProfileRole;
+      workerPoolPath: string;
+      teamMembers: TeamMemberInfo[];
     }>
   >;
   createProfile: (
@@ -563,6 +728,7 @@ interface HermesAPI {
   listCachedSessions: (
     limit?: number,
     offset?: number,
+    profile?: string,
   ) => Promise<
     Array<{
       id: string;
@@ -573,7 +739,9 @@ interface HermesAPI {
       model: string;
     }>
   >;
-  syncSessionCache: () => Promise<
+  syncSessionCache: (
+    profile?: string,
+  ) => Promise<
     Array<{
       id: string;
       title: string;
@@ -583,7 +751,11 @@ interface HermesAPI {
       model: string;
     }>
   >;
-  updateSessionTitle: (sessionId: string, title: string) => Promise<void>;
+  updateSessionTitle: (
+    sessionId: string,
+    title: string,
+    profile?: string,
+  ) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   deleteSessions: (
     sessionIds: string[],
@@ -593,6 +765,7 @@ interface HermesAPI {
   searchSessions: (
     query: string,
     limit?: number,
+    profile?: string,
   ) => Promise<
     Array<{
       sessionId: string;
@@ -621,6 +794,13 @@ interface HermesAPI {
     label: string,
     profile?: string,
   ) => Promise<Array<CredentialPoolEntry>>;
+  getFallbackProviders: (
+    profile?: string,
+  ) => Promise<Array<{ provider: string; model: string }>>;
+  setFallbackProviders: (
+    entries: Array<{ provider: string; model: string }>,
+    profile?: string,
+  ) => Promise<boolean>;
 
   // Models
   listModels: () => Promise<
@@ -948,6 +1128,69 @@ interface HermesAPI {
     background?: boolean;
     action?: string;
   }>;
+  listAiClis: () => Promise<
+    Array<{
+      id: string;
+      name: string;
+      command: string;
+      installed: boolean;
+      path: string | null;
+      version: string | null;
+      status: "ONLINE" | "OFFLINE" | "DEGRADED";
+      description: string;
+      promptMode: boolean;
+      error?: string;
+    }>
+  >;
+  runAiCliPrompt: (
+    id: string,
+    prompt: string,
+  ) => Promise<{
+    id: string;
+    command: string;
+    args: string[];
+    output: string;
+    exitCode: number | null;
+    success: boolean;
+    error?: string;
+  }>;
+  openAiCliTerminal: (id: string) => Promise<boolean>;
+  missionControlGetStatus: () => Promise<MissionControlStatus>;
+
+  // Self / personal workspace
+  selfGetWorkspace: () => Promise<SelfWorkspaceInfo>;
+  selfSetVaultRoot: (vaultRoot: string) => Promise<SelfWorkspaceInfo>;
+  selfReadNote: (
+    kind: "journal" | "daily-review",
+    date?: string,
+  ) => Promise<SelfNote>;
+  selfWriteNote: (
+    kind: "journal" | "daily-review",
+    date: string | undefined,
+    content: string,
+  ) => Promise<SelfNote>;
+
+  // Artifacts / workspace browser
+  listArtifactBuckets: (profile?: string) => Promise<ArtifactBucket[]>;
+  listArtifactFiles: (
+    bucketId: string,
+    profile?: string,
+  ) => Promise<ArtifactFile[]>;
+  readArtifactText: (
+    bucketId: string,
+    relPath: string,
+    profile?: string,
+  ) => Promise<ArtifactTextPreview | null>;
+  readArtifactDataUrl: (
+    bucketId: string,
+    relPath: string,
+    profile?: string,
+  ) => Promise<string | null>;
+  showArtifactInFolder: (
+    bucketId: string,
+    relPath: string,
+    profile?: string,
+  ) => Promise<boolean>;
 
   // Discover marketplace (community registry)
   fetchRegistry: (
