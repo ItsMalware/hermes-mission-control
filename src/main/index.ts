@@ -7,16 +7,28 @@ import {
   Notification,
   dialog,
   clipboard,
+  session,
 } from "electron";
 import { join, extname } from "path";
-import { readdir, readFile } from "fs/promises";
+import { readdir, readFile, stat } from "fs/promises";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import type { AppUpdater } from "electron-updater";
 import icon from "../../resources/icon.png?asset";
 import type { Attachment } from "../shared/attachments";
 import { stageAttachment, clearStagedAttachments } from "./attachment-staging";
-import { discoverProviderModels } from "./model-discovery";
-import { readMediaAsDataUrl, saveMedia, mediaFileExists } from "./media";
+import { persistPromptImageAttachments } from "./session-attachment-store";
+import {
+  discoverProviderModels,
+  getModelContextWindow,
+} from "./model-discovery";
+import {
+  cleanupTempMediaFiles,
+  materializeDataUrlToTemp,
+  readMediaAsDataUrl,
+  saveMedia,
+  mediaFileExists,
+} from "./media";
+import { openTerminalInDirectory } from "./terminal-launcher";
 import {
   checkInstallStatus,
   verifyInstall,
@@ -33,11 +45,20 @@ import {
   runHermesBackup,
   runHermesImport,
   runHermesDump,
-  listMcpServers,
   discoverMemoryProviders,
   readLogs,
   InstallProgress,
 } from "./installer";
+import {
+  addMcpServer,
+  installMcpCatalogEntry,
+  listMcpCatalog,
+  listMcpServers,
+  removeMcpServer,
+  setMcpServerEnabled,
+  testMcpServer,
+  type McpServerInput,
+} from "./mcp-servers";
 import { updaterLogger } from "./updater-log";
 import {
   runHermesAuthLogin,
@@ -48,15 +69,19 @@ import {
   isRemoteMode,
   isRemoteOnlyMode,
   sendMessage,
+  transcribeAudio,
   startGateway,
+  startGatewayDetailed,
   stopGateway,
   isGatewayRunning,
   testRemoteConnection,
   stopHealthPolling,
   restartGateway,
+  notifyProfileSwitched,
   ensureSshTunnelIfNeeded,
   setSshRemoteApiKey,
   getRemoteAuthHeader,
+  resolvePendingClarify,
 } from "./hermes";
 import {
   startSshTunnel,
@@ -79,21 +104,18 @@ import {
   getClaw3dPort,
   setClaw3dWsUrl,
   getClaw3dWsUrl,
+  waitForClaw3dReady,
   Claw3dSetupProgress,
 } from "./claw3d";
 import { startOfficeStack } from "./office-start";
 import {
   readEnv,
-  listProfileSecrets,
-  getEnvValue,
   setEnvValue,
   getConfigValue,
   setConfigValue,
   getHermesHome,
   getModelConfig,
-  getFallbackProviders,
   setModelConfig,
-  setFallbackProviders,
   getCredentialPool,
   setCredentialPool,
   addCredentialPoolEntry,
@@ -110,6 +132,7 @@ import {
   getSessionMessages,
   searchSessions,
   deleteSession,
+  deleteSessions,
 } from "./sessions";
 import {
   syncSessionCache,
@@ -117,15 +140,13 @@ import {
   updateSessionTitle,
 } from "./session-cache";
 import { listModels, addModel, removeModel, updateModel } from "./models";
-import { listAiClis } from "./ai-clis";
+import { validateChatReadiness } from "./validation";
 import {
-  getSelfWorkspace,
-  readSelfNote,
-  setSelfVaultRoot,
-  writeSelfNote,
-  type SelfNoteKind,
-} from "./self";
-import { getMissionControlStatus } from "./mission-control";
+  runConfigHealthCheck,
+  autoFixIssue,
+  readConfigFixLog,
+  type IssueCode,
+} from "./config-health";
 import {
   listProfiles,
   createProfile,
@@ -140,7 +161,20 @@ import {
   writeUserProfile,
 } from "./memory";
 import { readSoul, writeSoul, resetSoul } from "./soul";
-import { getToolsets, setToolsetEnabled } from "./tools";
+import {
+  getPlatformToolsets,
+  getToolsets,
+  setMessagingPlatformToolsetEnabled,
+  setToolsetEnabled,
+} from "./tools";
+import {
+  fetchRegistry,
+  fetchRegistryDetail,
+  listInstalledRegistry,
+  installRegistryItem,
+  type RegistryKind,
+  type RegistryItem,
+} from "./registry";
 import {
   listInstalledSkills,
   listBundledSkills,
@@ -156,6 +190,15 @@ import {
   resumeCronJob,
   triggerCronJob,
 } from "./cronjobs";
+import {
+  applyMessagingPlatformUpdate,
+  buildDesktopMessagingPlatforms,
+  fetchRemoteMessagingPlatforms,
+  readLocalGatewayPlatformStates,
+  testDesktopMessagingPlatform,
+  testRemoteMessagingPlatform,
+  updateRemoteMessagingPlatform,
+} from "./messaging-platforms";
 import {
   listBoards as kanbanListBoards,
   currentBoard as kanbanCurrentBoard,
@@ -201,7 +244,9 @@ import {
   sshWriteSoul,
   sshResetSoul,
   sshGetToolsets,
+  sshGetPlatformToolsets,
   sshSetToolsetEnabled,
+  sshSetMessagingPlatformToolsetEnabled,
   sshReadEnv,
   sshSetEnvValue,
   sshGetConfigValue,
@@ -233,6 +278,13 @@ import {
   sshRunDump,
   sshDiscoverMemoryProviders,
 } from "./ssh-remote";
+import { applyGpuPreferences, installGpuCrashGuard } from "./gpu-fallback";
+
+// Disable hardware acceleration up front if a prior launch detected a fatal
+// GPU crash (or the user forced it). MUST run before app is ready. See
+// gpu-fallback.ts / issue #592.
+applyGpuPreferences();
+installGpuCrashGuard();
 
 process.on("uncaughtException", (err) => {
   console.error("[MAIN UNCAUGHT]", err);
@@ -243,7 +295,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 let mainWindow: BrowserWindow | null = null;
-const chatAborts = new Map<string, () => void>();
+let currentChatAbort: (() => void) | null = null;
 
 function openExternalUrl(rawUrl: unknown): void {
   if (!isAllowedExternalUrl(rawUrl)) {
@@ -461,7 +513,7 @@ function setupIPC(): void {
         event.sender.send("install-progress", {
           step: 1,
           totalSteps: 1,
-          title: "Updating remote Hermes OS",
+          title: "Updating remote Hermes Agent",
           detail: "Running hermes update over SSH...",
           log: "Running hermes update over SSH...\n",
         });
@@ -539,35 +591,40 @@ function setupIPC(): void {
     return readEnv(profile);
   });
 
-  ipcMain.handle("list-profile-secrets", async (_event, profile?: string) => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "ssh" && conn.ssh) {
-      const env = await sshReadEnv(conn.ssh, profile);
-      return Object.entries(env)
-        .filter(([key, value]) => /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL)/i.test(key) && value)
-        .map(([key, value]) => ({
-          key,
-          profile: profile || "default",
-          source: "remote env",
-          category: "remote",
-          maskedValue: `${String(value).slice(0, 4)}...${String(value).slice(-4)}`,
-          length: String(value).length,
-        }));
-    }
-    return listProfileSecrets(profile);
+  // Pre-send chat readiness — answers "if Send is clicked right now,
+  // will it work?". Fail-open semantics: any uncertain state returns
+  // `ok: true`, so the renderer never false-blocks a Send.
+  ipcMain.handle("validate-chat-readiness", (_event, profile?: string) => {
+    return validateChatReadiness(profile);
+  });
+
+  // Config-health audit + per-issue auto-fix. The renderer renders a
+  // dismissible banner above the chat input and a full report in the
+  // Settings → Diagnose section. Auto-fixes are additive only — never
+  // delete; always log to ~/.hermes/logs/config-fixes.log.
+  ipcMain.handle("get-config-health", (_event, profile?: string) => {
+    return runConfigHealthCheck(profile);
+  });
+
+  ipcMain.handle("rerun-config-health", (_event, profile?: string) => {
+    return runConfigHealthCheck(profile);
   });
 
   ipcMain.handle(
-    "get-env-value",
-    async (_event, key: string, profile?: string) => {
-      const conn = getConnectionConfig();
-      if (conn.mode === "ssh" && conn.ssh) {
-        const env = await sshReadEnv(conn.ssh, profile);
-        return env[key] || "";
-      }
-      return getEnvValue(key, profile);
+    "autofix-config-issue",
+    (
+      _event,
+      code: IssueCode,
+      profile?: string,
+      context?: Record<string, string>,
+    ) => {
+      return autoFixIssue(code, profile, context);
     },
   );
+
+  ipcMain.handle("get-config-fix-log", (_event, maxEntries?: number) => {
+    return readConfigFixLog(maxEntries);
+  });
 
   ipcMain.handle(
     "set-env",
@@ -590,7 +647,7 @@ function setupIPC(): void {
         key.endsWith("_API_KEY") ||
         key.endsWith("_TOKEN") ||
         key === "HF_TOKEN";
-      if (isGatewayRunning() && looksLikeCredential) {
+      if (isGatewayRunning(profile) && looksLikeCredential) {
         restartGateway(profile);
       }
       return true;
@@ -631,10 +688,6 @@ function setupIPC(): void {
     return getModelConfig(profile);
   });
 
-  ipcMain.handle("get-fallback-providers", (_event, profile?: string) =>
-    getFallbackProviders(profile),
-  );
-
   ipcMain.handle(
     "set-model-config",
     async (
@@ -664,7 +717,7 @@ function setupIPC(): void {
 
       // Restart gateway when provider, model, or endpoint changes so it picks up new config
       if (
-        isGatewayRunning() &&
+        isGatewayRunning(profile) &&
         (prev.provider !== provider ||
           prev.model !== model ||
           prev.baseUrl !== baseUrl)
@@ -674,15 +727,6 @@ function setupIPC(): void {
 
       return true;
     },
-  );
-
-  ipcMain.handle(
-    "set-fallback-providers",
-    (
-      _event,
-      entries: Array<{ provider: string; model: string; baseUrl?: string }>,
-      profile?: string,
-    ) => setFallbackProviders(entries, profile),
   );
 
   // API_SERVER_KEY management — lets the renderer detect a missing key and
@@ -705,8 +749,8 @@ function setupIPC(): void {
         setEnvValue("API_SERVER_KEY", key);
       }
       // Restart gateway so it picks up the new key immediately.
-      if (isGatewayRunning()) {
-        stopGateway();
+      if (isGatewayRunning(profile)) {
+        stopGateway(profile, true);
         await new Promise<void>((r) => setTimeout(r, 800));
         startGateway(profile);
       }
@@ -812,6 +856,16 @@ function setupIPC(): void {
 
   // Chat — lazy-start gateway on first message
   ipcMain.handle(
+    "transcribe-audio",
+    async (
+      _event,
+      audio: Uint8Array,
+      mimeType: string,
+      profile?: string,
+    ): Promise<string> => transcribeAudio(audio, mimeType, profile),
+  );
+
+  ipcMain.handle(
     "send-message",
     async (
       event,
@@ -819,15 +873,10 @@ function setupIPC(): void {
       profile?: string,
       resumeSessionId?: string,
       history?: Array<{ role: string; content: string }>,
-      requestId?: string,
       attachments?: Attachment[],
       contextFolder?: string,
     ) => {
-      const chatRequestId =
-        requestId ||
-        `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-      if (!isRemoteMode() && !isGatewayRunning()) {
+      if (!isRemoteMode() && !isGatewayRunning(profile)) {
         startGateway(profile);
       }
 
@@ -846,6 +895,10 @@ function setupIPC(): void {
           const key = await sshReadRemoteApiKey(conn.ssh);
           setSshRemoteApiKey(key);
         }
+      }
+
+      if (currentChatAbort) {
+        currentChatAbort();
       }
 
       let fullResponse = "";
@@ -879,15 +932,10 @@ function setupIPC(): void {
         {
           onChunk: (chunk) => {
             fullResponse += chunk;
-            if (
-              !safeSend("chat-chunk", {
-                requestId: chatRequestId,
-                chunk,
-              })
-            ) {
+            if (!safeSend("chat-chunk", chunk) && currentChatAbort) {
               // Renderer is gone — stop generating and resolve with what we
               // have so the awaiting promise doesn't leak.
-              chatAborts.get(chatRequestId)?.();
+              currentChatAbort();
             }
           },
           onReasoningChunk: (chunk) => {
@@ -895,21 +943,21 @@ function setupIPC(): void {
             // the renderer can render the thinking bubble live during the
             // stream rather than waiting for a focus-change refresh (#352).
             // Same renderer-gone abort guard as the content channel.
-            if (
-              !safeSend("chat-reasoning-chunk", {
-                requestId: chatRequestId,
-                chunk,
-              })
-            ) {
-              chatAborts.get(chatRequestId)?.();
+            if (!safeSend("chat-reasoning-chunk", chunk) && currentChatAbort) {
+              currentChatAbort();
             }
           },
           onDone: (sessionId) => {
-            chatAborts.delete(chatRequestId);
-            safeSend("chat-done", {
-              requestId: chatRequestId,
-              sessionId: sessionId || "",
-            });
+            currentChatAbort = null;
+            try {
+              persistPromptImageAttachments(sessionId, message, attachments);
+            } catch (err) {
+              console.warn(
+                "[sessions] Failed to persist prompt image attachments:",
+                err,
+              );
+            }
+            safeSend("chat-done", sessionId || "");
             resolveChat({ response: fullResponse, sessionId });
             // Desktop notification when window is not focused and response took >10s
             if (
@@ -922,37 +970,34 @@ function setupIPC(): void {
                 .trim()
                 .slice(0, 80);
               new Notification({
-                title: "Hermes OS",
+                title: "Hermes One",
                 body: preview || "Response ready",
               }).show();
             }
           },
           onError: (error) => {
-            chatAborts.delete(chatRequestId);
-            safeSend("chat-error", {
-              requestId: chatRequestId,
-              error,
-            });
+            currentChatAbort = null;
+            safeSend("chat-error", error);
             rejectChat(new Error(error));
             // Notify on error too if window not focused
             if (mainWindow && !mainWindow.isFocused()) {
               new Notification({
-                title: "Hermes OS — Error",
+                title: "Hermes One — Error",
                 body: error.slice(0, 100),
               }).show();
             }
           },
           onToolProgress: (tool) => {
-            safeSend("chat-tool-progress", {
-              requestId: chatRequestId,
-              tool,
-            });
+            safeSend("chat-tool-progress", tool);
+          },
+          onToolEvent: (toolEvent) => {
+            safeSend("chat-tool-event", toolEvent);
           },
           onUsage: (usage) => {
-            safeSend("chat-usage", {
-              requestId: chatRequestId,
-              usage,
-            });
+            safeSend("chat-usage", usage);
+          },
+          onClarify: (req) => {
+            safeSend("chat-clarify-request", req);
           },
         },
         profile,
@@ -962,23 +1007,29 @@ function setupIPC(): void {
         contextFolder,
       );
 
-      chatAborts.set(chatRequestId, handle.abort);
+      currentChatAbort = handle.abort;
       return promise;
     },
   );
 
-  ipcMain.handle("abort-chat", (_event, requestId?: string) => {
-    if (requestId) {
-      const abort = chatAborts.get(requestId);
-      if (abort) {
-        abort();
-        chatAborts.delete(requestId);
-      }
-      return;
+  ipcMain.handle("abort-chat", () => {
+    if (currentChatAbort) {
+      currentChatAbort();
+      currentChatAbort = null;
     }
-    for (const abort of chatAborts.values()) abort();
-    chatAborts.clear();
   });
+
+  // Renderer's answer to an inline clarify card. Resolves the pending gateway
+  // request for this request_id, which forwards the answer to `clarify.respond`.
+  ipcMain.handle(
+    "clarify-respond",
+    (_event, payload: { requestId: string; answer: string }) => {
+      return resolvePendingClarify(
+        payload?.requestId ?? "",
+        payload?.answer ?? "",
+      );
+    },
+  );
 
   // Renderer-driven clipboard write (issue #298 — "Copy entire chat").
   // Routed through the main process so it doesn't depend on the renderer's
@@ -1015,23 +1066,21 @@ function setupIPC(): void {
       const isUrl = /^https?:\/\//i.test(src);
       const isData = src.startsWith("data:");
       const template: Electron.MenuItemConstructorOptions[] = [];
-      // "Open" needs a real target — a local file or a web URL. A data:
-      // URL is inline bytes with nothing to hand to the OS, so it is
-      // save-only.
-      if (!isData) {
-        template.push({
-          label: labels.open,
-          click: () => {
-            if (isUrl) {
-              openExternalUrl(src);
-            } else {
-              shell.openPath(src).then((err) => {
-                if (err) console.error("[media] open failed:", err);
-              });
-            }
-          },
-        });
-      }
+      template.push({
+        label: labels.open,
+        click: () => {
+          if (isUrl) {
+            openExternalUrl(src);
+            return;
+          }
+
+          const target = isData ? materializeDataUrlToTemp(src, name) : src;
+          if (!target) return;
+          shell.openPath(target).then((err) => {
+            if (err) console.error("[media] open failed:", err);
+          });
+        },
+      });
       template.push({
         label: labels.saveAs,
         click: () => {
@@ -1067,20 +1116,47 @@ function setupIPC(): void {
     },
   );
 
+  // Authoritative context-window size for the active model (issue #597).
+  // Resolves the real `context_length` from the provider's /models catalogue;
+  // returns null when unavailable so the renderer falls back to its heuristic.
+  ipcMain.handle(
+    "get-model-context-window",
+    (
+      _event,
+      provider: string,
+      model: string,
+      baseUrl: string | undefined,
+      profile?: string,
+    ) => {
+      return getModelContextWindow(
+        provider,
+        model,
+        baseUrl,
+        undefined,
+        profile,
+      );
+    },
+  );
+
   // Gateway
   ipcMain.handle("start-gateway", async () => {
     const conn = getConnectionConfig();
     if (conn.mode === "ssh" && conn.ssh) {
       await sshStartGateway(conn.ssh);
-      return true;
+      return { success: true, running: true };
     }
     if (conn.mode === "remote") {
       // The remote server runs its own gateway; nothing to start locally.
       // Without this guard we'd fall through to `startGateway()` and
       // spawn a non-existent local hermes-agent (issue #266).
-      return false;
+      return {
+        success: false,
+        running: false,
+        error:
+          "Remote mode points at an already-running Hermes server. Start or restart the gateway on that remote host.",
+      };
     }
-    return startGateway();
+    return startGatewayDetailed();
   });
   ipcMain.handle("stop-gateway", async () => {
     const conn = getConnectionConfig();
@@ -1092,8 +1168,22 @@ function setupIPC(): void {
       // No local gateway to stop in pure remote mode.
       return true;
     }
-    stopGateway(true);
+    // No profile argument → stops the active profile's gateway, leaving any
+    // other profiles' gateways running.
+    stopGateway(undefined, true);
     return true;
+  });
+  ipcMain.handle("restart-gateway", async (_event, profile?: string) => {
+    const conn = getConnectionConfig();
+    if (conn.mode === "ssh" && conn.ssh) {
+      await sshStopGateway(conn.ssh);
+      await sshStartGateway(conn.ssh);
+      return sshGatewayStatus(conn.ssh);
+    }
+    if (conn.mode === "remote") {
+      return false;
+    }
+    return restartGateway(profile);
   });
   ipcMain.handle("gateway-status", () => {
     const conn = getConnectionConfig();
@@ -1118,10 +1208,129 @@ function setupIPC(): void {
       }
       setPlatformEnabled(platform, enabled, profile);
       // Restart gateway so it picks up the new platform config
-      if (isGatewayRunning()) {
+      if (isGatewayRunning(profile)) {
         restartGateway(profile);
       }
       return true;
+    },
+  );
+
+  ipcMain.handle(
+    "get-messaging-platforms",
+    async (_event, profile?: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "remote") {
+        return fetchRemoteMessagingPlatforms();
+      }
+      if (conn.mode === "ssh" && conn.ssh) {
+        const [envData, enabled, running, platformToolsets] = await Promise.all(
+          [
+            sshReadEnv(conn.ssh, profile),
+            sshGetPlatformEnabled(conn.ssh, profile),
+            sshGatewayStatus(conn.ssh),
+            sshGetPlatformToolsets(conn.ssh, profile),
+          ],
+        );
+        return buildDesktopMessagingPlatforms(
+          envData,
+          enabled,
+          running,
+          platformToolsets,
+        );
+      }
+      const running = isGatewayRunning(profile);
+      return buildDesktopMessagingPlatforms(
+        readEnv(profile),
+        getPlatformEnabled(profile),
+        running,
+        getPlatformToolsets(profile),
+        readLocalGatewayPlatformStates(profile, running),
+      );
+    },
+  );
+
+  ipcMain.handle(
+    "update-messaging-platform",
+    async (_event, platform: string, update, profile?: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "remote") {
+        return updateRemoteMessagingPlatform(platform, update);
+      }
+      if (conn.mode === "ssh" && conn.ssh) {
+        await applyMessagingPlatformUpdate(
+          platform,
+          update,
+          (key, value) => sshSetEnvValue(conn.ssh!, key, value, profile),
+          (key, enabled) =>
+            sshSetPlatformEnabled(conn.ssh!, key, enabled, profile),
+          (platformKey, toolsetKey, enabled) =>
+            sshSetMessagingPlatformToolsetEnabled(
+              conn.ssh!,
+              platformKey,
+              toolsetKey,
+              enabled,
+              profile,
+            ),
+        );
+        return { ok: true, platform };
+      }
+      await applyMessagingPlatformUpdate(
+        platform,
+        update,
+        (key, value) => setEnvValue(key, value, profile),
+        (key, enabled) => setPlatformEnabled(key, enabled, profile),
+        (platformKey, toolsetKey, enabled) =>
+          setMessagingPlatformToolsetEnabled(
+            platformKey,
+            toolsetKey,
+            enabled,
+            profile,
+          ),
+      );
+      if (isGatewayRunning(profile)) {
+        restartGateway(profile);
+      }
+      return { ok: true, platform };
+    },
+  );
+
+  ipcMain.handle(
+    "test-messaging-platform",
+    async (_event, platform: string, profile?: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "remote") {
+        return testRemoteMessagingPlatform(platform);
+      }
+      if (conn.mode === "ssh" && conn.ssh) {
+        const [envData, enabled, running, platformToolsets] = await Promise.all(
+          [
+            sshReadEnv(conn.ssh, profile),
+            sshGetPlatformEnabled(conn.ssh, profile),
+            sshGatewayStatus(conn.ssh),
+            sshGetPlatformToolsets(conn.ssh, profile),
+          ],
+        );
+        return testDesktopMessagingPlatform(
+          platform,
+          buildDesktopMessagingPlatforms(
+            envData,
+            enabled,
+            running,
+            platformToolsets,
+          ),
+        );
+      }
+      const running = isGatewayRunning(profile);
+      return testDesktopMessagingPlatform(
+        platform,
+        buildDesktopMessagingPlatforms(
+          readEnv(profile),
+          getPlatformEnabled(profile),
+          running,
+          getPlatformToolsets(profile),
+          readLocalGatewayPlatformStates(profile, running),
+        ),
+      );
     },
   );
 
@@ -1133,15 +1342,19 @@ function setupIPC(): void {
     return listSessions(limit, offset);
   });
 
-  ipcMain.handle("get-session-messages", (_event, sessionId: string, profile?: string) => {
+  ipcMain.handle("get-session-messages", (_event, sessionId: string) => {
     const conn = getConnectionConfig();
     if (conn.mode === "ssh" && conn.ssh)
-      return sshGetSessionMessages(conn.ssh, sessionId, profile);
-    return getSessionMessages(sessionId, profile);
+      return sshGetSessionMessages(conn.ssh, sessionId);
+    return getSessionMessages(sessionId);
   });
 
   ipcMain.handle("delete-session", (_event, sessionId: string) => {
     return deleteSession(sessionId);
+  });
+
+  ipcMain.handle("delete-sessions", (_event, sessionIds: string[]) => {
+    return deleteSessions(Array.isArray(sessionIds) ? sessionIds : []);
   });
 
   // Profiles
@@ -1163,7 +1376,18 @@ function setupIPC(): void {
     return deleteProfile(name);
   });
   ipcMain.handle("set-active-profile", (_event, name: string) => {
-    if (getConnectionConfig().mode !== "ssh") setActiveProfile(name);
+    if (getConnectionConfig().mode !== "ssh") {
+      setActiveProfile(name);
+      // The desktop now follows this profile: chat/health resolve their URL
+      // from the active profile's own port. Drop the cached health flag so the
+      // next check probes the new gateway rather than the previous profile's.
+      notifyProfileSwitched();
+      // Bring the activated profile's own gateway up if it isn't already —
+      // without stopping any other profile's gateway (their bots stay online).
+      if (!isRemoteMode() && !isGatewayRunning(name)) {
+        startGateway(name);
+      }
+    }
     return true;
   });
 
@@ -1286,36 +1510,36 @@ function setupIPC(): void {
   // Session cache (fast local cache with generated titles)
   ipcMain.handle(
     "list-cached-sessions",
-    (_event, limit?: number, offset?: number, profile?: string) => {
+    (_event, limit?: number, offset?: number) => {
       const conn = getConnectionConfig();
       if (conn.mode === "ssh" && conn.ssh)
-        return sshListCachedSessions(conn.ssh, limit, offset, profile);
-      return listCachedSessions(limit, offset, profile);
+        return sshListCachedSessions(conn.ssh, limit, offset);
+      return listCachedSessions(limit, offset);
     },
   );
-  ipcMain.handle("sync-session-cache", (_event, profile?: string) => {
+  ipcMain.handle("sync-session-cache", () => {
     const conn = getConnectionConfig();
     if (conn.mode === "ssh" && conn.ssh)
-      return sshListCachedSessions(conn.ssh, 50, 0, profile);
+      return sshListCachedSessions(conn.ssh, 50);
     try {
-      return syncSessionCache(profile);
+      return syncSessionCache();
     } catch (error) {
       console.error("sync-session-cache failed; using local cache", error);
-      return listCachedSessions(50, 0, profile);
+      return listCachedSessions(50);
     }
   });
   ipcMain.handle(
     "update-session-title",
-    (_event, sessionId: string, title: string, profile?: string) =>
-      updateSessionTitle(sessionId, title, profile),
+    (_event, sessionId: string, title: string) =>
+      updateSessionTitle(sessionId, title),
   );
 
   // Session search
-  ipcMain.handle("search-sessions", (_event, query: string, limit?: number, profile?: string) => {
+  ipcMain.handle("search-sessions", (_event, query: string, limit?: number) => {
     const conn = getConnectionConfig();
     if (conn.mode === "ssh" && conn.ssh)
-      return sshSearchSessions(conn.ssh, query, limit, profile);
-    return searchSessions(query, limit, profile);
+      return sshSearchSessions(conn.ssh, query, limit);
+    return searchSessions(query, limit);
   });
 
   // Credential Pool — profile-aware. When `profile` is omitted, the
@@ -1361,34 +1585,6 @@ function setupIPC(): void {
     if (conn.mode === "ssh" && conn.ssh) return sshListModels(conn.ssh);
     return listModels();
   });
-  ipcMain.handle("mission-control-get-status", () => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "ssh" || conn.mode === "remote") {
-      // TODO: Mission Control reads the local filesystem only — profiles,
-      // config, sessions, kanban, etc. will reflect the *local* machine,
-      // not the remote host.  A future sshGetMissionControlStatus() would
-      // need to gather the same data over SSH.  For now, warn and return
-      // local data so the dashboard isn't completely blank.
-      console.warn(
-        `[MC] mission-control-get-status called in ${conn.mode} mode; returning local data`,
-      );
-    }
-    return getMissionControlStatus();
-  });
-  ipcMain.handle("list-ai-clis", () => listAiClis());
-  ipcMain.handle("self-get-workspace", () => getSelfWorkspace());
-  ipcMain.handle("self-set-vault-root", (_event, vaultRoot: string) =>
-    setSelfVaultRoot(vaultRoot),
-  );
-  ipcMain.handle(
-    "self-read-note",
-    (_event, kind: SelfNoteKind, date?: string) => readSelfNote(kind, date),
-  );
-  ipcMain.handle(
-    "self-write-note",
-    (_event, kind: SelfNoteKind, date: string | undefined, content: string) =>
-      writeSelfNote(kind, date, content),
-  );
   ipcMain.handle(
     "add-model",
     (
@@ -1453,9 +1649,12 @@ function setupIPC(): void {
       sshGatewayStatus,
       sshStartGateway,
       startSshTunnel,
+      stopSshTunnel,
       sshReadRemoteApiKey,
       setSshRemoteApiKey,
       startClaw3dAll,
+      stopClaw3dAll: stopClaw3d,
+      waitForClaw3dReady,
     }),
   );
   ipcMain.handle("claw3d-stop-all", () => {
@@ -1618,6 +1817,19 @@ function setupIPC(): void {
     }
   });
 
+  ipcMain.handle("open-terminal", async (_event, dirPath: string) => {
+    if (isRemoteOnlyMode()) return false;
+    if (typeof dirPath !== "string" || dirPath.trim().length === 0)
+      return false;
+    try {
+      const info = await stat(dirPath);
+      if (!info.isDirectory()) return false;
+      return await openTerminalInDirectory(dirPath);
+    } catch {
+      return false;
+    }
+  });
+
   // Read image file as data URL for preview
   ipcMain.handle(
     "read-image-file",
@@ -1723,6 +1935,49 @@ function setupIPC(): void {
   ipcMain.handle("list-mcp-servers", (_event, profile?: string) =>
     listMcpServers(profile),
   );
+  ipcMain.handle(
+    "add-mcp-server",
+    (_event, input: McpServerInput, profile?: string) =>
+      addMcpServer(input, profile),
+  );
+  ipcMain.handle(
+    "remove-mcp-server",
+    (_event, name: string, profile?: string) => removeMcpServer(name, profile),
+  );
+  ipcMain.handle(
+    "set-mcp-server-enabled",
+    (_event, name: string, enabled: boolean, profile?: string) =>
+      setMcpServerEnabled(name, enabled, profile),
+  );
+  ipcMain.handle("test-mcp-server", (_event, name: string, profile?: string) =>
+    testMcpServer(name, profile),
+  );
+  ipcMain.handle("list-mcp-catalog", (_event, profile?: string) =>
+    listMcpCatalog(profile),
+  );
+  ipcMain.handle(
+    "install-mcp-catalog-entry",
+    (_event, name: string, env?: Record<string, string>, profile?: string) =>
+      installMcpCatalogEntry(name, env, profile),
+  );
+
+  // Discover marketplace (community registry)
+  ipcMain.handle("registry-fetch", (_event, force?: boolean) =>
+    fetchRegistry(!!force),
+  );
+  ipcMain.handle("registry-list-installed", (_event, profile?: string) =>
+    listInstalledRegistry(profile),
+  );
+  ipcMain.handle(
+    "registry-detail",
+    (_event, kind: RegistryKind, item: RegistryItem) =>
+      fetchRegistryDetail(kind, item),
+  );
+  ipcMain.handle(
+    "registry-install",
+    (_event, kind: RegistryKind, item: RegistryItem, profile?: string) =>
+      installRegistryItem(kind, item, profile),
+  );
 
   // Memory providers
   ipcMain.handle("discover-memory-providers", (_event, profile?: string) => {
@@ -1826,7 +2081,7 @@ function buildMenu(): void {
       label: "Help",
       submenu: [
         {
-          label: "Hermes OS on GitHub",
+          label: "Hermes Agent on GitHub",
           click: (): void => {
             openExternalUrl("https://github.com/NousResearch/hermes-agent/");
           },
@@ -1945,8 +2200,21 @@ if (process.env.ENABLE_CDP === "1") {
 }
 
 app.whenReady().then(() => {
-  app.name = "Hermes";
+  app.setName("Hermes One");
   electronApp.setAppUserModelId("com.nousresearch.hermes");
+  cleanupTempMediaFiles();
+
+  // Allow microphone access for the app's own renderer (voice input). Without
+  // a handler Electron denies getUserMedia by default. Scoped to the `media`
+  // permission only; everything else stays denied.
+  session.defaultSession.setPermissionRequestHandler(
+    (_wc, permission, callback) => {
+      callback(permission === "media");
+    },
+  );
+  session.defaultSession.setPermissionCheckHandler(
+    (_wc, permission) => permission === "media",
+  );
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
@@ -1985,7 +2253,10 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
-    stopGateway();
+    // Intentionally do NOT stop the gateway on exit: profile gateways are
+    // detached and meant to keep running headless (e.g. Telegram/Discord bots
+    // stay online after the desktop closes). The user stops a gateway
+    // explicitly via the Gateway controls.
     stopSshTunnel();
     stopClaw3d();
     app.quit();
@@ -1993,10 +2264,14 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  cleanupTempMediaFiles();
   stopHealthPolling();
-  for (const abort of chatAborts.values()) abort();
-  chatAborts.clear();
-  stopGateway();
+  if (currentChatAbort) {
+    currentChatAbort();
+    currentChatAbort = null;
+  }
+  // Leave profile gateways running on quit (see window-all-closed) so bots
+  // and other platforms stay online headless.
   stopSshTunnel();
   stopClaw3d();
 });

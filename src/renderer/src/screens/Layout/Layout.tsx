@@ -1,13 +1,13 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Chat, { ChatMessage } from "../Chat/Chat";
 import {
   dbItemsToChatMessages,
   type DbHistoryItem,
 } from "../Chat/sessionHistory";
-import MissionControl from "../MissionControl/MissionControl";
-import AiClis from "../AiClis/AiClis";
 import Sessions from "../Sessions/Sessions";
 import Agents from "../Agents/Agents";
+import Discover from "../Discover/Discover";
+import ProfileSwitcher from "./ProfileSwitcher";
 import Settings from "../Settings/Settings";
 import Skills from "../Skills/Skills";
 import Memory from "../Memory/Memory";
@@ -20,71 +20,34 @@ import Schedules from "../Schedules/Schedules";
 import Kanban from "../Kanban/Kanban";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
-import hermesBanner from "../../assets/hermes-banner.jpg";
+import hermeslogo from "../../assets/hermes-one.svg";
 import {
   ChatBubble,
   Clock,
-  Users,
+  Compass,
   Settings as SettingsIcon,
-  Puzzle,
   Brain,
   Wrench,
   Signal,
   Building,
-  Monitor,
+  Layers,
   KeyRound,
   Timer,
   Kanban as KanbanIcon,
   Download,
-  Bot,
-  Plus,
-  Pin,
-  X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
-// ─── Pinned-tab persistence ────────────────────────────────────────────────
-const PINNED_TABS_KEY = "hermes-pinned-tabs";
-
-interface PinnedTabEntry {
-  sessionId: string;
-  title: string;
-}
-
-function loadPinnedTabs(): PinnedTabEntry[] {
-  try {
-    const raw = localStorage.getItem(PINNED_TABS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (e): e is PinnedTabEntry =>
-        e && typeof e.sessionId === "string" && typeof e.title === "string",
-    );
-  } catch {
-    return [];
-  }
-}
-
-function savePinnedTabs(conversations: ConversationState[]): void {
-  const entries: PinnedTabEntry[] = conversations
-    .filter((c) => c.pinned && c.sessionId)
-    .map((c) => ({ sessionId: c.sessionId!, title: c.title }));
-  try {
-    localStorage.setItem(PINNED_TABS_KEY, JSON.stringify(entries));
-  } catch {
-    // localStorage unavailable (private mode, quota) — silently ignore
-  }
-}
-
 type View =
-  | "mission-control"
-  | "ai-clis"
   | "chat"
   | "sessions"
+  | "discover"
   | "agents"
   | "office"
+  | "models"
   | "providers"
   | "skills"
   | "memory"
@@ -95,63 +58,30 @@ type View =
   | "settings";
 
 const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
-  {
-    view: "mission-control",
-    icon: Monitor,
-    labelKey: "navigation.missionControl",
-  },
   { view: "chat", icon: ChatBubble, labelKey: "navigation.chat" },
-  { view: "ai-clis", icon: Bot, labelKey: "navigation.aiClis" },
   { view: "sessions", icon: Clock, labelKey: "navigation.sessions" },
-  { view: "agents", icon: Users, labelKey: "navigation.agents" },
+  { view: "discover", icon: Compass, labelKey: "navigation.discover" },
+  // "agents" (Profiles) is reached from the sidebar-footer ProfileSwitcher's
+  // "Manage profiles" action rather than a top-level nav item.
   { view: "office", icon: Building, labelKey: "navigation.office" },
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
+  { view: "models", icon: Layers, labelKey: "navigation.models" },
   { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
-  { view: "tools", icon: Wrench, labelKey: "navigation.toolkit" },
-  { view: "skills", icon: Puzzle, labelKey: "navigation.skills" },
+  // "skills" lives under the Discover tab (installed + community), so it's no
+  // longer a top-level nav item.
   { view: "memory", icon: Brain, labelKey: "navigation.memory" },
+  { view: "tools", icon: Wrench, labelKey: "navigation.tools" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
   { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
   { view: "settings", icon: SettingsIcon, labelKey: "navigation.settings" },
 ];
 
+const SIDEBAR_COLLAPSED_KEY = "hermes.sidebar.collapsed";
+
 interface LayoutProps {
   verifyWarning?: boolean;
   onReinstall?: () => void;
   onDismissVerifyWarning?: () => void;
-}
-
-interface ConversationState {
-  id: string;
-  title: string;
-  sessionId: string | null;
-  messages: ChatMessage[];
-  pinned: boolean;
-}
-
-function createConversation(
-  partial: Partial<ConversationState> = {},
-): ConversationState {
-  return {
-    id:
-      partial.id ||
-      `conv-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    title: partial.title || "New chat",
-    sessionId: partial.sessionId ?? null,
-    messages: partial.messages || [],
-    pinned: partial.pinned ?? false,
-  };
-}
-
-function titleFromMessages(messages: ChatMessage[]): string {
-  const firstUser = messages
-    .find(
-      (m): m is ChatMessage & { content: string } =>
-        m.role === "user" && "content" in m && typeof m.content === "string",
-    )
-    ?.content.trim();
-  if (!firstUser) return "New chat";
-  return firstUser.replace(/\s+/g, " ").slice(0, 42);
 }
 
 function Layout({
@@ -161,27 +91,16 @@ function Layout({
 }: LayoutProps = {}): React.JSX.Element {
   const { t } = useI18n();
   const [view, setView] = useState<View>("chat");
-  const [conversations, setConversations] = useState<ConversationState[]>(() => {
-    // Restore pinned tabs from localStorage as skeleton conversations.
-    // Their messages will be hydrated in the useEffect below.
-    const pinned = loadPinnedTabs().map((entry) =>
-      createConversation({
-        title: entry.title,
-        sessionId: entry.sessionId,
-        pinned: true,
-      }),
-    );
-    const fresh = createConversation();
-    return pinned.length > 0 ? [...pinned, fresh] : [fresh];
-  });
-  const [activeConversationId, setActiveConversationId] = useState<string>(
-    () => {
-      // Default to the first non-pinned (fresh) conversation
-      const unpinned = conversations.find((c) => !c.pinned);
-      return unpinned ? unpinned.id : conversations[0].id;
-    },
-  );
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [activeProfile, setActiveProfile] = useState("default");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   // Tabs lazy-mount on first visit, then stay mounted (display:none toggle).
   // Keeps IPC refetch / DOM rebuild off the tab-switch hot path.
   const [visitedViews, setVisitedViews] = useState<Set<View>>(
@@ -189,6 +108,12 @@ function Layout({
   );
   // Remote-only mode — SSH tunnel has full access; only pure HTTP remote mode restricts screens
   const [remoteMode, setRemoteMode] = useState(false);
+  // Set by the Capabilities screen's "Browse" actions to focus a Discover tab
+  // (Skills → Community, or MCPs). The nonce re-fires Discover's effect.
+  const [discoverFocus, setDiscoverFocus] = useState<{
+    kind: "skills" | "mcps";
+    nonce: number;
+  } | null>(null);
 
   const paneStyle = (target: View): React.CSSProperties => ({
     display: view === target ? "flex" : "none",
@@ -202,10 +127,38 @@ function Layout({
     setView(v);
   }, []);
 
+  const focusDiscover = useCallback(
+    (kind: "skills" | "mcps") => {
+      setDiscoverFocus((prev) => ({ kind, nonce: (prev?.nonce ?? 0) + 1 }));
+      goTo("discover");
+    },
+    [goTo],
+  );
+
   // Re-check remote mode on tab switch (picks up Settings changes)
   useEffect(() => {
     window.hermesAPI.isRemoteOnlyMode().then(setRemoteMode);
   }, [view]);
+
+  // Restore the last-activated profile on launch. The main process persists it
+  // in ~/.hermes/active_profile (via `hermes profile use`), so the desktop
+  // should reopen on that profile rather than always resetting to "default".
+  useEffect(() => {
+    let cancelled = false;
+    window.hermesAPI
+      .listProfiles()
+      .then((profiles) => {
+        if (cancelled) return;
+        const active = profiles.find((p) => p.isActive);
+        if (active && active.name !== "default") setActiveProfile(active.name);
+      })
+      .catch(() => {
+        /* fall back to the default profile */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-update state
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
@@ -261,196 +214,25 @@ function Layout({
     }
   }
 
-  const activeConversation =
-    conversations.find((c) => c.id === activeConversationId) ||
-    conversations[0];
-  const currentSessionId = activeConversation?.sessionId ?? null;
-  const visibleConversations = useMemo(
-    () =>
-      conversations
-        .map((conversation, index) => ({ conversation, index }))
-        .sort((a, b) => {
-          if (a.conversation.pinned !== b.conversation.pinned) {
-            return a.conversation.pinned ? -1 : 1;
-          }
-          return a.index - b.index;
-        })
-        .map(({ conversation }) => conversation),
-    [conversations],
-  );
-
-  const setActiveMessages = useCallback(
-    (update: React.SetStateAction<ChatMessage[]>) => {
-      setConversations((prev) =>
-        prev.map((conversation) => {
-          if (conversation.id !== activeConversationId) return conversation;
-          const nextMessages =
-            typeof update === "function"
-              ? update(conversation.messages)
-              : update;
-          return {
-            ...conversation,
-            messages: nextMessages,
-            title:
-              conversation.sessionId || conversation.title !== "New chat"
-                ? conversation.title
-                : titleFromMessages(nextMessages),
-          };
-        }),
-      );
-    },
-    [activeConversationId],
-  );
-
-  const updateActiveSessionId = useCallback(
-    (sessionId: string) => {
-      setConversations((prev) =>
-        prev.map((conversation) =>
-          conversation.id === activeConversationId
-            ? {
-                ...conversation,
-                sessionId,
-                title:
-                  conversation.title === "New chat"
-                    ? `Session ${sessionId.slice(-6)}`
-                    : conversation.title,
-              }
-            : conversation,
-        ),
-      );
-    },
-    [activeConversationId],
-  );
+  const updateButtonTitle =
+    updateError ??
+    (updateState === "available"
+      ? t("common.updateAvailable", { version: updateVersion })
+      : updateState === "downloading"
+        ? t("common.downloading", { percent: downloadPercent })
+        : updateState === "ready"
+          ? t("common.restartToUpdate")
+          : updateState === "error"
+            ? t("common.updateFailed")
+            : undefined);
 
   const handleNewChat = useCallback(() => {
-    const conversation = createConversation();
-    setConversations((prev) => [...prev, conversation]);
-    setActiveConversationId(conversation.id);
+    // Abort any in-flight chat before clearing
+    window.hermesAPI.abortChat();
+    setMessages([]);
+    setCurrentSessionId(null);
     goTo("chat");
   }, [goTo]);
-
-  const handleCloseConversation = useCallback(
-    (conversationId: string) => {
-      setConversations((prev) => {
-        const closing = prev.find((c) => c.id === conversationId);
-        if (closing?.pinned) return prev;
-        if (closing) void window.hermesAPI.abortChat(closing.id);
-        const next = prev.filter((c) => c.id !== conversationId);
-        if (next.length === 0) {
-          const replacement = createConversation();
-          setActiveConversationId(replacement.id);
-          return [replacement];
-        }
-        if (conversationId === activeConversationId) {
-          setActiveConversationId(next[next.length - 1].id);
-        }
-        savePinnedTabs(next);
-        return next;
-      });
-    },
-    [activeConversationId],
-  );
-
-  const handleTogglePinnedConversation = useCallback(
-    (conversationId: string) => {
-      setConversations((prev) => {
-        const next = prev.map((conversation) =>
-          conversation.id === conversationId
-            ? { ...conversation, pinned: !conversation.pinned }
-            : conversation,
-        );
-        savePinnedTabs(next);
-        return next;
-      });
-    },
-    [],
-  );
-
-  // Hydrate pinned-tab messages from session store on first mount
-  useEffect(() => {
-    let cancelled = false;
-    const pinnedWithSessions = conversations.filter(
-      (c) => c.pinned && c.sessionId && c.messages.length === 0,
-    );
-    if (pinnedWithSessions.length === 0) return;
-
-    Promise.all(
-      pinnedWithSessions.map(async (c) => {
-        const items = await window.hermesAPI.getSessionMessages(
-          c.sessionId!,
-          activeProfile,
-        );
-        return { id: c.id, items };
-      }),
-    ).then((results) => {
-      if (cancelled) return;
-      setConversations((prev) =>
-        prev.map((conversation) => {
-          const match = results.find((r) => r.id === conversation.id);
-          if (!match || match.items.length === 0) return conversation;
-          const chatMessages: ChatMessage[] = match.items
-            .map((it): ChatMessage | null => {
-              switch (it.kind) {
-                case "user":
-                  return {
-                    id: `db-${it.id}`,
-                    role: "user",
-                    content: it.content,
-                    ...(it.attachments && it.attachments.length > 0
-                      ? { attachments: it.attachments }
-                      : {}),
-                  };
-                case "assistant":
-                  return {
-                    id: `db-${it.id}`,
-                    role: "agent",
-                    content: it.content,
-                    ...(it.attachments && it.attachments.length > 0
-                      ? { attachments: it.attachments }
-                      : {}),
-                  };
-                case "reasoning":
-                  return {
-                    id: `db-r-${it.id}`,
-                    kind: "reasoning",
-                    role: "agent",
-                    text: it.text,
-                  };
-                case "tool_call":
-                  return {
-                    id: `db-tc-${it.id}-${it.callId || "x"}`,
-                    kind: "tool_call",
-                    role: "agent",
-                    callId: it.callId,
-                    name: it.name,
-                    args: it.args,
-                  };
-                case "tool_result":
-                  return {
-                    id: `db-tr-${it.id}`,
-                    kind: "tool_result",
-                    role: "agent",
-                    callId: it.callId,
-                    name: it.name,
-                    content: it.content,
-                    ...(it.attachments && it.attachments.length > 0
-                      ? { attachments: it.attachments }
-                      : {}),
-                  };
-                default:
-                  return null;
-              }
-            })
-            .filter((m): m is ChatMessage => m !== null);
-          return { ...conversation, messages: chatMessages };
-        }),
-      );
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- one-time hydration on mount
 
   // Listen for menu IPC events (Cmd+N, Cmd+K from app menu)
   useEffect(() => {
@@ -468,49 +250,65 @@ function Layout({
 
   const handleSelectProfile = useCallback((name: string) => {
     setActiveProfile(name);
-    const conversation = createConversation();
-    setConversations([conversation]);
-    setActiveConversationId(conversation.id);
+    setMessages([]);
+    setCurrentSessionId(null);
   }, []);
-
-  const handleChatWithProfile = useCallback(
-    async (name: string) => {
-      await window.hermesAPI.setActiveProfile(name);
-      handleSelectProfile(name);
-      goTo("chat");
-    },
-    [goTo, handleSelectProfile],
-  );
 
   const handleResumeSession = useCallback(
     async (sessionId: string) => {
       const items = (await window.hermesAPI.getSessionMessages(
         sessionId,
-        activeProfile,
       )) as DbHistoryItem[];
-      const chatMessages = dbItemsToChatMessages(items);
-      const existing = conversations.find((c) => c.sessionId === sessionId);
-      if (existing) {
-        setActiveConversationId(existing.id);
-      } else {
-        const conversation = createConversation({
-          title: `Session ${sessionId.slice(-6)}`,
-          sessionId,
-          messages: chatMessages,
-        });
-        setConversations((prev) => [...prev, conversation]);
-        setActiveConversationId(conversation.id);
-      }
+      setMessages(dbItemsToChatMessages(items));
+      setCurrentSessionId(sessionId);
       goTo("chat");
     },
-    [activeProfile, conversations, goTo],
+    [goTo],
   );
 
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((collapsed) => {
+      const next = !collapsed;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+      } catch {
+        /* ignore persistence failures */
+      }
+      return next;
+    });
+  }, []);
+
+  const sidebarToggleLabel = sidebarCollapsed
+    ? t("navigation.expandSidebar")
+    : t("navigation.collapseSidebar");
+
   return (
-    <div className="layout">
+    <div className={`layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <img src={hermesBanner} height={42} alt="Hermes OS" style={{ borderRadius: 6 }} />
+          <span
+            className="sidebar-logo"
+            role="img"
+            aria-label="Hermes"
+            style={{
+              maskImage: `url(${hermeslogo})`,
+              WebkitMaskImage: `url(${hermeslogo})`,
+            }}
+          />
+          <button
+            className="sidebar-collapse-toggle"
+            type="button"
+            onClick={toggleSidebar}
+            title={sidebarToggleLabel}
+            aria-label={sidebarToggleLabel}
+            aria-expanded={!sidebarCollapsed}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen size={16} />
+            ) : (
+              <PanelLeftClose size={16} />
+            )}
+          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -519,9 +317,11 @@ function Layout({
               key={v}
               className={`sidebar-nav-item ${view === v ? "active" : ""}`}
               onClick={() => goTo(v)}
+              title={t(labelKey)}
+              aria-label={t(labelKey)}
             >
               <Icon size={16} />
-              {t(labelKey)}
+              <span className="sidebar-nav-label">{t(labelKey)}</span>
             </button>
           ))}
         </nav>
@@ -534,7 +334,8 @@ function Layout({
               }`}
               onClick={handleUpdate}
               disabled={updateState === "downloading"}
-              title={updateError ?? undefined}
+              title={updateButtonTitle}
+              aria-label={updateButtonTitle}
             >
               <Download size={13} />
               {updateState === "available" && (
@@ -555,9 +356,12 @@ function Layout({
               )}
             </button>
           )}
-          <div className="sidebar-footer-text">
-            {activeProfile === "default" ? t("common.appName") : activeProfile}
-          </div>
+          <ProfileSwitcher
+            activeProfile={activeProfile}
+            onSwitch={handleSelectProfile}
+            onManage={() => goTo("agents")}
+            compact={sidebarCollapsed}
+          />
         </div>
       </aside>
 
@@ -568,90 +372,16 @@ function Layout({
             onDismiss={onDismissVerifyWarning}
           />
         )}
-        <div style={paneStyle("mission-control")}>
-          <MissionControl
-            onNavigate={goTo}
-            onChatWith={handleChatWithProfile}
-            profile={activeProfile}
-            visible={view === "mission-control"}
-          />
-        </div>
         <div style={paneStyle("chat")}>
-          <div className="conversation-tabs">
-            {visibleConversations.map((conversation) => (
-              <div
-                key={conversation.id}
-                className={`conversation-tab${
-                  conversation.id === activeConversationId ? " active" : ""
-                }${conversation.pinned ? " pinned" : ""}`}
-                title={
-                  conversation.pinned
-                    ? `${conversation.title} (pinned)`
-                    : conversation.title
-                }
-              >
-                <button
-                  className="conversation-tab-pin"
-                  aria-pressed={conversation.pinned}
-                  aria-label={
-                    conversation.pinned ? "Unpin chat tab" : "Pin chat tab"
-                  }
-                  title={conversation.pinned ? "Unpin chat tab" : "Pin chat tab"}
-                  type="button"
-                  onClick={() => {
-                    handleTogglePinnedConversation(conversation.id);
-                  }}
-                >
-                  <Pin size={11} />
-                </button>
-                <button
-                  className="conversation-tab-label"
-                  type="button"
-                  onClick={() => setActiveConversationId(conversation.id)}
-                >
-                  {conversation.title}
-                </button>
-                {conversations.length > 1 && !conversation.pinned && (
-                  <button
-                    className="conversation-tab-close"
-                    type="button"
-                    aria-label="Close chat tab"
-                    title="Close chat tab"
-                    onClick={() => {
-                      handleCloseConversation(conversation.id);
-                    }}
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            ))}
-            <button
-              className="conversation-tab conversation-tab-add"
-              onClick={handleNewChat}
-              title="New chat"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
           <Chat
-            key={activeConversation.id}
-            requestId={activeConversation.id}
-            messages={activeConversation.messages}
-            setMessages={setActiveMessages}
-            sessionId={activeConversation.sessionId}
+            messages={messages}
+            setMessages={setMessages}
+            sessionId={currentSessionId}
             profile={activeProfile}
-            onSessionIdChange={updateActiveSessionId}
             onNewChat={handleNewChat}
+            onOpenDiagnose={() => goTo("settings")}
           />
         </div>
-
-        {visitedViews.has("ai-clis") && (
-          <div style={paneStyle("ai-clis")}>
-            <AiClis />
-          </div>
-        )}
-
 
         {visitedViews.has("sessions") && (
           <div style={paneStyle("sessions")}>
@@ -662,8 +392,21 @@ function Layout({
                 onResumeSession={handleResumeSession}
                 onNewChat={handleNewChat}
                 currentSessionId={currentSessionId}
-                profile={activeProfile}
                 visible={view === "sessions"}
+              />
+            )}
+          </div>
+        )}
+
+        {visitedViews.has("discover") && (
+          <div style={paneStyle("discover")}>
+            {remoteMode ? (
+              <RemoteNotice feature="Discover" />
+            ) : (
+              <Discover
+                profile={activeProfile}
+                visible={view === "discover"}
+                focusKind={discoverFocus ?? undefined}
               />
             )}
           </div>
@@ -677,7 +420,10 @@ function Layout({
               <Agents
                 activeProfile={activeProfile}
                 onSelectProfile={handleSelectProfile}
-                onChatWith={handleChatWithProfile}
+                onChatWith={(name: string) => {
+                  handleSelectProfile(name);
+                  goTo("chat");
+                }}
               />
             )}
           </div>
@@ -689,18 +435,21 @@ function Layout({
           </div>
         )}
 
+        {visitedViews.has("models") && (
+          <div style={paneStyle("models")}>
+            <Models visible={view === "models"} />
+          </div>
+        )}
+
         {visitedViews.has("providers") && (
           <div style={paneStyle("providers")}>
             {remoteMode ? (
               <RemoteNotice feature="Providers" />
             ) : (
-              <>
-                <Providers
-                  profile={activeProfile}
-                  visible={view === "providers"}
-                />
-                <Models visible={view === "providers"} />
-              </>
+              <Providers
+                profile={activeProfile}
+                visible={view === "providers"}
+              />
             )}
           </div>
         )}
@@ -727,15 +476,14 @@ function Layout({
 
         {visitedViews.has("tools") && (
           <div style={paneStyle("tools")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Toolkit" />
-            ) : (
-              <div className="toolkit-pane">
-                <Tools profile={activeProfile} />
-                <div className="toolkit-divider" />
-                <Skills profile={activeProfile} />
-              </div>
-            )}
+            <Tools
+              profile={activeProfile}
+              showPlatformToolsets={!remoteMode}
+              remoteMode={remoteMode}
+              visible={view === "tools"}
+              onBrowseSkills={() => focusDiscover("skills")}
+              onBrowseMcps={() => focusDiscover("mcps")}
+            />
           </div>
         )}
 

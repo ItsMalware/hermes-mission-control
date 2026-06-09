@@ -8,6 +8,7 @@ import {
 import type { AppLocale } from "./types";
 import commonEn from "./locales/en/common";
 import navigationEn from "./locales/en/navigation";
+import discoverEn from "./locales/en/discover";
 import welcomeEn from "./locales/en/welcome";
 import setupEn from "./locales/en/setup";
 import chatEn from "./locales/en/chat";
@@ -17,7 +18,6 @@ import sessionsEn from "./locales/en/sessions";
 import modelsEn from "./locales/en/models";
 import providersEn from "./locales/en/providers";
 import officeEn from "./locales/en/office";
-import kanbanEn from "./locales/en/kanban";
 import errorsEn from "./locales/en/errors";
 import schedulesEn from "./locales/en/schedules";
 import skillsEn from "./locales/en/skills";
@@ -27,6 +27,8 @@ import soulEn from "./locales/en/soul";
 import memoryEn from "./locales/en/memory";
 import installEn from "./locales/en/install";
 import constantsEn from "./locales/en/constants";
+import kanbanEn from "./locales/en/kanban";
+import diagnoseEn from "./locales/en/diagnose";
 import commonPl from "./locales/pl/common";
 import navigationPl from "./locales/pl/navigation";
 import welcomePl from "./locales/pl/welcome";
@@ -59,7 +61,6 @@ import sessionsEs from "./locales/es/sessions";
 import modelsEs from "./locales/es/models";
 import providersEs from "./locales/es/providers";
 import officeEs from "./locales/es/office";
-import kanbanEs from "./locales/es/kanban";
 import errorsEs from "./locales/es/errors";
 import schedulesEs from "./locales/es/schedules";
 import skillsEs from "./locales/es/skills";
@@ -69,6 +70,8 @@ import soulEs from "./locales/es/soul";
 import memoryEs from "./locales/es/memory";
 import installEs from "./locales/es/install";
 import constantsEs from "./locales/es/constants";
+import kanbanEs from "./locales/es/kanban";
+import diagnoseEs from "./locales/es/diagnose";
 import commonId from "./locales/id/common";
 import navigationId from "./locales/id/navigation";
 import welcomeId from "./locales/id/welcome";
@@ -100,7 +103,6 @@ import sessionsZh from "./locales/zh-CN/sessions";
 import modelsZh from "./locales/zh-CN/models";
 import providersZh from "./locales/zh-CN/providers";
 import officeZh from "./locales/zh-CN/office";
-import kanbanZh from "./locales/zh-CN/kanban";
 import errorsZh from "./locales/zh-CN/errors";
 import schedulesZh from "./locales/zh-CN/schedules";
 import skillsZh from "./locales/zh-CN/skills";
@@ -110,6 +112,7 @@ import soulZh from "./locales/zh-CN/soul";
 import memoryZh from "./locales/zh-CN/memory";
 import installZh from "./locales/zh-CN/install";
 import constantsZh from "./locales/zh-CN/constants";
+import kanbanZh from "./locales/zh-CN/kanban";
 import commonZhTw from "./locales/zh-TW/common";
 import navigationZhTw from "./locales/zh-TW/navigation";
 import welcomeZhTw from "./locales/zh-TW/welcome";
@@ -162,7 +165,6 @@ import sessionsPt from "./locales/pt-BR/sessions";
 import modelsPt from "./locales/pt-BR/models";
 import providersPt from "./locales/pt-BR/providers";
 import officePt from "./locales/pt-BR/office";
-import kanbanPt from "./locales/pt-BR/kanban";
 import errorsPt from "./locales/pt-BR/errors";
 import schedulesPt from "./locales/pt-BR/schedules";
 import skillsPt from "./locales/pt-BR/skills";
@@ -193,12 +195,37 @@ import memoryPtPt from "./locales/pt-PT/memory";
 import installPtPt from "./locales/pt-PT/install";
 import constantsPtPt from "./locales/pt-PT/constants";
 import kanbanPtPt from "./locales/pt-PT/kanban";
+import diagnosePtPt from "./locales/pt-PT/diagnose";
+import commonTr from "./locales/tr/common";
+import navigationTr from "./locales/tr/navigation";
+import discoverTr from "./locales/tr/discover";
+import welcomeTr from "./locales/tr/welcome";
+import setupTr from "./locales/tr/setup";
+import chatTr from "./locales/tr/chat";
+import settingsTr from "./locales/tr/settings";
+import toolsTr from "./locales/tr/tools";
+import sessionsTr from "./locales/tr/sessions";
+import modelsTr from "./locales/tr/models";
+import providersTr from "./locales/tr/providers";
+import officeTr from "./locales/tr/office";
+import errorsTr from "./locales/tr/errors";
+import schedulesTr from "./locales/tr/schedules";
+import skillsTr from "./locales/tr/skills";
+import gatewayTr from "./locales/tr/gateway";
+import agentsTr from "./locales/tr/agents";
+import soulTr from "./locales/tr/soul";
+import memoryTr from "./locales/tr/memory";
+import installTr from "./locales/tr/install";
+import constantsTr from "./locales/tr/constants";
+import kanbanTr from "./locales/tr/kanban";
+import diagnoseTr from "./locales/tr/diagnose";
 
 export const resources = {
   en: {
     translation: {
       common: commonEn,
       navigation: navigationEn,
+      discover: discoverEn,
       welcome: welcomeEn,
       setup: setupEn,
       chat: chatEn,
@@ -208,7 +235,6 @@ export const resources = {
       models: modelsEn,
       providers: providersEn,
       office: officeEn,
-      kanban: kanbanEn,
       errors: errorsEn,
       schedules: schedulesEn,
       skills: skillsEn,
@@ -218,6 +244,8 @@ export const resources = {
       memory: memoryEn,
       install: installEn,
       constants: constantsEn,
+      kanban: kanbanEn,
+      diagnose: diagnoseEn,
     },
   },
   pl: {
@@ -258,7 +286,6 @@ export const resources = {
       models: modelsEs,
       providers: providersEs,
       office: officeEs,
-      kanban: kanbanEs,
       errors: errorsEs,
       schedules: schedulesEs,
       skills: skillsEs,
@@ -268,6 +295,8 @@ export const resources = {
       memory: memoryEs,
       install: installEs,
       constants: constantsEs,
+      kanban: kanbanEs,
+      diagnose: diagnoseEs,
     },
   },
   id: {
@@ -307,7 +336,6 @@ export const resources = {
       models: modelsZh,
       providers: providersZh,
       office: officeZh,
-      kanban: kanbanZh,
       errors: errorsZh,
       schedules: schedulesZh,
       skills: skillsZh,
@@ -317,6 +345,7 @@ export const resources = {
       memory: memoryZh,
       install: installZh,
       constants: constantsZh,
+      kanban: kanbanZh,
     },
   },
   "zh-TW": {
@@ -357,7 +386,6 @@ export const resources = {
       models: modelsPt,
       providers: providersPt,
       office: officePt,
-      kanban: kanbanPt,
       errors: errorsPt,
       schedules: schedulesPt,
       skills: skillsPt,
@@ -392,6 +420,7 @@ export const resources = {
       install: installPtPt,
       constants: constantsPtPt,
       kanban: kanbanPtPt,
+      diagnose: diagnosePtPt,
     },
   },
   ja: {
@@ -416,6 +445,33 @@ export const resources = {
       memory: memoryJa,
       install: installJa,
       constants: constantsJa,
+    },
+  },
+  tr: {
+    translation: {
+      common: commonTr,
+      navigation: navigationTr,
+      discover: discoverTr,
+      welcome: welcomeTr,
+      setup: setupTr,
+      chat: chatTr,
+      settings: settingsTr,
+      tools: toolsTr,
+      sessions: sessionsTr,
+      models: modelsTr,
+      providers: providersTr,
+      office: officeTr,
+      errors: errorsTr,
+      schedules: schedulesTr,
+      skills: skillsTr,
+      gateway: gatewayTr,
+      agents: agentsTr,
+      soul: soulTr,
+      memory: memoryTr,
+      install: installTr,
+      constants: constantsTr,
+      kanban: kanbanTr,
+      diagnose: diagnoseTr,
     },
   },
 } satisfies Resource;

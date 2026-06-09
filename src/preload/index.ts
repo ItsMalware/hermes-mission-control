@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AppLocale } from "../shared/i18n/types";
 import type { Attachment } from "../shared/attachments";
+import type {
+  MessagingPlatformsResponse,
+  MessagingPlatformTestResponse,
+  MessagingPlatformUpdate,
+} from "../shared/messaging-platforms";
+import type { ChatToolEvent } from "../shared/chat-stream";
 
 /**
  * Mirror of the renderer-side `CredentialPoolEntry` ambient type
@@ -19,6 +25,14 @@ interface CredentialPoolEntry {
   base_url?: string;
   request_count?: number;
   key?: string;
+}
+
+interface GatewayStartResult {
+  success: boolean;
+  running: boolean;
+  alreadyRunning?: boolean;
+  error?: string;
+  logPath?: string;
 }
 
 const electronAPI = {
@@ -125,24 +139,36 @@ const hermesAPI = {
   getEnv: (profile?: string): Promise<Record<string, string>> =>
     ipcRenderer.invoke("get-env", profile),
 
-  listProfileSecrets: (
-    profile?: string,
-  ): Promise<
-    Array<{
-      key: string;
-      profile: string;
-      source: string;
-      category: string;
-      maskedValue: string;
-      length: number;
-    }>
-  > => ipcRenderer.invoke("list-profile-secrets", profile),
-
-  getEnvValue: (key: string, profile?: string): Promise<string> =>
-    ipcRenderer.invoke("get-env-value", key, profile),
-
   setEnv: (key: string, value: string, profile?: string): Promise<boolean> =>
     ipcRenderer.invoke("set-env", key, value, profile),
+
+  validateChatReadiness: (
+    profile?: string,
+  ): Promise<{
+    ok: boolean;
+    code?:
+      | "NO_ACTIVE_MODEL"
+      | "NO_PROVIDER"
+      | "NO_BASE_URL"
+      | "MISSING_API_KEY"
+      | "GATEWAY_DOWN";
+    message?: string;
+    fixLocation?: "providers" | "models" | "gateway" | "setup";
+    expectedEnvKey?: string;
+  }> => ipcRenderer.invoke("validate-chat-readiness", profile),
+
+  getConfigHealth: (profile?: string): Promise<unknown> =>
+    ipcRenderer.invoke("get-config-health", profile),
+  rerunConfigHealth: (profile?: string): Promise<unknown> =>
+    ipcRenderer.invoke("rerun-config-health", profile),
+  autofixConfigIssue: (
+    code: string,
+    profile?: string,
+    context?: Record<string, string>,
+  ): Promise<{ ok: boolean; message?: string }> =>
+    ipcRenderer.invoke("autofix-config-issue", code, profile, context),
+  getConfigFixLog: (maxEntries?: number): Promise<unknown[]> =>
+    ipcRenderer.invoke("get-config-fix-log", maxEntries),
 
   getConfig: (key: string, profile?: string): Promise<string | null> =>
     ipcRenderer.invoke("get-config", key, profile),
@@ -158,11 +184,6 @@ const hermesAPI = {
   ): Promise<{ provider: string; model: string; baseUrl: string }> =>
     ipcRenderer.invoke("get-model-config", profile),
 
-  getFallbackProviders: (
-    profile?: string,
-  ): Promise<Array<{ provider: string; model: string; baseUrl?: string }>> =>
-    ipcRenderer.invoke("get-fallback-providers", profile),
-
   setModelConfig: (
     provider: string,
     model: string,
@@ -170,12 +191,6 @@ const hermesAPI = {
     profile?: string,
   ): Promise<boolean> =>
     ipcRenderer.invoke("set-model-config", provider, model, baseUrl, profile),
-
-  setFallbackProviders: (
-    entries: Array<{ provider: string; model: string; baseUrl?: string }>,
-    profile?: string,
-  ): Promise<boolean> =>
-    ipcRenderer.invoke("set-fallback-providers", entries, profile),
 
   // Connection mode (local / remote / ssh)
   isRemoteMode: (): Promise<boolean> => ipcRenderer.invoke("is-remote-mode"),
@@ -253,7 +268,6 @@ const hermesAPI = {
     profile?: string,
     resumeSessionId?: string,
     history?: Array<{ role: string; content: string }>,
-    requestId?: string,
     attachments?: Attachment[],
     contextFolder?: string,
   ): Promise<{ response: string; sessionId?: string }> =>
@@ -263,13 +277,18 @@ const hermesAPI = {
       profile,
       resumeSessionId,
       history,
-      requestId,
       attachments,
       contextFolder,
     ),
 
-  abortChat: (requestId?: string): Promise<void> =>
-    ipcRenderer.invoke("abort-chat", requestId),
+  abortChat: (): Promise<void> => ipcRenderer.invoke("abort-chat"),
+
+  transcribeAudio: (
+    audio: Uint8Array,
+    mimeType: string,
+    profile?: string,
+  ): Promise<string> =>
+    ipcRenderer.invoke("transcribe-audio", audio, mimeType, profile),
 
   getApiServerKeyStatus: (profile?: string): Promise<{ hasKey: boolean }> =>
     ipcRenderer.invoke("get-api-server-key-status", profile),
@@ -323,7 +342,7 @@ const hermesAPI = {
     profile?: string,
   ): Promise<{
     models: string[];
-    status: "ok" | "no-key" | "unsupported" | "unknown-host";
+    status: "ok" | "no-key" | "error" | "unsupported" | "unknown-host";
     cached: boolean;
     /** Subset of `models` flagged as free per the provider catalog
      *  (Nous Portal today). Optional — providers without pricing
@@ -338,19 +357,23 @@ const hermesAPI = {
       profile,
     ),
 
-  onChatChunk: (
-    callback: (payload: { requestId?: string; chunk: string }) => void,
-  ): (() => void) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      payload: unknown,
-    ): void => {
-      if (typeof payload === "string") {
-        callback({ chunk: payload });
-        return;
-      }
-      callback(payload as { requestId?: string; chunk: string });
-    };
+  getModelContextWindow: (
+    provider: string,
+    model: string,
+    baseUrl?: string,
+    profile?: string,
+  ): Promise<number | null> =>
+    ipcRenderer.invoke(
+      "get-model-context-window",
+      provider,
+      model,
+      baseUrl,
+      profile,
+    ),
+
+  onChatChunk: (callback: (chunk: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, chunk: string): void =>
+      callback(chunk);
     ipcRenderer.on("chat-chunk", handler);
     return () => ipcRenderer.removeListener("chat-chunk", handler);
   },
@@ -358,36 +381,18 @@ const hermesAPI = {
   /** Streaming reasoning / thinking tokens — separate from `onChatChunk`
    *  so the renderer can render a "thinking" bubble that grows
    *  independently of the assistant's content (#352). */
-  onChatReasoningChunk: (
-    callback: (payload: { requestId?: string; chunk: string }) => void,
-  ): (() => void) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      payload: unknown,
-    ): void => {
-      if (typeof payload === "string") {
-        callback({ chunk: payload });
-        return;
-      }
-      callback(payload as { requestId?: string; chunk: string });
-    };
+  onChatReasoningChunk: (callback: (chunk: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, chunk: string): void =>
+      callback(chunk);
     ipcRenderer.on("chat-reasoning-chunk", handler);
     return () => ipcRenderer.removeListener("chat-reasoning-chunk", handler);
   },
 
-  onChatDone: (
-    callback: (payload: { requestId?: string; sessionId?: string }) => void,
-  ): (() => void) => {
+  onChatDone: (callback: (sessionId?: string) => void): (() => void) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
-      payload?: unknown,
-    ): void => {
-      if (typeof payload === "string") {
-        callback({ sessionId: payload });
-        return;
-      }
-      callback((payload || {}) as { requestId?: string; sessionId?: string });
-    };
+      sessionId?: string,
+    ): void => callback(sessionId);
     ipcRenderer.on("chat-done", handler);
     return () => ipcRenderer.removeListener("chat-done", handler);
   },
@@ -415,88 +420,86 @@ const hermesAPI = {
       ipcRenderer.removeListener("context-menu-select-bubble", handler);
   },
 
-  onChatToolProgress: (
-    callback: (payload: { requestId?: string; tool: string }) => void,
-  ): (() => void) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      payload: unknown,
-    ): void => {
-      if (typeof payload === "string") {
-        callback({ tool: payload });
-        return;
-      }
-      callback(payload as { requestId?: string; tool: string });
-    };
+  onChatToolProgress: (callback: (tool: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, tool: string): void =>
+      callback(tool);
     ipcRenderer.on("chat-tool-progress", handler);
     return () => ipcRenderer.removeListener("chat-tool-progress", handler);
   },
 
+  onChatToolEvent: (callback: (event: ChatToolEvent) => void): (() => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      toolEvent: ChatToolEvent,
+    ): void => callback(toolEvent);
+    ipcRenderer.on("chat-tool-event", handler);
+    return () => ipcRenderer.removeListener("chat-tool-event", handler);
+  },
+
   onChatUsage: (
-    callback: (payload: {
-      requestId?: string;
-      usage: {
-        promptTokens: number;
-        completionTokens: number;
-        totalTokens: number;
-        cost?: number;
-        rateLimitRemaining?: number;
-        rateLimitReset?: number;
-      };
+    callback: (usage: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+      cost?: number;
+      rateLimitRemaining?: number;
+      rateLimitReset?: number;
+      cacheReadTokens?: number;
+      cacheWriteTokens?: number;
     }) => void,
   ): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, value: unknown): void => {
-      if (value && typeof value === "object" && "usage" in value) {
-        callback(
-          value as {
-            requestId?: string;
-            usage: {
-              promptTokens: number;
-              completionTokens: number;
-              totalTokens: number;
-              cost?: number;
-              rateLimitRemaining?: number;
-              rateLimitReset?: number;
-            };
-          },
-        );
-        return;
-      }
-      callback({
-        usage: value as {
+    const handler = (_event: Electron.IpcRendererEvent, usage: unknown): void =>
+      callback(
+        usage as {
           promptTokens: number;
           completionTokens: number;
           totalTokens: number;
           cost?: number;
           rateLimitRemaining?: number;
           rateLimitReset?: number;
+          cacheReadTokens?: number;
+          cacheWriteTokens?: number;
         },
-      });
-    };
+      );
     ipcRenderer.on("chat-usage", handler);
     return () => ipcRenderer.removeListener("chat-usage", handler);
   },
 
-  onChatError: (
-    callback: (payload: { requestId?: string; error: string }) => void,
-  ): (() => void) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      payload: unknown,
-    ): void => {
-      if (typeof payload === "string") {
-        callback({ error: payload });
-        return;
-      }
-      callback(payload as { requestId?: string; error: string });
-    };
+  onChatError: (callback: (error: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, error: string): void =>
+      callback(error);
     ipcRenderer.on("chat-error", handler);
     return () => ipcRenderer.removeListener("chat-error", handler);
   },
 
+  /** The agent asked a clarifying question mid-turn. The renderer shows an
+   *  inline card and answers via `respondClarify`. */
+  onClarifyRequest: (
+    callback: (req: {
+      requestId: string;
+      question: string;
+      choices: string[];
+    }) => void,
+  ): (() => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      req: { requestId: string; question: string; choices: string[] },
+    ): void => callback(req);
+    ipcRenderer.on("chat-clarify-request", handler);
+    return () => ipcRenderer.removeListener("chat-clarify-request", handler);
+  },
+
+  /** Answer an inline clarify card. An empty/skip answer lets the agent proceed
+   *  autonomously (the gateway treats it as "you decide"). */
+  respondClarify: (requestId: string, answer: string): Promise<boolean> =>
+    ipcRenderer.invoke("clarify-respond", { requestId, answer }),
+
   // Gateway
-  startGateway: (): Promise<boolean> => ipcRenderer.invoke("start-gateway"),
+  startGateway: (): Promise<GatewayStartResult> =>
+    ipcRenderer.invoke("start-gateway"),
   stopGateway: (): Promise<boolean> => ipcRenderer.invoke("stop-gateway"),
+  restartGateway: (profile?: string): Promise<boolean> =>
+    ipcRenderer.invoke("restart-gateway", profile),
   gatewayStatus: (): Promise<boolean> => ipcRenderer.invoke("gateway-status"),
 
   // Platform toggles
@@ -508,6 +511,21 @@ const hermesAPI = {
     profile?: string,
   ): Promise<boolean> =>
     ipcRenderer.invoke("set-platform-enabled", platform, enabled, profile),
+  getMessagingPlatforms: (
+    profile?: string,
+  ): Promise<MessagingPlatformsResponse> =>
+    ipcRenderer.invoke("get-messaging-platforms", profile),
+  updateMessagingPlatform: (
+    platform: string,
+    update: MessagingPlatformUpdate,
+    profile?: string,
+  ): Promise<{ ok: boolean; platform: string }> =>
+    ipcRenderer.invoke("update-messaging-platform", platform, update, profile),
+  testMessagingPlatform: (
+    platform: string,
+    profile?: string,
+  ): Promise<MessagingPlatformTestResponse> =>
+    ipcRenderer.invoke("test-messaging-platform", platform, profile),
 
   // Sessions
   listSessions: (
@@ -528,50 +546,15 @@ const hermesAPI = {
 
   getSessionMessages: (
     sessionId: string,
-    profile?: string,
   ): Promise<
-    Array<
-      | {
-          kind: "user";
-          id: number;
-          content: string;
-          timestamp: number;
-          attachments?: Attachment[];
-        }
-      | {
-          kind: "assistant";
-          id: number;
-          content: string;
-          timestamp: number;
-          attachments?: Attachment[];
-        }
-      | {
-          kind: "reasoning";
-          id: number;
-          assistantId: number;
-          text: string;
-          timestamp: number;
-        }
-      | {
-          kind: "tool_call";
-          id: number;
-          assistantId: number;
-          callId: string;
-          name: string;
-          args: string;
-          timestamp: number;
-        }
-      | {
-          kind: "tool_result";
-          id: number;
-          callId: string;
-          name: string;
-          content: string;
-          timestamp: number;
-          attachments?: Attachment[];
-        }
-    >
-  > => ipcRenderer.invoke("get-session-messages", sessionId, profile),
+    Array<{
+      id: number;
+      role: "user" | "assistant";
+      content: string;
+      timestamp: number;
+      attachments?: Attachment[];
+    }>
+  > => ipcRenderer.invoke("get-session-messages", sessionId),
 
   // Profiles
   listProfiles: (): Promise<
@@ -580,19 +563,8 @@ const hermesAPI = {
       path: string;
       isDefault: boolean;
       isActive: boolean;
-      description: string;
       model: string;
       provider: string;
-      role: "director" | "worker" | "assistant" | "specialist" | "general";
-      team: string;
-      workerPoolPath: string;
-      teamMembers: Array<{
-        id: string;
-        name: string;
-        role: "director" | "worker" | "assistant" | "specialist" | "general";
-        source: "worker-pool";
-        path: string;
-      }>;
       hasEnv: boolean;
       hasSoul: boolean;
       skillCount: number;
@@ -695,7 +667,6 @@ const hermesAPI = {
   listCachedSessions: (
     limit?: number,
     offset?: number,
-    profile?: string,
   ): Promise<
     Array<{
       id: string;
@@ -705,11 +676,9 @@ const hermesAPI = {
       messageCount: number;
       model: string;
     }>
-  > => ipcRenderer.invoke("list-cached-sessions", limit, offset, profile),
+  > => ipcRenderer.invoke("list-cached-sessions", limit, offset),
 
-  syncSessionCache: (
-    profile?: string,
-  ): Promise<
+  syncSessionCache: (): Promise<
     Array<{
       id: string;
       title: string;
@@ -718,22 +687,21 @@ const hermesAPI = {
       messageCount: number;
       model: string;
     }>
-  > => ipcRenderer.invoke("sync-session-cache", profile),
+  > => ipcRenderer.invoke("sync-session-cache"),
 
-  updateSessionTitle: (
-    sessionId: string,
-    title: string,
-    profile?: string,
-  ): Promise<void> =>
-    ipcRenderer.invoke("update-session-title", sessionId, title, profile),
+  updateSessionTitle: (sessionId: string, title: string): Promise<void> =>
+    ipcRenderer.invoke("update-session-title", sessionId, title),
   deleteSession: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke("delete-session", sessionId),
+  deleteSessions: (
+    sessionIds: string[],
+  ): Promise<{ requested: number; deleted: number }> =>
+    ipcRenderer.invoke("delete-sessions", sessionIds),
 
   // Session search
   searchSessions: (
     query: string,
     limit?: number,
-    profile?: string,
   ): Promise<
     Array<{
       sessionId: string;
@@ -744,7 +712,7 @@ const hermesAPI = {
       model: string;
       snippet: string;
     }>
-  > => ipcRenderer.invoke("search-sessions", query, limit, profile),
+  > => ipcRenderer.invoke("search-sessions", query, limit),
 
   // Credential Pool (profile-aware: reads/writes the named profile's
   // auth.json; defaults to the currently active profile when omitted)
@@ -1046,6 +1014,8 @@ const hermesAPI = {
     ipcRenderer.invoke("read-file", filePath, maxBytes),
   openFileInEditor: (filePath: string): Promise<boolean> =>
     ipcRenderer.invoke("open-file-in-editor", filePath),
+  openTerminal: (dirPath: string): Promise<boolean> =>
+    ipcRenderer.invoke("open-terminal", dirPath),
   readImageFile: (filePath: string): Promise<string | null> =>
     ipcRenderer.invoke("read-image-file", filePath),
   kanbanAssignTask: (
@@ -1108,59 +1078,93 @@ const hermesAPI = {
   listMcpServers: (
     profile?: string,
   ): Promise<
-    Array<{ name: string; type: string; enabled: boolean; detail: string }>
-  > => ipcRenderer.invoke("list-mcp-servers", profile),
-
-  // Mission Control
-  missionControlGetStatus: () =>
-    ipcRenderer.invoke("mission-control-get-status"),
-
-  // AI CLI inventory
-  listAiClis: (): Promise<
     Array<{
-      id: string;
       name: string;
-      command: string;
-      installed: boolean;
-      path: string | null;
-      version: string | null;
-      status: "ONLINE" | "OFFLINE" | "DEGRADED";
-      description: string;
-      error?: string;
+      type: "http" | "stdio" | "unknown";
+      transport: "http" | "stdio" | "unknown";
+      enabled: boolean;
+      detail: string;
+      url?: string;
+      command?: string;
+      args: string[];
+      env: Record<string, string>;
+      auth?: string;
+      tools?: unknown;
     }>
-  > => ipcRenderer.invoke("list-ai-clis"),
+  > => ipcRenderer.invoke("list-mcp-servers", profile),
+  addMcpServer: (
+    input: {
+      name: string;
+      type: "http" | "stdio";
+      url?: string;
+      command?: string;
+      args?: string[];
+      env?: Record<string, string>;
+      auth?: string;
+    },
+    profile?: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("add-mcp-server", input, profile),
+  removeMcpServer: (
+    name: string,
+    profile?: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("remove-mcp-server", name, profile),
+  setMcpServerEnabled: (
+    name: string,
+    enabled: boolean,
+    profile?: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("set-mcp-server-enabled", name, enabled, profile),
+  testMcpServer: (
+    name: string,
+    profile?: string,
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    tools?: Array<{ name: string; description: string }>;
+  }> => ipcRenderer.invoke("test-mcp-server", name, profile),
+  listMcpCatalog: (
+    profile?: string,
+  ): Promise<{
+    entries: Array<{
+      name: string;
+      description: string;
+      source: string;
+      transport: "http" | "stdio" | "unknown";
+      authType: string;
+      requiredEnv: Array<{ name: string; prompt: string; required: boolean }>;
+      needsInstall: boolean;
+      installed: boolean;
+      enabled: boolean;
+    }>;
+    diagnostics: unknown[];
+    error?: string;
+  }> => ipcRenderer.invoke("list-mcp-catalog", profile),
+  installMcpCatalogEntry: (
+    name: string,
+    env?: Record<string, string>,
+    profile?: string,
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    background?: boolean;
+    action?: string;
+  }> => ipcRenderer.invoke("install-mcp-catalog-entry", name, env, profile),
 
-  // Self workspace
-  selfGetWorkspace: (): Promise<{
-    vaultRoot: string;
-    baseDir: string;
-    detected: boolean;
-  }> => ipcRenderer.invoke("self-get-workspace"),
-  selfSetVaultRoot: (
-    vaultRoot: string,
-  ): Promise<{ vaultRoot: string; baseDir: string; detected: boolean }> =>
-    ipcRenderer.invoke("self-set-vault-root", vaultRoot),
-  selfReadNote: (
-    kind: "journal" | "daily-review",
-    date?: string,
-  ): Promise<{
-    kind: "journal" | "daily-review";
-    date: string;
-    path: string;
-    content: string;
-    exists: boolean;
-  }> => ipcRenderer.invoke("self-read-note", kind, date),
-  selfWriteNote: (
-    kind: "journal" | "daily-review",
-    date: string | undefined,
-    content: string,
-  ): Promise<{
-    kind: "journal" | "daily-review";
-    date: string;
-    path: string;
-    content: string;
-    exists: boolean;
-  }> => ipcRenderer.invoke("self-write-note", kind, date, content),
+  // Discover marketplace (community registry)
+  fetchRegistry: (force?: boolean) =>
+    ipcRenderer.invoke("registry-fetch", force),
+  listInstalledRegistry: (profile?: string) =>
+    ipcRenderer.invoke("registry-list-installed", profile),
+  fetchRegistryDetail: (kind: string, item: unknown) =>
+    ipcRenderer.invoke("registry-detail", kind, item),
+  installRegistryItem: (
+    kind: string,
+    item: unknown,
+    profile?: string,
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("registry-install", kind, item, profile),
 
   // Log viewer
   readLogs: (

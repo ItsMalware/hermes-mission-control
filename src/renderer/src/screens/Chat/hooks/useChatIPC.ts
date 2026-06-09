@@ -1,19 +1,22 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { ChatMessage, UsageState } from "../types";
 import {
   dbItemsToChatMessages,
   reconcileStreamedWithDb,
   type DbHistoryItem,
 } from "../sessionHistory";
+import {
+  liveToolEventFromProgress,
+  upsertLiveToolEvent,
+} from "../liveToolEvents";
+import { upsertLiveReasoningChunk } from "../liveReasoningEvents";
 
 interface UseChatIPCArgs {
-  requestId: string;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setHermesSessionId: (id: string) => void;
   setToolProgress: (tool: string | null) => void;
   setIsLoading: (loading: boolean) => void;
   setUsage: React.Dispatch<React.SetStateAction<UsageState | null>>;
-  onSessionIdChange?: (sessionId: string) => void;
 }
 
 /**
@@ -23,18 +26,16 @@ interface UseChatIPCArgs {
  * stable `useState`/`useDispatch` setters (React guarantees identity).
  */
 export function useChatIPC({
-  requestId,
   setMessages,
   setHermesSessionId,
   setToolProgress,
   setIsLoading,
   setUsage,
-  onSessionIdChange,
 }: UseChatIPCArgs): void {
+  const reasoningSegmentClosedRef = useRef(false);
+
   useEffect(() => {
-    const cleanupChunk = window.hermesAPI.onChatChunk((payload) => {
-      if (payload.requestId && payload.requestId !== requestId) return;
-      const { chunk } = payload;
+    const cleanupChunk = window.hermesAPI.onChatChunk((chunk) => {
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (
@@ -58,52 +59,20 @@ export function useChatIPC({
     });
 
     // Streaming reasoning / thinking bubbles for the current turn (#352).
-    // Reasoning typically arrives BEFORE content (DeepSeek, o1/o3), but
-    // we don't rely on that order — we find the reasoning row for the
-    // active turn (last agent reasoning row since the most recent user
-    // message) and append to it. If no such row exists yet, create one
-    // and place it BEFORE any assistant content bubbles in the same
-    // turn so the visual order is reasoning → answer.
-    const cleanupReasoning = window.hermesAPI.onChatReasoningChunk((payload) => {
-      if (payload.requestId && payload.requestId !== requestId) return;
-      const { chunk } = payload;
+    // Keep chunk order relative to tool rows. A new thought after a tool call
+    // should become a new block there, not mutate the first thought block.
+    const cleanupReasoning = window.hermesAPI.onChatReasoningChunk((chunk) => {
       if (!chunk) return;
-      setMessages((prev) => {
-        let insertAt = prev.length;
-        for (let i = prev.length - 1; i >= 0; i--) {
-          const m = prev[i];
-          if (m.role === "user") break;
-          // Append to the active turn's reasoning row if one exists.
-          if ("kind" in m && m.kind === "reasoning") {
-            return [
-              ...prev.slice(0, i),
-              { ...m, text: m.text + chunk },
-              ...prev.slice(i + 1),
-            ];
-          }
-          // Otherwise track the earliest in-turn agent row so the new
-          // reasoning bubble lands ahead of it (typical case: content
-          // bubble started first because reasoning arrived a tick late).
-          insertAt = i;
-        }
-        return [
-          ...prev.slice(0, insertAt),
-          {
-            id: `reasoning-${Date.now()}`,
-            kind: "reasoning",
-            role: "agent",
-            text: chunk,
-          },
-          ...prev.slice(insertAt),
-        ];
-      });
+      const forceNewSegment = reasoningSegmentClosedRef.current;
+      reasoningSegmentClosedRef.current = false;
+      setMessages((prev) =>
+        upsertLiveReasoningChunk(prev, chunk, Date.now(), forceNewSegment),
+      );
     });
 
-    const cleanupDone = window.hermesAPI.onChatDone(async (payload) => {
-      if (payload.requestId && payload.requestId !== requestId) return;
-      const { sessionId } = payload;
+    const cleanupDone = window.hermesAPI.onChatDone(async (sessionId) => {
+      reasoningSegmentClosedRef.current = false;
       if (sessionId) setHermesSessionId(sessionId);
-      if (sessionId) onSessionIdChange?.(sessionId);
       setToolProgress(null);
       setIsLoading(false);
       // End-of-stream merge from state.db. The gateway doesn't forward
@@ -131,9 +100,8 @@ export function useChatIPC({
       }
     });
 
-    const cleanupError = window.hermesAPI.onChatError((payload) => {
-      if (payload.requestId && payload.requestId !== requestId) return;
-      const { error } = payload;
+    const cleanupError = window.hermesAPI.onChatError((error) => {
+      reasoningSegmentClosedRef.current = false;
       setMessages((prev) => [
         ...prev,
         {
@@ -146,20 +114,59 @@ export function useChatIPC({
       setIsLoading(false);
     });
 
-    const cleanupToolProgress = window.hermesAPI.onChatToolProgress((payload) => {
-      if (payload.requestId && payload.requestId !== requestId) return;
-      const { tool } = payload;
-      setToolProgress(tool);
+    const cleanupClarify = window.hermesAPI.onClarifyRequest((req) => {
+      reasoningSegmentClosedRef.current = true;
+      setToolProgress(null);
+      // Keep the turn marked busy: the agent is blocked on the user's answer.
+      setIsLoading(true);
+      setMessages((prev) => {
+        // Idempotent: ignore a duplicate request for an already-shown question.
+        if (
+          prev.some(
+            (m) => m.kind === "clarify" && m.requestId === req.requestId,
+          )
+        ) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            id: `clarify-${req.requestId}`,
+            kind: "clarify",
+            role: "agent",
+            requestId: req.requestId,
+            question: req.question,
+            choices: Array.isArray(req.choices) ? req.choices : [],
+          },
+        ];
+      });
     });
 
-    const cleanupUsage = window.hermesAPI.onChatUsage((payload) => {
-      if (payload.requestId && payload.requestId !== requestId) return;
-      const u = payload.usage;
+    const cleanupToolProgress = window.hermesAPI.onChatToolProgress((tool) => {
+      setToolProgress(null);
+      if (!tool.trim()) return;
+      reasoningSegmentClosedRef.current = true;
+      setMessages((prev) =>
+        upsertLiveToolEvent(prev, liveToolEventFromProgress(tool)),
+      );
+    });
+
+    const cleanupToolEvent = window.hermesAPI.onChatToolEvent((toolEvent) => {
+      setToolProgress(null);
+      reasoningSegmentClosedRef.current = true;
+      setMessages((prev) => upsertLiveToolEvent(prev, toolEvent));
+    });
+
+    const cleanupUsage = window.hermesAPI.onChatUsage((u) => {
       setUsage((prev) => ({
         promptTokens: (prev?.promptTokens || 0) + u.promptTokens,
         completionTokens: (prev?.completionTokens || 0) + u.completionTokens,
         totalTokens: (prev?.totalTokens || 0) + u.totalTokens,
         cost: u.cost != null ? (prev?.cost || 0) + u.cost : prev?.cost,
+        // Latest-turn values (overwrite, not sum) for the context gauge.
+        contextTokens: u.promptTokens || prev?.contextTokens,
+        cacheReadTokens: u.cacheReadTokens ?? prev?.cacheReadTokens,
+        cacheWriteTokens: u.cacheWriteTokens ?? prev?.cacheWriteTokens,
       }));
     });
 
@@ -168,7 +175,9 @@ export function useChatIPC({
       cleanupReasoning();
       cleanupDone();
       cleanupError();
+      cleanupClarify();
       cleanupToolProgress();
+      cleanupToolEvent();
       cleanupUsage();
     };
   }, [
@@ -177,7 +186,5 @@ export function useChatIPC({
     setToolProgress,
     setIsLoading,
     setUsage,
-    requestId,
-    onSessionIdChange,
   ]);
 }
