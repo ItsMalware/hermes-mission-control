@@ -7,17 +7,19 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { Send, Square as Stop, Slash, Paperclip } from "lucide-react";
+import { Send, Square as Stop, Slash, Paperclip, Mic } from "lucide-react";
 import { isImeComposing } from "./keyboard";
 import { useI18n } from "../../components/useI18n";
 import { SLASH_COMMANDS, type SlashCommand } from "./slashCommands";
 import { useInputHistory } from "./hooks/useInputHistory";
+import { useVoiceInput } from "./hooks/useVoiceInput";
 import {
   processFiles,
   filesFromClipboard,
   type AttachmentError,
 } from "./attachmentUtils";
 import { AttachmentChip } from "../../components/AttachmentChip";
+import { ContextGauge, type ContextUsage } from "./ContextGauge";
 import type { Attachment } from "../../../../shared/attachments";
 
 export interface ChatInputHandle {
@@ -28,11 +30,29 @@ export interface ChatInputHandle {
   addFiles(files: File[] | FileList): Promise<AttachmentError[]>;
 }
 
+export interface ChatInputReadiness {
+  ok: boolean;
+  code?: string;
+  message?: string;
+  fixLocation?: string;
+  expectedEnvKey?: string;
+}
+
 interface ChatInputProps {
   isLoading: boolean;
   hasSession: boolean;
   sessionId?: string | null;
   remoteMode?: boolean;
+  /** Active profile — used to resolve the provider for voice transcription. */
+  profile?: string;
+  /** Context-window occupancy for the gauge; null until the first response. */
+  contextUsage?: ContextUsage | null;
+  /** Pre-send validation state. When `ok` is false, Send is disabled
+   * and an inline banner explains why + how to fix it. */
+  readiness?: ChatInputReadiness;
+  /** Controls rendered inline in the bottom toolbar row (model + folder
+   * pickers) so they share the composer's single bordered container. */
+  toolbarExtras?: React.ReactNode;
   onSubmit: (text: string, attachments: Attachment[]) => void;
   onQuickAsk: (text: string, attachments: Attachment[]) => void;
   onAbort: () => void;
@@ -45,6 +65,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       hasSession,
       sessionId,
       remoteMode,
+      profile,
+      contextUsage,
+      readiness,
+      toolbarExtras,
       onSubmit,
       onQuickAsk,
       onAbort,
@@ -61,6 +85,24 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const slashMenuRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // Tracks an active IME composition (Korean/Japanese/Chinese). Driven by the
+    // composition events rather than the synthetic event's `isComposing` flag,
+    // which macOS Chromium can report as false on the finalizing Enter.
+    const composingRef = useRef(false);
+
+    // Voice input. We snapshot whatever was already typed when recording starts
+    // (`voiceBaseRef`), then rebuild the field as `base + livetranscript` on
+    // every result so the SpeechRecognition path streams in live. The recorder
+    // fallback delivers one final result on stop.
+    const voiceBaseRef = useRef("");
+    const handleVoiceResult = useCallback((text: string, isFinal: boolean) => {
+      const base = voiceBaseRef.current;
+      setInput(
+        base.trim() ? (text ? `${base.trimEnd()} ${text}` : base) : text,
+      );
+      if (isFinal) inputRef.current?.focus();
+    }, []);
+    const voice = useVoiceInput(handleVoiceResult, profile);
 
     const autoResize = useCallback((): void => {
       const el = inputRef.current;
@@ -264,7 +306,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     }
 
     function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
-      if (isImeComposing(e)) return;
+      if (isImeComposing(e) || composingRef.current) return;
 
       // Slash menu keyboard navigation
       if (slashMenuOpen && filteredSlashCommands.length > 0) {
@@ -340,7 +382,31 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       setAttachmentError(null);
     }
 
-    const canSend = input.trim().length > 0 || attachments.length > 0;
+    // Pre-send validation gate (#369): even with the queue model from
+    // PR #379, we still block Send when readiness fails — a queued message
+    // with a missing API key would just fail later. The !isLoading gate
+    // is intentionally dropped here vs. the pre-merge version, so users
+    // can queue messages while the agent is mid-response.
+    const readinessOk = readiness?.ok !== false;
+    const canSend =
+      (input.trim().length > 0 || attachments.length > 0) && readinessOk;
+
+    // Map fixLocation → user-facing call to action. The strings are
+    // wrapped in i18n; the location ids come from main/validation.ts.
+    function readinessFixLabel(loc: string | undefined): string {
+      switch (loc) {
+        case "providers":
+          return t("chat.validation.fixInProviders");
+        case "models":
+          return t("chat.validation.fixInModels");
+        case "gateway":
+          return t("chat.validation.fixInGateway");
+        case "setup":
+          return t("chat.validation.fixInSetup");
+        default:
+          return "";
+      }
+    }
 
     return (
       <>
@@ -367,6 +433,26 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             </div>
           </div>
         )}
+        {!readinessOk && readiness?.message && (
+          <div
+            className="chat-readiness-banner"
+            role="alert"
+            data-testid="chat-readiness-banner"
+          >
+            <span className="chat-readiness-message">
+              {readiness.expectedEnvKey
+                ? t("chat.validation.missingKey", {
+                    key: readiness.expectedEnvKey,
+                  })
+                : readiness.message}
+            </span>
+            {readiness.fixLocation && (
+              <span className="chat-readiness-fix">
+                {readinessFixLabel(readiness.fixLocation)}
+              </span>
+            )}
+          </div>
+        )}
         {(attachments.length > 0 || attachmentError) && (
           <div className="chat-attachment-strip">
             {attachments.map((att) => (
@@ -383,6 +469,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             )}
           </div>
         )}
+        {voice.error && (
+          <div className="chat-attachment-error chat-voice-error" role="alert">
+            {voice.error}
+          </div>
+        )}
         <div className="chat-input-wrapper">
           <input
             ref={fileInputRef}
@@ -391,16 +482,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             style={{ display: "none" }}
             onChange={handleFileInputChange}
           />
-          <button
-            className="chat-attach-btn"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading}
-            title={t("chat.attach")}
-            aria-label={t("chat.attach")}
-            type="button"
-          >
-            <Paperclip size={16} />
-          </button>
           <textarea
             ref={inputRef}
             className="chat-input"
@@ -408,39 +489,96 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onCompositionStart={() => {
+              composingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              composingRef.current = false;
+            }}
             onPaste={handlePaste}
             rows={1}
             autoFocus
           />
-          {isLoading ? (
+          <div className="chat-input-toolbar">
             <button
-              className="chat-send-btn chat-stop-btn"
-              onClick={onAbort}
-              title={t("common.stop")}
+              className="chat-attach-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading}
+              title={t("chat.attach")}
+              aria-label={t("chat.attach")}
+              type="button"
             >
-              <Stop size={14} />
+              <Paperclip size={16} />
             </button>
-          ) : (
-            <>
-              {input.trim() && hasSession && (
-                <button
-                  className="chat-btw-btn"
-                  onClick={handleQuickAsk}
-                  title={t("chat.quickAskTitle")}
-                >
-                  💭
-                </button>
-              )}
+            {voice.supported && (
               <button
-                className="chat-send-btn"
-                onClick={handleSend}
-                disabled={!canSend}
-                title={t("chat.send")}
+                className={`chat-mic-btn${
+                  voice.recording ? " chat-mic-btn--recording" : ""
+                }`}
+                onClick={() => {
+                  // Snapshot the current text so live results append to it.
+                  if (!voice.recording && !voice.transcribing) {
+                    voiceBaseRef.current = input;
+                  }
+                  voice.toggle();
+                }}
+                disabled={voice.transcribing}
+                title={
+                  voice.transcribing
+                    ? t("chat.voiceTranscribing")
+                    : voice.recording
+                      ? t("chat.voiceStop")
+                      : t("chat.voiceInput")
+                }
+                aria-label={
+                  voice.recording ? t("chat.voiceStop") : t("chat.voiceInput")
+                }
+                aria-pressed={voice.recording}
+                type="button"
               >
-                <Send size={16} />
+                <Mic size={16} />
               </button>
-            </>
-          )}
+            )}
+            {toolbarExtras && (
+              <>
+                <span className="chat-input-toolbar-divider" aria-hidden />
+                {toolbarExtras}
+              </>
+            )}
+            <div className="chat-input-toolbar-spacer" />
+            {contextUsage && contextUsage.used > 0 && (
+              <ContextGauge {...contextUsage} />
+            )}
+            {isLoading ? (
+              <button
+                className="chat-send-btn chat-stop-btn"
+                onClick={onAbort}
+                title={t("common.stop")}
+              >
+                <Stop size={14} />
+              </button>
+            ) : (
+              <>
+                {input.trim() && hasSession && (
+                  <button
+                    className="chat-btw-btn"
+                    onClick={handleQuickAsk}
+                    title={t("chat.quickAskTitle")}
+                  >
+                    💭
+                  </button>
+                )}
+                <button
+                  className="chat-send-btn"
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  title={t("chat.send")}
+                >
+                  <Send size={16} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </>
     );

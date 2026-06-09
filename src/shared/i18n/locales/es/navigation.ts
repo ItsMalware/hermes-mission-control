@@ -15,4 +15,6 @@ export default {
   schedules: "Programaciones",
   gateway: "Gateway",
   settings: "Configuración",
+  collapseSidebar: "Contraer barra lateral",
+  expandSidebar: "Expandir barra lateral",
 } as const;

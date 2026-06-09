@@ -17,6 +17,7 @@ describe("expectedEnvKeyForModel — provider-name lookup", () => {
     ["openrouter", "OPENROUTER_API_KEY"],
     ["anthropic", "ANTHROPIC_API_KEY"],
     ["openai", "OPENAI_API_KEY"],
+    ["ollama-cloud", "OLLAMA_API_KEY"],
     ["google", "GOOGLE_API_KEY"],
     ["xai", "XAI_API_KEY"],
     ["deepseek", "DEEPSEEK_API_KEY"], // the specific provider from issue #236
@@ -31,6 +32,7 @@ describe("expectedEnvKeyForModel — provider-name lookup", () => {
     ["minimax", "MINIMAX_API_KEY"],
     ["glm", "GLM_API_KEY"],
     ["kimi", "KIMI_API_KEY"],
+    ["xiaomi", "XIAOMI_API_KEY"],
   ])("maps provider %s → %s", (provider, expected) => {
     expect(expectedEnvKeyForModel(provider, "")).toBe(expected);
   });
@@ -56,6 +58,12 @@ describe("expectedEnvKeyForModel — URL fallback for custom/auto providers", ()
     expect(
       expectedEnvKeyForModel("custom", "https://openrouter.ai/api/v1"),
     ).toBe("OPENROUTER_API_KEY");
+    expect(
+      expectedEnvKeyForModel("custom", "https://ollama.com/v1"),
+    ).toBe("OLLAMA_API_KEY");
+    expect(
+      expectedEnvKeyForModel("custom", "https://api.xiaomimimo.com/v1"),
+    ).toBe("XIAOMI_API_KEY");
   });
 
   it("recognizes a known endpoint when provider is 'auto'", () => {

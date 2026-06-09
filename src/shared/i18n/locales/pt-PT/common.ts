@@ -1,5 +1,5 @@
 export default {
-  appName: "Agente Hermes",
+  appName: "Hermes One",
   continue: "Continuar",
   cancel: "Cancelar",
   retry: "Tentar novamente",
@@ -16,6 +16,7 @@ export default {
   add: "Adicionar",
   create: "Criar",
   close: "Fechar",
+  dismiss: "Dispensar",
   confirm: "Confirmar",
   reset: "Repor",
   back: "Voltar",

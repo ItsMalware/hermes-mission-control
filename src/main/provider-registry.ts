@@ -15,16 +15,24 @@
 export const PROVIDER_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   openrouter: "https://openrouter.ai/api/v1",
+  "ollama-cloud": "https://ollama.com/v1",
   deepseek: "https://api.deepseek.com/v1",
   groq: "https://api.groq.com/openai/v1",
   mistral: "https://api.mistral.ai/v1",
   together: "https://api.together.xyz/v1",
   fireworks: "https://api.fireworks.ai/inference/v1",
+  atlascloud: "https://api.atlascloud.ai/v1",
   cerebras: "https://api.cerebras.ai/v1",
   perplexity: "https://api.perplexity.ai",
   huggingface: "https://router.huggingface.co/v1",
+  xiaomi: "https://api.xiaomimimo.com/v1",
   zai: "https://api.z.ai/api/paas/v4",
   anthropic: "https://api.anthropic.com/v1",
+  lmstudio: "http://localhost:1234/v1",
+  atomicchat: "http://localhost:1337/v1",
+  ollama: "http://localhost:11434/v1",
+  vllm: "http://localhost:8000/v1",
+  llamacpp: "http://localhost:8080/v1",
 };
 
 /**

@@ -35,6 +35,7 @@ export default {
     japanese: "日本語",
     spanish: "Español",
     chinese: "中文",
+    portuguese: "Português",
     hint: "Elige el idioma de la interfaz",
   },
   notDetected: "No detectado",

@@ -15,6 +15,7 @@ export default {
   messages: "msg",
   messageSingular: "msg",
   delete: "Delete conversation",
+  rename: "Rename conversation",
   deleteConfirmTitle: "Delete conversation",
   deleteConfirm:
     "Delete this conversation? This cannot be undone — both the messages and the session record will be permanently removed.",
@@ -22,4 +23,15 @@ export default {
   deleteCancel: "Cancel",
   deleteConfirmAction: "Delete",
   deleteDeleting: "Deleting...",
+  selectMode: "Select",
+  cancelSelect: "Cancel",
+  selectedCount: "{{count}} selected",
+  selectVisible: "Select visible",
+  clearVisible: "Clear visible",
+  deleteSelected: "Delete selected",
+  selectSession: "Select session",
+  deleteSelectedConfirmTitle: "Delete selected sessions",
+  deleteSelectedConfirm:
+    "Delete {{count}} selected sessions? This cannot be undone — messages and session records will be permanently removed.",
+  deleteSelectedClose: "Close bulk delete confirmation",
 } as const;

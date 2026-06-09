@@ -1,5 +1,5 @@
 export default {
-  appName: "Hermes OS",
+  appName: "Hermes One",
   continue: "Continue",
   cancel: "Cancel",
   retry: "Retry",
@@ -16,6 +16,7 @@ export default {
   add: "Add",
   create: "Create",
   close: "Close",
+  dismiss: "Dismiss",
   confirm: "Confirm",
   reset: "Reset",
   back: "Back",

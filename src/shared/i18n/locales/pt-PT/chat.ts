@@ -38,6 +38,15 @@ export default {
   attachReadFailed: "{{name}}: não foi possível ler",
   attachRemoteModeBinary:
     "{{name}}: anexos PDF/binários exigem o modo local — imagens e ficheiros de texto continuam a funcionar.",
+  validation: {
+    noModel: "Nenhum modelo seleccionado. Escolha um no selector de Chat em baixo.",
+    noProvider: "Sem fornecedor definido para o modelo activo.",
+    missingKey: "Falta {{key}} — exigida pelo fornecedor activo.",
+    fixInProviders: "Defina em Fornecedores →",
+    fixInModels: "Escolha um modelo em Modelos →",
+    fixInGateway: "Verifique o separador Gateway →",
+    fixInSetup: "Executar configuração →",
+  },
   fastMode: "Modo Rápido",
   fastModeOn: "Modo Rápido LIGADO",
   fastModeActive:
@@ -53,6 +62,7 @@ export default {
   media: {
     open: "Abrir",
     saveAs: "Guardar como…",
+    saveImage: "Guardar imagem",
   },
   commands: {
     new: "Iniciar um novo chat",
@@ -86,5 +96,7 @@ export default {
     empty: "A pasta está vazia",
     emptyFolder: "Pasta vazia",
     errorLoading: "Falha ao carregar conteúdo da pasta",
+    openTerminal: "Abrir terminal aqui",
+    openTerminalFailed: "Não foi possível abrir um terminal para esta pasta.",
   },
 } as const;

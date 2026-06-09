@@ -28,10 +28,12 @@ export const PROVIDERS = {
     { value: "anthropic", label: "constants.anthropicName" },
     { value: "openai", label: "constants.openaiName" },
     { value: "openai-codex", label: "constants.openaiCodexName" },
+    { value: "ollama-cloud", label: "constants.ollamaCloudName" },
     { value: "google", label: "constants.googleName" },
     { value: "gemini", label: "constants.geminiName" },
     { value: "google-gemini-cli", label: "constants.googleGeminiCliName" },
     { value: "xai", label: "constants.xaiName" },
+    { value: "xiaomi", label: "Xiaomi MiMo" },
     { value: "mistral", label: "Mistral" },
     { value: "deepseek", label: "DeepSeek" },
     { value: "groq", label: "Groq" },
@@ -45,6 +47,14 @@ export const PROVIDERS = {
     { value: "qwen", label: "Qwen" },
     { value: "minimax", label: "MiniMax" },
     { value: "nous", label: "constants.nousName" },
+    // Local OpenAI-compatible servers. Keep these explicit so users
+    // looking for "Ollama" or "LM Studio" do not have to discover the
+    // generic custom-provider path first.
+    { value: "lmstudio", label: "constants.lmstudio" },
+    { value: "atomicchat", label: "constants.atomicchat" },
+    { value: "ollama", label: "constants.ollama" },
+    { value: "vllm", label: "constants.vllm" },
+    { value: "llamacpp", label: "constants.llamacpp" },
     // Subscription / OAuth plans
     // openai-codex is listed once above (first-party group) via #102 —
     // not repeated here to avoid a duplicate <option> value.
@@ -61,10 +71,12 @@ export const PROVIDERS = {
     anthropic: "constants.anthropicName",
     openai: "constants.openaiName",
     "openai-codex": "constants.openaiCodexName",
+    "ollama-cloud": "constants.ollamaCloudName",
     google: "constants.googleName",
     gemini: "constants.geminiName",
     "google-gemini-cli": "constants.googleGeminiCliName",
     xai: "constants.xaiName",
+    xiaomi: "Xiaomi MiMo",
     mistral: "Mistral",
     deepseek: "DeepSeek",
     groq: "Groq",
@@ -78,6 +90,11 @@ export const PROVIDERS = {
     qwen: "Qwen",
     minimax: "MiniMax",
     nous: "constants.nousName",
+    lmstudio: "constants.lmstudio",
+    atomicchat: "constants.atomicchat",
+    ollama: "constants.ollama",
+    vllm: "constants.vllm",
+    llamacpp: "constants.llamacpp",
     "xai-oauth": "xAI Grok (OAuth)",
     "qwen-oauth": "Qwen (OAuth)",
     "minimax-oauth": "MiniMax (OAuth)",
@@ -152,6 +169,18 @@ export const PROVIDERS = {
       needsKey: false,
     },
     {
+      id: "ollama-cloud",
+      name: "constants.ollamaCloudName",
+      desc: "constants.ollamaCloudDesc",
+      tag: "constants.ollamaCloudTag",
+      envKey: "OLLAMA_API_KEY",
+      url: "https://ollama.com/settings/keys",
+      placeholder: "ollama_...",
+      configProvider: "ollama-cloud",
+      baseUrl: "https://ollama.com/v1",
+      needsKey: true,
+    },
+    {
       id: "google",
       name: "constants.googleName",
       desc: "constants.googleDesc",
@@ -173,6 +202,18 @@ export const PROVIDERS = {
       placeholder: "xai-...",
       configProvider: "xai",
       baseUrl: "",
+      needsKey: true,
+    },
+    {
+      id: "xiaomi",
+      name: "Xiaomi MiMo",
+      desc: "MiMo models",
+      tag: "",
+      envKey: "XIAOMI_API_KEY",
+      url: "https://platform.xiaomimimo.com",
+      placeholder: "sk-...",
+      configProvider: "xiaomi",
+      baseUrl: "https://api.xiaomimimo.com/v1",
       needsKey: true,
     },
     {
@@ -330,13 +371,82 @@ export const LOCAL_PRESETS: LocalPreset[] = [
 
 // ── Theme ───────────────────────────────────────────────
 
-export const THEME_OPTIONS = [
-  { value: "system" as const, label: "constants.themeSystem" },
-  { value: "light" as const, label: "constants.themeLight" },
-  { value: "dark" as const, label: "constants.themeDark" },
+export type ThemeAppearance = "dark" | "light";
+
+export interface ThemeDef {
+  /** Value written to localStorage and the `data-theme` attribute. */
+  id: string;
+  /** Display name shown in the picker (proper names are not translated). */
+  name: string;
+  /** Whether the palette is dark or light (drives the "System" fallback). */
+  appearance: ThemeAppearance;
+}
+
+/**
+ * Registry of selectable themes. Each entry must have a matching
+ * `[data-theme="<id>"]` block in `assets/main.css`. To add a theme, append an
+ * entry here and define its CSS variables there — nothing else is required.
+ */
+export const THEMES: ThemeDef[] = [
+  { id: "dark", name: "Dark", appearance: "dark" },
+  { id: "light", name: "Light", appearance: "light" },
+  { id: "dracula", name: "Dracula", appearance: "dark" },
+  { id: "nord", name: "Nord", appearance: "dark" },
+  { id: "one-dark", name: "One Dark", appearance: "dark" },
+  { id: "github-dark", name: "GitHub Dark", appearance: "dark" },
+  { id: "monokai", name: "Monokai", appearance: "dark" },
+  { id: "solarized-dark", name: "Solarized Dark", appearance: "dark" },
+  { id: "gruvbox-dark", name: "Gruvbox Dark", appearance: "dark" },
+  { id: "tokyo-night", name: "Tokyo Night", appearance: "dark" },
+  { id: "github-light", name: "GitHub Light", appearance: "light" },
+  { id: "solarized-light", name: "Solarized Light", appearance: "light" },
 ];
 
+/**
+ * Legacy options retained for older callers/tests that only distinguish between
+ * OS-following, light, and dark modes. New theme pickers should use THEMES.
+ */
+export const THEME_OPTIONS = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+
+/** Themes used by the "System" setting when following the OS preference. */
+export const DEFAULT_DARK_THEME = "dark";
+export const DEFAULT_LIGHT_THEME = "light";
+
 export const THEME_STORAGE_KEY = "hermes-theme";
+
+// ── Font ────────────────────────────────────────────────
+
+// Each option maps to a full font-family stack assigned to `--font-sans`.
+// "manrope" is the bundled default; the rest fall back to OS-installed
+// families with a sane sans-serif chain so something always renders.
+export interface FontOption {
+  value: string;
+  label: string;
+  stack: string;
+}
+
+export const FONT_OPTIONS: FontOption[] = [
+  {
+    value: "manrope",
+    label: "settings.font.manrope",
+    stack:
+      '"Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  },
+  {
+    value: "system",
+    label: "settings.font.system",
+    stack:
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, "Helvetica Neue", sans-serif',
+  },
+];
+
+export const DEFAULT_FONT = "manrope";
+
+export const FONT_STORAGE_KEY = "hermes-font";
 
 // ── Settings API Key Sections ───────────────────────────
 
@@ -355,6 +465,12 @@ export const SETTINGS_SECTIONS: SectionDef[] = [
         label: "constants.openaiApiKey",
         type: "password",
         hint: "constants.openaiHint",
+      },
+      {
+        key: "OLLAMA_API_KEY",
+        label: "constants.ollamaCloudApiKey",
+        type: "password",
+        hint: "constants.ollamaCloudHint",
       },
       {
         key: "ANTHROPIC_API_KEY",
@@ -490,6 +606,12 @@ export const SETTINGS_SECTIONS: SectionDef[] = [
         label: "constants.xaiApiKey",
         type: "password",
         hint: "constants.xaiHint",
+      },
+      {
+        key: "XIAOMI_API_KEY",
+        label: "constants.xiaomiApiKey",
+        type: "password",
+        hint: "constants.xiaomiHint",
       },
     ],
   },

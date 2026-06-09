@@ -285,6 +285,7 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
   openrouter: "OPENROUTER_API_KEY",
   anthropic: "ANTHROPIC_API_KEY",
   openai: "OPENAI_API_KEY",
+  "ollama-cloud": "OLLAMA_API_KEY",
   google: "GOOGLE_API_KEY",
   xai: "XAI_API_KEY",
   groq: "GROQ_API_KEY",
@@ -301,6 +302,15 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
   glm: "GLM_API_KEY",
   kimi: "KIMI_API_KEY",
   nvidia: "NVIDIA_API_KEY",
+  // Nous Portal supports BOTH OAuth (`nous` variant) AND API key
+  // (`nous-api` variant). Register the env var name under both ids so
+  // the install-gate + pre-send validation + config-health audit can
+  // detect a missing key — whichever id the user's profile happens to
+  // be configured under. The OAuth case is handled separately by
+  // checking auth.json via hasOAuthCredentials() (config.ts).
+  nous: "NOUS_API_KEY",
+  "nous-api": "NOUS_API_KEY",
+  xiaomi: "XIAOMI_API_KEY",
 };
 
 // When provider is "custom" or "auto", the desktop's setup flow falls
@@ -310,6 +320,7 @@ const URL_TO_ENV_KEY: Array<[RegExp, string]> = [
   [/openrouter\.ai/i, "OPENROUTER_API_KEY"],
   [/anthropic\.com/i, "ANTHROPIC_API_KEY"],
   [/openai\.com/i, "OPENAI_API_KEY"],
+  [/(^|\/\/|\.)ollama\.com(?=\/|:|$)/i, "OLLAMA_API_KEY"],
   [/huggingface\.co/i, "HF_TOKEN"],
   [/api\.groq\.com/i, "GROQ_API_KEY"],
   [/api\.deepseek\.com/i, "DEEPSEEK_API_KEY"],
@@ -318,6 +329,7 @@ const URL_TO_ENV_KEY: Array<[RegExp, string]> = [
   [/api\.cerebras\.ai/i, "CEREBRAS_API_KEY"],
   [/api\.mistral\.ai/i, "MISTRAL_API_KEY"],
   [/api\.perplexity\.ai/i, "PERPLEXITY_API_KEY"],
+  [/api\.xiaomimimo\.com/i, "XIAOMI_API_KEY"],
 ];
 
 /**

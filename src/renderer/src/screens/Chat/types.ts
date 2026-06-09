@@ -37,6 +37,7 @@ export interface ToolCallMessage {
   callId: string;
   name: string;
   args: string;
+  status?: "running" | "completed" | "failed";
 }
 
 export interface ToolResultMessage {
@@ -49,11 +50,30 @@ export interface ToolResultMessage {
   attachments?: Attachment[];
 }
 
+/**
+ * An inline clarifying question from the agent (`clarify.request`). Rendered as
+ * a card in the transcript: choice buttons when `choices` is non-empty, else an
+ * open-ended textarea, plus an auto-choose toggle and a skip ("let Hermes
+ * decide") control. `resolved` flips once the user answers/skips so the card
+ * disables its controls and shows the chosen answer.
+ */
+export interface ClarifyMessage {
+  id: string;
+  kind: "clarify";
+  role: "agent";
+  requestId: string;
+  question: string;
+  choices: string[];
+  answer?: string;
+  resolved?: boolean;
+}
+
 export type ChatMessage =
   | ChatBubbleMessage
   | ReasoningMessage
   | ToolCallMessage
-  | ToolResultMessage;
+  | ToolResultMessage
+  | ClarifyMessage;
 
 export interface ModelGroup {
   provider: string;
@@ -71,4 +91,10 @@ export interface UsageState {
   completionTokens: number;
   totalTokens: number;
   cost?: number;
+  /** Latest turn's prompt tokens = current context-window occupancy (NOT
+   *  summed across turns, unlike promptTokens). Drives the context gauge. */
+  contextTokens?: number;
+  /** Latest turn's prompt-cache read/write tokens, if the provider reports them. */
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
 }

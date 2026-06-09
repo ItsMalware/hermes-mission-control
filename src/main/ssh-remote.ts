@@ -19,6 +19,7 @@ import type { MemoryInfo } from "./memory";
 import type { SessionSummary, SearchResult } from "./sessions";
 import type { CachedSession } from "./session-cache";
 import type { ToolsetInfo } from "./tools";
+import { DEFAULT_MESSAGING_PLATFORM_TOOLSETS } from "../shared/messaging-platforms";
 import type { SavedModel } from "./models";
 import type { MemoryProviderInfo } from "./installer";
 import { t } from "../shared/i18n";
@@ -260,9 +261,58 @@ export async function sshUninstallSkill(
   try {
     const stdout = await sshExec(
       config,
-      `hermes skills uninstall ${shellQuote(name)} 2>&1`,
+      `hermes skills uninstall ${shellQuote(name)} --yes 2>&1`,
     );
-    return classifySkillCliOutput(stdout ?? "");
+    const result = classifySkillCliOutput(stdout ?? "");
+    if (result.success) return result;
+
+    // CLI didn't find it — try direct filesystem removal on the remote.
+    // Walk ~/.hermes/skills/*/ to find a directory whose SKILL.md frontmatter
+    // name or directory basename matches `name`.
+    await sshExec(
+      config,
+      `python3 -c '
+import os, sys
+name = ${shellQuote(name)}
+home = os.path.expanduser("~")
+skills_dir = os.path.join(home, ".hermes", "skills")
+if not os.path.isdir(skills_dir):
+    sys.exit(0)
+for cat in os.listdir(skills_dir):
+    cat_path = os.path.join(skills_dir, cat)
+    if not os.path.isdir(cat_path):
+        continue
+    for entry in os.listdir(cat_path):
+        entry_path = os.path.join(cat_path, entry)
+        if not os.path.isdir(entry_path):
+            continue
+        skill_file = os.path.join(entry_path, "SKILL.md")
+        if not os.path.isfile(skill_file):
+            continue
+        skill_name = entry
+        try:
+            with open(skill_file, "r", encoding="utf-8") as f:
+                lines = f.read(4000).splitlines()
+            in_fm = False
+            for line in lines:
+                if line.strip() == "---":
+                    if not in_fm:
+                        in_fm = True
+                        continue
+                    else:
+                        break
+                if in_fm and line.strip().startswith("name:"):
+                    skill_name = line.split(":", 1)[1].strip().strip('"').strip("'")
+                    break
+        except Exception:
+            pass
+        if skill_name == name or entry == name:
+            import shutil
+            shutil.rmtree(entry_path)
+            sys.exit(0)
+' 2>&1`,
+    );
+    return { success: true };
   } catch (err) {
     return { success: false, error: (err as Error).message };
   }
@@ -581,36 +631,48 @@ const TOOLSET_DEFS = [
   },
 ];
 
-function parseEnabledToolsets(content: string): Set<string> {
-  const enabled = new Set<string>();
+function parsePlatformToolsets(content: string): Record<string, Set<string>> {
+  const toolsets: Record<string, Set<string>> = {};
   let inPlatformToolsets = false;
-  let inCli = false;
+  let currentPlatform: string | null = null;
   for (const line of content.split("\n")) {
     const trimmed = line.trimEnd();
     if (/^\s*platform_toolsets\s*:/.test(trimmed)) {
       inPlatformToolsets = true;
-      inCli = false;
+      currentPlatform = null;
       continue;
     }
-    if (inPlatformToolsets && /^\s+cli\s*:/.test(trimmed)) {
-      inCli = true;
-      continue;
-    }
-    if (inPlatformToolsets && /^\S/.test(trimmed) && !/^\s*$/.test(trimmed)) {
+    if (inPlatformToolsets && /^\S/.test(trimmed) && trimmed !== "") {
       inPlatformToolsets = false;
-      inCli = false;
+      currentPlatform = null;
       continue;
     }
-    if (inCli && /^\s{4}\S/.test(trimmed) && !/^\s{4,}-/.test(trimmed)) {
-      inCli = false;
+    if (!inPlatformToolsets) continue;
+
+    const platformMatch = trimmed.match(
+      /^\s+([A-Za-z0-9_-]+)\s*:\s*(\[\])?\s*(?:#.*)?$/,
+    );
+    if (platformMatch) {
+      const platformName = platformMatch[1];
+      currentPlatform = platformMatch[2] ? null : platformName;
+      toolsets[platformName] ??= new Set<string>();
       continue;
     }
-    if (inCli) {
-      const m = trimmed.match(/^\s+-\s+["']?(\w+)["']?/);
-      if (m) enabled.add(m[1]);
+
+    if (currentPlatform) {
+      const m = trimmed.match(/^\s+-\s+["']?([A-Za-z0-9_-]+)["']?/);
+      if (m) toolsets[currentPlatform].add(m[1]);
     }
   }
-  return enabled;
+  return toolsets;
+}
+
+function parseEnabledToolsets(content: string, platform = "cli"): Set<string> {
+  return parsePlatformToolsets(content)[platform] ?? new Set<string>();
+}
+
+function isSafeToolsetConfigKey(key: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(key);
 }
 
 function localizeToolDefs(
@@ -643,18 +705,70 @@ export async function sshGetToolsets(
   return localizeToolDefs((key) => enabled.has(key));
 }
 
+export async function sshGetPlatformToolsets(
+  config: SshConfig,
+  profile?: string,
+): Promise<Record<string, string[]>> {
+  const content = await sshReadFile(config, remoteConfigPath(profile));
+  if (!content) return {};
+  return Object.fromEntries(
+    Object.entries(parsePlatformToolsets(content)).map(([platform, values]) => [
+      platform,
+      Array.from(values).sort(),
+    ]),
+  );
+}
+
 export async function sshSetToolsetEnabled(
   config: SshConfig,
   key: string,
   enabled: boolean,
   profile?: string,
 ): Promise<boolean> {
+  return sshSetPlatformToolsetEnabled(config, "cli", key, enabled, profile);
+}
+
+export async function sshSetMessagingPlatformToolsetEnabled(
+  config: SshConfig,
+  platform: string,
+  key: string,
+  enabled: boolean,
+  profile?: string,
+): Promise<boolean> {
+  return sshSetPlatformToolsetEnabled(
+    config,
+    platform,
+    key,
+    enabled,
+    profile,
+    DEFAULT_MESSAGING_PLATFORM_TOOLSETS,
+  );
+}
+
+async function sshSetPlatformToolsetEnabled(
+  config: SshConfig,
+  platform: string,
+  key: string,
+  enabled: boolean,
+  profile?: string,
+  defaultEnabled: string[] = [],
+): Promise<boolean> {
   try {
+    if (!isSafeToolsetConfigKey(platform) || !isSafeToolsetConfigKey(key)) {
+      return false;
+    }
     const configPath = remoteConfigPath(profile);
     const content = await sshReadFile(config, configPath);
     if (!content) return false;
 
-    const current = parseEnabledToolsets(content);
+    const parsed = parsePlatformToolsets(content);
+    const hasPlatformConfig = Object.prototype.hasOwnProperty.call(
+      parsed,
+      platform,
+    );
+    const current = hasPlatformConfig
+      ? new Set(parsed[platform])
+      : new Set(defaultEnabled);
     if (enabled) current.add(key);
     else current.delete(key);
 
@@ -662,14 +776,15 @@ export async function sshSetToolsetEnabled(
       .sort()
       .map((t) => `      - ${t}`)
       .join("\n");
-    const newSection = `  cli:\n${toolsetLines}`;
+    const newSection = `  ${platform}:\n${toolsetLines}`;
+    const platformHeader = new RegExp(`^\\s+${platform}\\s*:`);
 
     let newContent: string;
     if (content.includes("platform_toolsets")) {
       const lines = content.split("\n");
       const result: string[] = [];
       let inPT = false,
-        inCli = false,
+        inTargetPlatform = false,
         inserted = false;
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -679,15 +794,15 @@ export async function sshSetToolsetEnabled(
           result.push(line);
           continue;
         }
-        if (inPT && /^\s+cli\s*:/.test(trimmed)) {
-          inCli = true;
+        if (inPT && platformHeader.test(trimmed)) {
+          inTargetPlatform = true;
           result.push(newSection);
           inserted = true;
           continue;
         }
-        if (inCli) {
+        if (inTargetPlatform) {
           if (/^\s+-\s/.test(trimmed)) continue;
-          inCli = false;
+          inTargetPlatform = false;
           result.push(line);
           continue;
         }
@@ -695,9 +810,13 @@ export async function sshSetToolsetEnabled(
           inPT = false;
           if (!inserted) {
             result.push(newSection);
+            inserted = true;
           }
         }
         result.push(line);
+      }
+      if (inPT && !inserted) {
+        result.push(newSection);
       }
       newContent = result.join("\n");
     } else {
@@ -1782,14 +1901,21 @@ const SSH_SUPPORTED_PLATFORMS = [
   "dingtalk",
   "feishu",
   "wecom",
+  "wecom_callback",
   "weixin",
+  "qqbot",
+  "yuanbao",
+  "api_server",
+  "webhook",
   "webhooks",
+  "homeassistant",
   "home_assistant",
 ];
 
 // Map from app platform keys to gateway_state.json keys (where they differ)
 const PLATFORM_STATE_KEY: Record<string, string> = {
   home_assistant: "homeassistant",
+  webhooks: "webhook",
 };
 
 export async function sshGetPlatformEnabled(

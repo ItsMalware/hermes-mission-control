@@ -266,6 +266,9 @@ export function syncSessionCache(profile?: string): CachedSession[] {
           .all(...chunk) as Array<{ id: string; message_count: number }>;
         for (const r of refreshed) countsById.set(r.id, r.message_count);
       }
+      cache.sessions = cache.sessions.filter(
+        (s) => refreshedIds.has(s.id) || countsById.has(s.id),
+      );
       for (const s of cache.sessions) {
         const fresh = countsById.get(s.id);
         if (fresh !== undefined && fresh !== s.messageCount) {
@@ -322,6 +325,23 @@ export function updateSessionTitle(
   if (idx >= 0) {
     cache.sessions[idx].title = title;
     writeCache(cache, profile);
+  }
+  // Also persist in state.db so the rename survives cache rebuilds
+  try {
+    const dbPath = activeStateDbPath();
+    if (existsSync(dbPath)) {
+      const db = new Database(dbPath);
+      try {
+        db.prepare("UPDATE sessions SET title = ? WHERE id = ?").run(
+          title,
+          sessionId,
+        );
+      } finally {
+        db.close();
+      }
+    }
+  } catch {
+    // ignore DB errors — cache update above is the fast path
   }
 }
 

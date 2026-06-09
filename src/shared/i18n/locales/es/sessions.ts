@@ -15,6 +15,7 @@ export default {
   messages: "msg",
   messageSingular: "msg",
   delete: "Eliminar conversación",
+  rename: "Renombrar conversación",
   deleteConfirmTitle: "Eliminar conversación",
   deleteConfirm:
     "¿Eliminar esta conversación? Esta acción no se puede deshacer — los mensajes y el registro de la sesión se eliminarán permanentemente.",
@@ -22,4 +23,15 @@ export default {
   deleteCancel: "Cancelar",
   deleteConfirmAction: "Eliminar",
   deleteDeleting: "Eliminando...",
+  selectMode: "Seleccionar",
+  cancelSelect: "Cancelar",
+  selectedCount: "{{count}} seleccionados",
+  selectVisible: "Seleccionar visibles",
+  clearVisible: "Limpiar visibles",
+  deleteSelected: "Eliminar seleccionados",
+  selectSession: "Seleccionar sesión",
+  deleteSelectedConfirmTitle: "Eliminar sesiones seleccionadas",
+  deleteSelectedConfirm:
+    "¿Eliminar {{count}} sesiones seleccionadas? Esta acción no se puede deshacer — los mensajes y registros de sesión se eliminarán permanentemente.",
+  deleteSelectedClose: "Cerrar confirmación de eliminación masiva",
 } as const;

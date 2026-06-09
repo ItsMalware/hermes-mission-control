@@ -94,7 +94,9 @@ import {
   normaliseRemoteUrl,
   getApiUrl,
   startGateway,
+  startGatewayDetailed,
   restartGateway,
+  restartGatewayViaCli,
   testRemoteConnection,
   contextFolderSystemMessage,
 } from "../src/main/hermes";
@@ -305,11 +307,31 @@ describe("startGateway / restartGateway in remote mode", () => {
     expect(spawnSpy).not.toHaveBeenCalled();
   });
 
+  it("startGatewayDetailed reports why remote mode cannot start a local gateway", () => {
+    spawnSpy.mockClear();
+    connModeRef.mode = "remote";
+    const result = startGatewayDetailed();
+    expect(result.success).toBe(false);
+    expect(result.running).toBe(false);
+    expect(result.error).toContain("local mode");
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
   it("startGateway refuses to spawn in ssh mode", () => {
     spawnSpy.mockClear();
     connModeRef.mode = "ssh";
     const result = startGateway();
     expect(result).toBe(false);
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  it("startGatewayDetailed reports why ssh mode cannot start a local gateway", () => {
+    spawnSpy.mockClear();
+    connModeRef.mode = "ssh";
+    const result = startGatewayDetailed();
+    expect(result.success).toBe(false);
+    expect(result.running).toBe(false);
+    expect(result.error).toContain("local mode");
     expect(spawnSpy).not.toHaveBeenCalled();
   });
 
@@ -324,6 +346,20 @@ describe("startGateway / restartGateway in remote mode", () => {
     spawnSpy.mockClear();
     connModeRef.mode = "ssh";
     restartGateway();
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  it("restartGatewayViaCli refuses to spawn in remote mode", async () => {
+    spawnSpy.mockClear();
+    connModeRef.mode = "remote";
+    await expect(restartGatewayViaCli()).resolves.toBe(false);
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  it("restartGatewayViaCli refuses to spawn in ssh mode", async () => {
+    spawnSpy.mockClear();
+    connModeRef.mode = "ssh";
+    await expect(restartGatewayViaCli()).resolves.toBe(false);
     expect(spawnSpy).not.toHaveBeenCalled();
   });
 });

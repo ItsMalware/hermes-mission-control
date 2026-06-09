@@ -76,6 +76,9 @@ describe("Skills.tsx — Install button (issue #310 diagnosis)", () => {
     // with the card's skill.name and the current profile (undefined here).
     expect(installSkill).toHaveBeenCalledTimes(1);
     expect(installSkill).toHaveBeenCalledWith("concept-diagram", undefined);
+    await waitFor(() => {
+      expect(listInstalledSkills).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("surfaces the CLI error in the UI when installSkill returns success:false (issue #310 fix)", async () => {
@@ -108,13 +111,20 @@ describe("Skills.tsx — Install button (issue #310 diagnosis)", () => {
     });
 
     const view = render(<Skills />);
-    await waitFor(() => expect(listBundledSkills).toHaveBeenCalled());
+    await waitFor(() => {
+      expect(listBundledSkills).toHaveBeenCalled();
+      expect(listInstalledSkills).toHaveBeenCalled();
+    });
 
-    const browseTab = view.container.querySelectorAll(
-      ".skills-tab",
-    )[1] as HTMLButtonElement;
+    let browseTab: HTMLButtonElement | null = null;
+    await waitFor(() => {
+      browseTab = view.container.querySelectorAll(
+        ".skills-tab",
+      )[1] as HTMLButtonElement | null;
+      expect(browseTab).toBeTruthy();
+    });
     await act(async () => {
-      fireEvent.click(browseTab);
+      fireEvent.click(browseTab!);
     });
 
     let installBtn: HTMLButtonElement | null = null;
