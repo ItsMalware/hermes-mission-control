@@ -332,23 +332,7 @@ export default function SEOView() {
             </button>
           );
         })}
-        {/* AIPB share-pack actions — let members open the setup guide or grab
-            the zip. Pushed to the right via ml-auto so they don't crowd tabs. */}
-        <a
-          href="/seo-guide"
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12.5px] transition border-[var(--panel-border)] text-[var(--fg-dim)] hover:text-[var(--fg)] hover:border-[rgba(163,230,53,0.4)]"
-          title="Open the step-by-step SEO setup guide for AIPB members"
-        >
-          <BookOpen size={14} /> Setup Guide
-        </a>
-        <a
-          href="/downloads/seo-pack.zip"
-          download
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12.5px] transition border-[rgba(163,230,53,0.4)] bg-[rgba(163,230,53,0.12)] text-lime-300 hover:bg-[rgba(163,230,53,0.18)]"
-          title="Download the skill + config templates + sample transcript (.zip)"
-        >
-          <Save size={14} /> SEO Pack (.zip)
-        </a>
+
       </div>
 
       {tab === "generate" && (
