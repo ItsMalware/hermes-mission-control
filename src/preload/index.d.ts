@@ -1169,6 +1169,55 @@ interface HermesAPI {
     date: string | undefined,
     content: string,
   ) => Promise<SelfNote>;
+  selfSearchNotes: (query: string, limit?: number) => Promise<any[]>;
+  selfRecentNotes: (limit?: number) => Promise<any[]>;
+  selfReadNoteByPath: (relPath: string) => Promise<string>;
+  selfGetVaultGraph: () => Promise<{ nodes: any[]; links: any[] }>;
+
+  // NotebookLM MCP bridge
+  notebookLmHealth: () => Promise<unknown>;
+  notebookLmSetupAuth: () => Promise<unknown>;
+  notebookLmListNotebooks: () => Promise<unknown>;
+  notebookLmCreateNotebook: (title: string) => Promise<unknown>;
+  notebookLmLibrary: () => Promise<unknown>;
+  notebookLmStudioStatus: (notebookId: string) => Promise<unknown>;
+  notebookLmAsk: (
+    notebookId: string,
+    question: string,
+    notebookName?: string,
+  ) => Promise<unknown>;
+  notebookLmStudioCreate: (
+    notebookId: string,
+    artifactType: string,
+    customPrompt?: string,
+  ) => Promise<unknown>;
+  notebookLmDownloadArtifact: (
+    notebookId: string,
+    artifactId: string,
+    artifactType: string,
+    title?: string,
+    notebookName?: string,
+  ) => Promise<unknown>;
+
+  // Notion Tickets
+  notionQueryTickets: (
+    databaseId: string,
+    profile?: string,
+  ) => Promise<{
+    success: boolean;
+    tickets?: Array<{
+      id: string;
+      title: string;
+      status: string;
+      priority: string;
+      completionDate: string | null;
+      notes: string;
+      url: string;
+      createdTime: string;
+      queue: string;
+    }>;
+    error?: string;
+  }>;
 
   // Artifacts / workspace browser
   listArtifactBuckets: (profile?: string) => Promise<ArtifactBucket[]>;

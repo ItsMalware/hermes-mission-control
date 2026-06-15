@@ -32,5 +32,15 @@ export default defineConfig({
       dedupe: ["three"],
     },
     plugins: [tailwindcss(), react()],
+    optimizeDeps: {
+      include: [
+        "use-sync-external-store/shim/with-selector",
+        "zustand",
+        "zustand/traditional",
+        "scheduler",
+        "stats.js"
+      ],
+      exclude: ["three", "@react-three/fiber", "@react-three/drei", "troika-three-text"],
+    },
   },
 });

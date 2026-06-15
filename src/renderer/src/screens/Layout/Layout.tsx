@@ -5,43 +5,22 @@ import {
   type DbHistoryItem,
 } from "../Chat/sessionHistory";
 import MissionControl from "../MissionControl/MissionControl";
-import AiClis from "../AiClis/AiClis";
-import Artifacts from "../Artifacts/Artifacts";
-import Sessions from "../Sessions/Sessions";
-import Agents from "../Agents/Agents";
-import Discover from "../Discover/Discover";
 import ProfileSwitcher from "./ProfileSwitcher";
 import Settings from "../Settings/Settings";
-import Skills from "../Skills/Skills";
-import Memory from "../Memory/Memory";
-import Tools from "../Tools/Tools";
-import Gateway from "../Gateway/Gateway";
-import Office from "../Office/Office";
-import Models from "../Models/Models";
-import Providers from "../Providers/Providers";
-import Schedules from "../Schedules/Schedules";
-import Kanban from "../Kanban/Kanban";
+import Self from "../Self/Self";
+import Workspace from "../Workspace/Workspace";
+import AiClis from "../AiClis/AiClis";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
-import hermeslogo from "../../assets/hermes-one.svg";
+import hermescat from "../../assets/hermescat.png";
 import {
   ChatBubble,
-  Clock,
-  Compass,
-  Bot,
-  Settings as SettingsIcon,
-  Brain,
-  Wrench,
-  Signal,
-  Building,
-  Layers,
   Monitor,
-  KeyRound,
-  Timer,
-  Kanban as KanbanIcon,
+  Settings as SettingsIcon,
+  Layers,
+  Users,
   Download,
-  PanelLeftClose,
-  PanelLeftOpen,
+  Bot,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
@@ -63,7 +42,9 @@ type View =
   | "schedules"
   | "kanban"
   | "gateway"
-  | "settings";
+  | "settings"
+  | "self"
+  | "workspace";
 
 const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   {
@@ -73,21 +54,8 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   },
   { view: "chat", icon: ChatBubble, labelKey: "navigation.chat" },
   { view: "ai-clis", icon: Bot, labelKey: "navigation.aiClis" },
-  { view: "artifacts", icon: Layers, labelKey: "navigation.artifacts" },
-  { view: "sessions", icon: Clock, labelKey: "navigation.sessions" },
-  { view: "discover", icon: Compass, labelKey: "navigation.discover" },
-  // "agents" (Profiles) is reached from the sidebar-footer ProfileSwitcher's
-  // "Manage profiles" action rather than a top-level nav item.
-  { view: "office", icon: Building, labelKey: "navigation.office" },
-  { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
-  { view: "models", icon: Layers, labelKey: "navigation.models" },
-  { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
-  // "skills" lives under the Discover tab (installed + community), so it's no
-  // longer a top-level nav item.
-  { view: "memory", icon: Brain, labelKey: "navigation.memory" },
-  { view: "tools", icon: Wrench, labelKey: "navigation.tools" },
-  { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
-  { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
+  { view: "self", icon: Users, labelKey: "navigation.self" },
+  { view: "workspace", icon: Layers, labelKey: "navigation.workspace" },
   { view: "settings", icon: SettingsIcon, labelKey: "navigation.settings" },
 ];
 
@@ -109,7 +77,7 @@ function Layout({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [activeProfile, setActiveProfile] = useState("default");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+  const [sidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
     } catch {
@@ -123,18 +91,13 @@ function Layout({
   );
   // Remote-only mode — SSH tunnel has full access; only pure HTTP remote mode restricts screens
   const [remoteMode, setRemoteMode] = useState(false);
-  // Set by the Capabilities screen's "Browse" actions to focus a Discover tab
-  // (Skills → Community, or MCPs). The nonce re-fires Discover's effect.
-  const [discoverFocus, setDiscoverFocus] = useState<{
-    kind: "skills" | "mcps";
-    nonce: number;
-  } | null>(null);
 
   const paneStyle = (target: View): React.CSSProperties => ({
     display: view === target ? "flex" : "none",
     flex: 1,
     flexDirection: "column",
-    overflow: "hidden",
+    overflow: "auto",
+    minHeight: 0,
   });
 
   const goTo = useCallback((v: View) => {
@@ -142,13 +105,7 @@ function Layout({
     setView(v);
   }, []);
 
-  const focusDiscover = useCallback(
-    (kind: "skills" | "mcps") => {
-      setDiscoverFocus((prev) => ({ kind, nonce: (prev?.nonce ?? 0) + 1 }));
-      goTo("discover");
-    },
-    [goTo],
-  );
+
 
   // Re-check remote mode on tab switch (picks up Settings changes)
   useEffect(() => {
@@ -281,49 +238,23 @@ function Layout({
     [goTo],
   );
 
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((collapsed) => {
-      const next = !collapsed;
-      try {
-        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
-      } catch {
-        /* ignore persistence failures */
-      }
-      return next;
-    });
-  }, []);
 
-  const sidebarToggleLabel = sidebarCollapsed
-    ? t("navigation.expandSidebar")
-    : t("navigation.collapseSidebar");
 
   return (
     <div className={`layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span
+          <img
+            src={hermescat}
             className="sidebar-logo"
-            role="img"
-            aria-label="Hermes"
+            alt="Hermes"
             style={{
-              maskImage: `url(${hermeslogo})`,
-              WebkitMaskImage: `url(${hermeslogo})`,
+              width: 42,
+              height: 42,
+              objectFit: 'contain',
+              borderRadius: 6,
             }}
           />
-          <button
-            className="sidebar-collapse-toggle"
-            type="button"
-            onClick={toggleSidebar}
-            title={sidebarToggleLabel}
-            aria-label={sidebarToggleLabel}
-            aria-expanded={!sidebarCollapsed}
-          >
-            {sidebarCollapsed ? (
-              <PanelLeftOpen size={16} />
-            ) : (
-              <PanelLeftClose size={16} />
-            )}
-          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -342,11 +273,9 @@ function Layout({
         </nav>
 
         <div className="sidebar-footer">
-          {updateState && (
+          {updateState && updateState !== "error" && (
             <button
-              className={`sidebar-update-btn ${
-                updateState === "error" ? "error" : ""
-              }`}
+              className="sidebar-update-btn"
               onClick={handleUpdate}
               disabled={updateState === "downloading"}
               title={updateButtonTitle}
@@ -366,9 +295,7 @@ function Layout({
               {updateState === "ready" && (
                 <span>{t("common.restartToUpdate")}</span>
               )}
-              {updateState === "error" && (
-                <span>{t("common.updateFailed")}</span>
-              )}
+
             </button>
           )}
           <ProfileSwitcher
@@ -394,6 +321,7 @@ function Layout({
             sessionId={currentSessionId}
             profile={activeProfile}
             onNewChat={handleNewChat}
+            onResumeSession={handleResumeSession}
             onOpenDiagnose={() => goTo("settings")}
           />
         </div>
@@ -408,149 +336,25 @@ function Layout({
           </div>
         )}
 
+        {visitedViews.has("workspace") && (
+          <div style={paneStyle("workspace")}>
+            {remoteMode ? (
+              <RemoteNotice feature="Workspace" />
+            ) : (
+              <Workspace profile={activeProfile} visible={view === "workspace"} />
+            )}
+          </div>
+        )}
+
         {visitedViews.has("ai-clis") && (
           <div style={paneStyle("ai-clis")}>
             <AiClis />
           </div>
         )}
 
-        {visitedViews.has("artifacts") && (
-          <div style={paneStyle("artifacts")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Artifacts" />
-            ) : (
-              <Artifacts profile={activeProfile} />
-            )}
-          </div>
-        )}
-
-        {visitedViews.has("sessions") && (
-          <div style={paneStyle("sessions")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Sessions" />
-            ) : (
-              <Sessions
-                onResumeSession={handleResumeSession}
-                onNewChat={handleNewChat}
-                currentSessionId={currentSessionId}
-                visible={view === "sessions"}
-              />
-            )}
-          </div>
-        )}
-
-        {visitedViews.has("discover") && (
-          <div style={paneStyle("discover")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Discover" />
-            ) : (
-              <Discover
-                profile={activeProfile}
-                visible={view === "discover"}
-                focusKind={discoverFocus ?? undefined}
-              />
-            )}
-          </div>
-        )}
-
-        {visitedViews.has("agents") && (
-          <div style={paneStyle("agents")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Profiles" />
-            ) : (
-              <Agents
-                activeProfile={activeProfile}
-                onSelectProfile={handleSelectProfile}
-                onChatWith={(name: string) => {
-                  handleSelectProfile(name);
-                  goTo("chat");
-                }}
-              />
-            )}
-          </div>
-        )}
-
-        {visitedViews.has("office") && (
-          <div style={paneStyle("office")}>
-            <Office profile={activeProfile} visible={view === "office"} />
-          </div>
-        )}
-
-        {visitedViews.has("models") && (
-          <div style={paneStyle("models")}>
-            <Models visible={view === "models"} />
-          </div>
-        )}
-
-        {visitedViews.has("providers") && (
-          <div style={paneStyle("providers")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Providers" />
-            ) : (
-              <Providers
-                profile={activeProfile}
-                visible={view === "providers"}
-              />
-            )}
-          </div>
-        )}
-
-        {visitedViews.has("skills") && (
-          <div style={paneStyle("skills")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Skills" />
-            ) : (
-              <Skills profile={activeProfile} />
-            )}
-          </div>
-        )}
-
-        {visitedViews.has("memory") && (
-          <div style={paneStyle("memory")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Memory" />
-            ) : (
-              <Memory profile={activeProfile} />
-            )}
-          </div>
-        )}
-
-        {visitedViews.has("tools") && (
-          <div style={paneStyle("tools")}>
-            <Tools
-              profile={activeProfile}
-              showPlatformToolsets={!remoteMode}
-              remoteMode={remoteMode}
-              visible={view === "tools"}
-              onBrowseSkills={() => focusDiscover("skills")}
-              onBrowseMcps={() => focusDiscover("mcps")}
-            />
-          </div>
-        )}
-
-        {visitedViews.has("schedules") && (
-          <div style={paneStyle("schedules")}>
-            <Schedules profile={activeProfile} />
-          </div>
-        )}
-
-        {visitedViews.has("kanban") && (
-          <div style={paneStyle("kanban")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Kanban" />
-            ) : (
-              <Kanban profile={activeProfile} visible={view === "kanban"} />
-            )}
-          </div>
-        )}
-
-        {visitedViews.has("gateway") && (
-          <div style={paneStyle("gateway")}>
-            {remoteMode ? (
-              <RemoteNotice feature="Gateway" />
-            ) : (
-              <Gateway profile={activeProfile} />
-            )}
+        {visitedViews.has("self") && (
+          <div style={paneStyle("self")}>
+            <Self profile={activeProfile} />
           </div>
         )}
 

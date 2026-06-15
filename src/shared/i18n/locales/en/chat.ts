@@ -145,4 +145,7 @@ export default {
   },
   showWorktree: "Show file explorer",
   hideWorktree: "Hide file explorer",
+  toggleHistory: "Toggle session history",
+  pinSession: "Pin session",
+  unpinSession: "Unpin session",
 } as const;

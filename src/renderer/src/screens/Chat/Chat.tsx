@@ -7,6 +7,7 @@ import { ModelPicker } from "./ModelPicker";
 import { ReasoningEffortPicker } from "./ReasoningEffortPicker";
 import { ContextFolderChip } from "./ContextFolderChip";
 import { WorktreePanel } from "./WorktreePanel";
+import Sessions from "../Sessions/Sessions";
 import { useChatScroll } from "./hooks/useChatScroll";
 import { useChatIPC } from "./hooks/useChatIPC";
 import { useChatActions } from "./hooks/useChatActions";
@@ -37,6 +38,7 @@ interface ChatProps {
   profile?: string;
   onSessionStarted?: () => void;
   onNewChat?: () => void;
+  onResumeSession?: (sessionId: string) => void;
   /** Optional callback to navigate to Settings → Diagnose section
    *  when the user clicks "Show details" in the config-health banner. */
   onOpenDiagnose?: () => void;
@@ -49,6 +51,7 @@ function Chat({
   profile,
   onSessionStarted,
   onNewChat,
+  onResumeSession,
   onOpenDiagnose,
 }: ChatProps): React.JSX.Element {
   const { t } = useI18n();
@@ -63,6 +66,7 @@ function Chat({
   const [contextFolder, setContextFolder] = useState<string | null>(null);
   // Whether the worktree panel is visible (only applies when contextFolder is set)
   const [worktreeVisible, setWorktreeVisible] = useState<boolean>(true);
+  const [historyVisible, setHistoryVisible] = useState(false);
   const dragCounter = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const requestIdRef = useRef(
@@ -421,13 +425,31 @@ function Chat({
     : null;
 
   return (
-    <div
-      className="chat-container"
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <div className="chat-layout-wrapper">
+      {historyVisible && (
+        <div className="chat-sessions-drawer">
+           <Sessions 
+              onResumeSession={(id) => {
+                 if (onResumeSession) onResumeSession(id);
+                 if (window.innerWidth < 768) setHistoryVisible(false);
+              }}
+              onNewChat={() => {
+                 if (onNewChat) onNewChat();
+                 if (window.innerWidth < 768) setHistoryVisible(false);
+              }}
+              currentSessionId={sessionId}
+              profile={profile}
+              visible={historyVisible}
+           />
+        </div>
+      )}
+      <div
+        className="chat-container"
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
       <ChatHeader
         sessionId={sessionId}
         usage={usage}
@@ -436,6 +458,8 @@ function Chat({
         onToggleFast={toggleFastMode}
         onNewChat={onNewChat}
         onClear={handleClear}
+        historyVisible={historyVisible}
+        onToggleHistory={() => setHistoryVisible(!historyVisible)}
       />
 
       <ConfigHealthBanner profile={profile} onOpenDiagnose={onOpenDiagnose} />
@@ -510,6 +534,7 @@ function Chat({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

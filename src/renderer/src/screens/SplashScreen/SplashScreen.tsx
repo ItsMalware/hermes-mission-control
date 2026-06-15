@@ -1,46 +1,26 @@
-import { useEffect, useRef } from "react";
-import startVid from "../../assets/startvid.mp4";
-import splashLogo from "../../assets/hermes-one.svg";
+import { useEffect } from "react";
 
 interface SplashScreenProps {
   onFinished: () => void;
   status?: string;
 }
 
-function SplashScreen({
-  onFinished,
-  status,
-}: SplashScreenProps): React.JSX.Element {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
+function SplashScreen({ onFinished, status }: SplashScreenProps): React.JSX.Element {
   useEffect(() => {
     onFinished();
   }, [onFinished]);
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.playbackRate = 1;
-    video.play().catch(() => {
-      // autoplay blocked or video error — silently fall back to black bg
-    });
-  }, []);
-
   return (
-    <div className="splash-screen">
-      <video
-        ref={videoRef}
-        className="splash-bg"
-        src={startVid}
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-        style={{ display: "block", objectFit: "cover" }}
-      />
-      <img className="splash-logo" src={splashLogo} alt="Hermes One" />
-      {status && <div className="splash-status">{status}</div>}
+    <div className="splash-screen" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary, #0a0a0a)' }}>
+      <div style={{ fontSize: 28, fontWeight: 600, fontFamily: 'var(--font-display, var(--font-sans))', color: 'var(--accent, #0f766e)', letterSpacing: 1 }}>
+        Hermes Mission Control
+      </div>
+      {status && (
+        <div style={{ marginTop: 16, fontSize: 12, color: 'var(--fg-dim, #888)', fontFamily: 'var(--font-sans)' }}>
+          {status}
+        </div>
+      )}
+      <div style={{ marginTop: 24, width: 32, height: 32, border: '3px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--accent, #0f766e)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
     </div>
   );
 }

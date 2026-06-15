@@ -1211,6 +1211,61 @@ const hermesAPI = {
     date: string | undefined,
     content: string,
   ) => ipcRenderer.invoke("self-write-note", kind, date, content),
+  selfSearchNotes: (query: string, limit?: number) =>
+    ipcRenderer.invoke("self-search-notes", query, limit),
+  selfRecentNotes: (limit?: number) =>
+    ipcRenderer.invoke("self-recent-notes", limit),
+  selfReadNoteByPath: (relPath: string) =>
+    ipcRenderer.invoke("self-read-note-by-path", relPath),
+  selfGetVaultGraph: () =>
+    ipcRenderer.invoke("self-get-vault-graph"),
+
+  // NotebookLM MCP bridge
+  notebookLmHealth: () =>
+    ipcRenderer.invoke("notebooklm-health"),
+  notebookLmSetupAuth: (): Promise<unknown> =>
+    ipcRenderer.invoke("notebooklm-setup-auth"),
+  notebookLmListNotebooks: () =>
+    ipcRenderer.invoke("notebooklm-list-notebooks"),
+  notebookLmCreateNotebook: (title: string) =>
+    ipcRenderer.invoke("notebooklm-create-notebook", title),
+  notebookLmLibrary: () =>
+    ipcRenderer.invoke("notebooklm-library"),
+  notebookLmStudioStatus: (notebookId: string) =>
+    ipcRenderer.invoke("notebooklm-studio-status", notebookId),
+  notebookLmAsk: (notebookId: string, question: string, notebookName?: string) =>
+    ipcRenderer.invoke("notebooklm-ask", notebookId, question, notebookName),
+  notebookLmStudioCreate: (notebookId: string, artifactType: string, customPrompt?: string) =>
+    ipcRenderer.invoke("notebooklm-studio-create", notebookId, artifactType, customPrompt),
+  notebookLmDownloadArtifact: (
+    notebookId: string,
+    artifactId: string,
+    artifactType: string,
+    title?: string,
+    notebookName?: string,
+  ) =>
+    ipcRenderer.invoke("notebooklm-download-artifact", notebookId, artifactId, artifactType, title, notebookName),
+
+  // Notion Tickets
+  notionQueryTickets: (
+    databaseId: string,
+    profile?: string,
+  ): Promise<{
+    success: boolean;
+    tickets?: Array<{
+      id: string;
+      title: string;
+      status: string;
+      priority: string;
+      completionDate: string | null;
+      notes: string;
+      url: string;
+      createdTime: string;
+      queue: string;
+    }>;
+    error?: string;
+  }> =>
+    ipcRenderer.invoke("notion-query-tickets", databaseId, profile),
 
   // Artifacts / workspace browser
   listArtifactBuckets: (

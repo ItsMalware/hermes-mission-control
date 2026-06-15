@@ -15,6 +15,7 @@ import {
   getConnectionConfig,
   getModelConfig,
   hasOAuthCredentials,
+  readEnv,
 } from "./config";
 import { providerDoesNotNeedApiKey } from "./providers";
 import { getActiveProfileNameSync, profileHome, stripAnsi } from "./utils";
@@ -352,40 +353,6 @@ export function expectedEnvKeyForModel(
   return null;
 }
 
-function envHasUsableValue(
-  content: string,
-  expectedKey: string | null,
-): boolean {
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const m = trimmed.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
-    if (!m) continue;
-    const key = m[1];
-    let value = m[2].trim();
-    // Strip surrounding quotes so `KEY=""` or `KEY="abc"` parse the
-    // same way as `KEY=abc`.
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (!value) continue;
-
-    if (expectedKey) {
-      if (key === expectedKey) return true;
-    } else {
-      // No known mapping for this provider/URL — accept any value that
-      // looks like a credential. Avoids regressing users on providers
-      // we haven't catalogued explicitly, while still rejecting
-      // unrelated env vars (TELEGRAM_BOT_TOKEN etc. shouldn't satisfy
-      // the model install gate, but a custom `*_API_KEY` should).
-      if (/_API_KEY$/.test(key)) return true;
-    }
-  }
-  return false;
-}
 
 // ── Pre-install inspection (issue #272) ──────────────────────────────────────
 
@@ -487,13 +454,19 @@ export function checkInstallStatus(): InstallStatus {
     /* ignore */
   }
 
-  if (!hasApiKey && configured && existsSync(envFile)) {
+  if (!hasApiKey && configured) {
     try {
-      const content = readFileSync(envFile, "utf-8");
+      const env = readEnv(activeProfile);
       const expectedKey = mc
         ? expectedEnvKeyForModel(mc.provider, mc.baseUrl)
         : null;
-      hasApiKey = envHasUsableValue(content, expectedKey);
+      if (expectedKey) {
+        hasApiKey = Boolean(env[expectedKey]);
+      } else {
+        hasApiKey = Object.entries(env).some(
+          ([key, value]) => key.endsWith("_API_KEY") && value,
+        );
+      }
     } catch {
       /* ignore read errors */
     }

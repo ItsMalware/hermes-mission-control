@@ -16,6 +16,7 @@ export default {
   schedules: "Agendamentos",
   gateway: "Gateway",
   settings: "Configurações",
+  missionControl: "Controle de Missão",
   collapseSidebar: "Recolher barra lateral",
   expandSidebar: "Expandir barra lateral",
 } as const;

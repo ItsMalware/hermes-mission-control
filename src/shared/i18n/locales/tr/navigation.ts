@@ -14,6 +14,7 @@ export default {
   kanban: "Kanban",
   gateway: "Gateway",
   settings: "Ayarlar",
+  missionControl: "Görev Kontrolü",
   collapseSidebar: "Kenar çubuğunu daralt",
   expandSidebar: "Kenar çubuğunu genişlet",
 } as const;

@@ -306,9 +306,9 @@ function AgentsLayer({
 
   return (
     <>
-      {agents.map((agent) => (
+      {agents.map((agent, i) => (
         <AgentModel
-          key={agent.id}
+          key={`${agent.id}-${i}`}
           agentId={agent.id}
           name={agent.name}
           // Nameplate shows the name only; the model/provider stays in the

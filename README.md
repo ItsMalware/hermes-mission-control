@@ -1,355 +1,141 @@
-<img width="100%" alt="HERMES DESKTOP" src="previews/header.webp" />
-
-<br/>
 <p align="center">
-  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://t.me/hermes_agent_desktop"><img src="https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram"></a>
-  <a href="https://github.com/fathah/hermes-desktop/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-  <a href="https://hermesagents.cc/"><img src="https://img.shields.io/badge/Download-Releases-FF6600?style=for-the-badge" alt="Releases"></a>
-<a href="https://github.com/fathah/hermes-desktop/stargazers">
-  <img src="https://img.shields.io/github/stars/fathah/hermes-desktop?style=for-the-badge&color=FFD700&label=Stars" alt="Stars">
-</a>
-  <a href="https://github.com/fathah/hermes-desktop/releases/">
-  <img src="https://img.shields.io/github/downloads/fathah/hermes-desktop/total?style=for-the-badge&color=00B496&label=Total%20Downloads" alt="Downloads">
-</a>
+  <h1 align="center">Hermes Mission Control</h1>
+  <p align="center">
+    <strong>Your Personal AI Operating System</strong>
+  </p>
+  <p align="center">
+    <a href="https://github.com/ItsMalware/hermes-mission-control/stargazers"><img src="https://img.shields.io/github/stars/ItsMalware/hermes-mission-control?style=flat&color=5D5CDE" alt="Stars"></a>
+    <a href="https://github.com/ItsMalware/hermes-mission-control/releases"><img src="https://img.shields.io/github/downloads/ItsMalware/hermes-mission-control/total?style=flat&color=44CC11" alt="Downloads"></a>
+    <a href="https://github.com/ItsMalware/hermes-mission-control/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ItsMalware/hermes-mission-control?style=flat&color=blue" alt="License"></a>
+    <img src="https://img.shields.io/badge/version-2.0.0-orange?style=flat" alt="Version">
+  </p>
 </p>
 
-<p align="center">
-  <a href="README.md">English</a> ·
-  <a href="README.zh-CN.md">简体中文</a> ·
-  <a href="README.ja-JP.md">日本語</a> ·
-  <a href="README.es-LATAM.md">Español (LATAM)</a>
-</p>
+---
 
-> **This project is in active development.** Features may change, and some things might break. If you run into a problem or have an idea, [open an issue](https://github.com/fathah/hermes-desktop/issues). Contributions are welcome!
+Hermes Mission Control is a cross-platform desktop application that wraps the Hermes Agent CLI in a native experience — giving you multi-provider AI chat, 19 messaging gateways, persistent memory, an interactive 3D office, and a growing ecosystem of tools and integrations. Built with Electron, React, and TypeScript. All data stays local.
 
-Hermes Desktop is a native desktop app for installing, configuring, and chatting with [Hermes Agent](https://github.com/NousResearch/hermes-agent) — a self-improving AI assistant with tool use, multi-platform messaging, and a closed learning loop.
+Built by **Indigo Intelligence**.
 
-Instead of managing the CLI by hand, the app walks through install, provider setup, and day-to-day usage in one place. It uses the official Hermes install script, stores Hermes in `~/.hermes`, and gives you a GUI for chat, sessions, profiles, memory, skills, tools, scheduling, messaging gateways, and more.
+---
 
-## Sponsors
+## Quick Start
 
-<a href="https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=hermes-desktop" target="_blank" rel="noopener noreferrer">
-    <img src="src/renderer/src/assets/logos/atlascloud.svg" alt="Atlas Cloud" height="100" style="display: block;">
-  </a>
-  
-  > **[Atlas Cloud](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=hermes-desktop)** is a full-modal, OpenAI-compatible AI inference platform (DeepSeek, Qwen, GLM, Kimi, MiniMax, and more). Use it in Hermes Desktop by selecting **Atlas Cloud** as your provider — the base URL is pre-configured automatically.
+1. **Download** — Grab the latest release for your platform from [Releases](https://github.com/ItsMalware/hermes-mission-control/releases).
+2. **Install** — Run the installer (`.dmg` for macOS, `.exe` for Windows, `.AppImage`/`.deb`/`.rpm`/`.snap` for Linux).
+3. **Launch** — Open Hermes Mission Control, configure your first provider, and start chatting.
 
-## Install
-
-<a href="https://hermesagents.cc/"><img width="380" alt="Download Now" src="previews/download.webp" /></a>
-
-### Windows
-
-> **Windows users:** The installer is not code-signed. Windows SmartScreen will warn on first launch — click "More info" → "Run anyway".
-
-> **WSL users:** If the installer stalls at `Switching to root user to install dependencies...`, Playwright is waiting for a sudo password that has no TTY to read from. Grant passwordless sudo for the install, then revert when finished:
->
-> ```bash
-> echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/hermes-install
-> # …re-run the installer; once it finishes:
-> sudo rm /etc/sudoers.d/hermes-install
-> ```
->
-> Tracked in [#109](https://github.com/fathah/hermes-desktop/issues/109).
-
-### Fedora (RPM)
-
-```bash
-sudo dnf install ./hermes-desktop-<version>.rpm
-```
-
-> **Fedora users:** The `.rpm` is not GPG-signed. If your system enforces signature checking, append `--nogpgcheck` to the install command. Auto-update is not supported for `.rpm` builds (limitation of `electron-updater`); reinstall the new `.rpm` to update.
-
-## Preview
-
-<table>
-<tr>
-<td width="50%" align="center"><b>Chat</b><br/><img width="100%" alt="Chat" src="previews/chat.png" /></td>
-<td width="50%" align="center"><b>Profiles</b><br/><img width="100%" alt="Profiles" src="previews/profiles.png" /></td>
-</tr>
-<tr>
-<td width="50%" align="center"><b>Models</b><br/><img width="100%" alt="Models" src="previews/models.png" /></td>
-<td width="50%" align="center"><b>Providers</b><br/><img width="100%" alt="Providers" src="previews/providers.png" /></td>
-</tr>
-<tr>
-<td width="50%" align="center"><b>Tools</b><br/><img width="100%" alt="Tools" src="previews/tools.png" /></td>
-<td width="50%" align="center"><b>Skills</b><br/><img width="100%" alt="Skills" src="previews/skills.png" /></td>
-</tr>
-<tr>
-<td width="50%" align="center"><b>Schedules</b><br/><img width="100%" alt="Schedules" src="previews/schedules.png" /></td>
-<td width="50%" align="center"><b>Gateway</b><br/><img width="100%" alt="Gateway" src="previews/gateway.png" /></td>
-</tr>
-<tr>
-<td width="50%" align="center"><b>Persona</b><br/><img width="100%" alt="Persona" src="previews/persona.png" /></td>
-<td width="50%" align="center"><b>Kanban</b><br/><img width="100%" alt="Kanban" src="previews/kanban.png" /></td>
-</tr>
-<tr>
-<td width="50%" align="center"><b>Office</b><br/><img width="100%" alt="Office" src="previews/office.png" /></td>
-<td width="50%" align="center"><b>Settings</b><br/><img width="100%" alt="Settings" src="previews/settings.png" /></td>
-</tr>
-</table>
+---
 
 ## Features
 
-- **Guided first-run install** for Hermes Agent with progress tracking and dependency resolution
-- **Local or remote backend** — run Hermes locally on `127.0.0.1:8642`, or connect the desktop app to a remote Hermes API server with URL + API key
-- **Multi-provider support** — OpenRouter, Anthropic, OpenAI, Google (Gemini), xAI (Grok), Nous Portal, Qwen, MiniMax, Hugging Face, Groq, and local OpenAI-compatible endpoints (LM Studio, Atomic Chat, Ollama, vLLM, llama.cpp)
-- **Streaming chat UI** with SSE streaming, tool progress indicators, markdown rendering, and syntax highlighting
-- **Token usage tracking** — live prompt/completion token counts and cost display in the chat footer, plus a `/usage` slash command
-- **22 slash commands** — `/new`, `/clear`, `/fast`, `/web`, `/image`, `/browse`, `/code`, `/shell`, `/usage`, `/help`, `/tools`, `/skills`, `/model`, `/memory`, `/persona`, `/version`, `/compact`, `/compress`, `/undo`, `/retry`, `/debug`, `/status`, and more
-- **Session management** — full-text search (SQLite FTS5), date-grouped history, resume and search across conversations
-- **Profile switching** — create, delete, and switch between separate Hermes environments with isolated config
-- **14 toolsets** — web, browser, terminal, file, code execution, vision, image gen, TTS, skills, memory, session search, clarify, delegation, MoA, and task planning
-- **Memory system** — view/edit memory entries, user profile memory, capacity tracking, and discoverable memory providers (Honcho, Hindsight, Mem0, RetainDB, Supermemory, ByteRover)
-- **Persona editor** — edit and reset your agent's SOUL.md personality
-- **Saved models** — CRUD management for model configurations across providers
-- **Scheduled tasks** — cron job builder (minutes, hourly, daily, weekly, custom cron) with 15 delivery targets
-- **16 messaging gateways** — Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Mattermost, Email (IMAP/SMTP), SMS (Twilio/Vonage), iMessage (BlueBubbles), DingTalk, Feishu/Lark, WeCom, WeChat (iLink Bot), Webhooks, Home Assistant
-- **Hermes Office (Claw3d)** — visual 3D interface with dev server and adapter management
-- **Backup, import & debug dump** — full data backup/restore and system diagnostics from Settings
-- **Log viewer** — view gateway and agent logs directly from the Settings screen
-- **Auto-updater** — check for and install updates via electron-updater
-- **i18n ready** — internationalization framework with English locale covering all screens, ready for community translations
-- **Test suite** — SSE parser, IPC handlers, preload API surface, installer utilities, and constants validation with Vitest
+### 🤖 Multi-Provider AI Chat
 
-## How It Works
+Connect to **35+ providers** including OpenRouter, Anthropic, OpenAI, Google, xAI, DeepSeek, Groq, and local models via Ollama or vLLM. Full support for streaming responses, tool use, reasoning display, and image/audio attachments.
 
-On first launch, the app:
+### 📱 19 Messaging Gateways
 
-1. Asks whether you want to run Hermes **locally** or connect to a **remote** Hermes API server.
-2. **Local mode:** checks whether Hermes is already installed in `~/.hermes`; if not, runs the official Hermes installer with dependency resolution (Git, uv, Python 3.11+).
-3. **Remote mode:** prompts for the remote API URL and API key, validates the connection, and skips local install.
-4. Prompts for an API provider or local model endpoint.
-5. Saves provider config and API keys through Hermes config files.
-6. Launches the main workspace once setup is complete.
+Reach your agent from anywhere — Telegram, Discord, Slack, WhatsApp, Signal, iMessage (BlueBubbles), Email, SMS (Twilio), Matrix, Mattermost, DingTalk, Feishu/Lark, WeCom, WeChat, QQ Bot, Home Assistant, API Server, and Webhooks.
 
-In local mode, chat requests go through `http://127.0.0.1:8642` with SSE streaming. In remote mode, the app talks to your configured remote URL with the same streaming protocol. The desktop app parses the stream in real time, rendering tool progress, markdown content, and token usage as it arrives.
+### 🧠 Memory & Learning
 
-## Screens
+Persistent memory powered by `MEMORY.md` and user profiling via `USER.md`. Integrates with Obsidian vaults for notes, journaling, and daily review — your agent remembers context across sessions.
 
-| Screen        | Description                                                                           |
-| ------------- | ------------------------------------------------------------------------------------- |
-| **Chat**      | Streaming conversation UI with slash commands, tool progress, and token tracking      |
-| **Sessions**  | Browse, search, and resume past conversations                                         |
-| **Agents**    | Create, delete, and switch between Hermes profiles                                    |
-| **Skills**    | Browse, install, and manage bundled and installed skills                              |
-| **Models**    | Manage saved model configurations per provider                                        |
-| **Memory**    | View/edit memory entries, user profile, and configure memory providers                |
-| **Soul**      | Edit the active profile's persona (SOUL.md)                                           |
-| **Tools**     | Enable or disable individual toolsets                                                 |
-| **Schedules** | Create and manage cron jobs with delivery targets                                     |
-| **Gateway**   | Configure and control messaging platform integrations                                 |
-| **Office**    | Claw3d visual interface setup and management                                          |
-| **Settings**  | Provider config, credential pools, backup/import, log viewer, network settings, theme |
+### 🏢 3D Office
 
-## Supported Providers
+An interactive Three.js-powered office environment where AI agent profiles appear as team members. Assign a CEO, build your AI team, and manage agents visually.
 
-### Sponsors
+### 🔧 MCP Ecosystem
 
-| Provider        | Notes                                                                                                                                                                               |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Atlas Cloud** | OpenAI-compatible gateway — DeepSeek, Qwen, GLM, Kimi, MiniMax and more ([atlascloud.ai](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=hermes-desktop)) |
+Connect MCP servers to extend your agent's tool capabilities. Browse a built-in marketplace to discover servers, skills, and workflows.
 
-### LLM Providers
+### 📋 Notion Integration
 
-| Provider            | Notes                                    |
-| ------------------- | ---------------------------------------- |
-| **OpenRouter**      | 200+ models via single API (recommended) |
-| **Anthropic**       | Direct Claude access                     |
-| **OpenAI**          | Direct GPT access                        |
-| **Google (Gemini)** | Google AI Studio                         |
-| **xAI (Grok)**      | Grok models                              |
-| **Nous Portal**     | Free tier available                      |
-| **Qwen**            | QwenAI models                            |
-| **MiniMax**         | Global and China endpoints               |
-| **Hugging Face**    | 20+ open models via HF Inference         |
-| **Groq**            | Fast inference (voice/STT)               |
-| **Local/Custom**    | Any OpenAI-compatible endpoint           |
+Query Notion databases directly from the app for ticket tracking and project management workflows.
 
-Local presets are included for LM Studio, Atomic Chat, Ollama, vLLM, and llama.cpp.
+### 📝 SEO Pipeline
 
-### Messaging Platforms
+Generate SEO-optimized articles from transcripts and deploy them to connected sites — content creation powered by your AI agent.
 
-Telegram, Discord, Slack, WhatsApp, Signal, Matrix/Element, Mattermost, Email (IMAP/SMTP), SMS (Twilio & Vonage), iMessage (BlueBubbles), DingTalk, Feishu/Lark, WeCom, WeChat (iLink Bot), Webhooks, and Home Assistant.
+### 📓 NotebookLM
 
-### Tool Integrations
+NotebookLM integration via MCP for research workflows and studio artifacts.
 
-Exa Search, Parallel API, Tavily, Firecrawl, FAL.ai (image generation), Honcho, Browserbase, Weights & Biases, and Tinker.
+### 🖥️ AI CLIs
 
-## Development
+Launch Claude Code, Gemini CLI, Antigravity, Codex, OpenCode, and Hermes Agent directly from the app's built-in terminal.
 
-### Prerequisites
+### 🔒 Local-First
 
-- Node.js and npm
-- A Unix-like shell environment for the Hermes installer
-- Network access for downloading Hermes during first-run install
+All data is stored locally in `~/.hermes`. Your API keys, conversation history, memory files, and configuration never leave your machine. Your keys, your data, your control.
 
-### Install dependencies
+### 🌍 10 Languages
+
+Full localization support: English, Spanish, Indonesian, Japanese, Polish, Portuguese (BR/PT), Turkish, and Chinese (Simplified/Traditional).
+
+### 🖥️ Cross-Platform
+
+Native builds for **macOS**, **Windows**, and **Linux** (AppImage, snap, deb, rpm).
+
+---
+
+## Building from Source
 
 ```bash
-npm install
-```
-
-### Agent install/update instructions
-
-Use these steps when an agent is installing or updating this fork for a user.
-
-#### Fresh install from this fork
-
-```bash
-git clone https://github.com/ItsMalware/hermes-desktop.git
+git clone https://github.com/ItsMalware/hermes-mission-control.git
 cd hermes-desktop
 npm install
-npm run build:unpack:local
-open "dist/mac-arm64/Hermes Agent.app"
 ```
 
-For a local macOS app copy:
+| Command              | Description          |
+| -------------------- | -------------------- |
+| `npm run dev`        | Development mode     |
+| `npm run build:mac`  | Build for macOS      |
+| `npm run build:win`  | Build for Windows    |
+| `npm run build:linux`| Build for Linux      |
 
-```bash
-osascript -e 'quit app "Hermes Agent"' || true
-rm -rf "/Applications/Hermes Agent.app"
-ditto "dist/mac-arm64/Hermes Agent.app" "/Applications/Hermes Agent.app"
-xattr -dr com.apple.quarantine "/Applications/Hermes Agent.app" 2>/dev/null || true
-open "/Applications/Hermes Agent.app"
-```
-
-Hermes runtime state is stored separately in `~/.hermes`, so replacing the app
-bundle should not delete profiles, sessions, API keys, Kanban data, or memory.
-
-#### Update an existing install of this fork
-
-```bash
-cd /path/to/hermes-desktop
-git status --short
-git pull --ff-only
-npm install
-npm run typecheck
-npm test -- tests/env-validation.test.ts tests/preload-api-surface.test.ts
-npm run build:unpack:local
-osascript -e 'quit app "Hermes Agent"' || true
-rm -rf "/Applications/Hermes Agent.app"
-ditto "dist/mac-arm64/Hermes Agent.app" "/Applications/Hermes Agent.app"
-xattr -dr com.apple.quarantine "/Applications/Hermes Agent.app" 2>/dev/null || true
-open "/Applications/Hermes Agent.app"
-```
-
-If `git status --short` shows user edits, do not overwrite them. Create a branch
-or stash only after confirming the edits are safe to move.
-
-#### Pull updates from the original repo
-
-Keep this fork connected to upstream so original Hermes Desktop releases can be
-merged without losing fork-specific changes.
-
-```bash
-cd /path/to/hermes-desktop
-git remote -v
-git remote add upstream https://github.com/fathah/hermes-desktop.git 2>/dev/null || true
-git fetch upstream
-git checkout main
-git pull --ff-only origin main
-git merge upstream/main
-npm install
-npm run typecheck
-npm test -- tests/env-validation.test.ts tests/preload-api-surface.test.ts
-git push origin main
-```
-
-For feature branches, rebase or merge from the refreshed `main`, resolve
-conflicts in source files only, rebuild with `npm run build:unpack:local`, and
-verify `/Applications/Hermes Agent.app/Contents/Resources/app.asar` contains the
-expected feature strings before telling a user the installed app is updated.
-
-### Start the app in development
-
-```bash
-npm run dev
-```
-
-### Run checks
-
-```bash
-npm run lint
-npm run typecheck
-```
-
-### Run tests
-
-```bash
-npm run test
-npm run test:watch
-```
-
-### Build the desktop app
-
-```bash
-npm run build
-```
-
-Platform packaging:
-
-```bash
-npm run build:mac
-npm run build:win
-npm run build:linux
-npm run build:rpm    # Fedora/RHEL .rpm only
-```
-
-## First-Time Setup
-
-When the app opens for the first time, it will either detect an existing Hermes installation or offer to install it for you.
-
-Supported setup paths in the UI:
-
-- `OpenRouter`
-- `Anthropic`
-- `OpenAI`
-- `Local LLM` via an OpenAI-compatible base URL
-
-Local presets are included for:
-
-- LM Studio
-- Atomic Chat
-- Ollama
-- vLLM
-- llama.cpp
-
-Hermes files are managed in:
-
-- `~/.hermes`
-- `~/.hermes/.env`
-- `~/.hermes/config.yaml`
-- `~/.hermes/hermes-agent`
-- `~/.hermes/profiles/` — named profile directories
-- `~/.hermes/state.db` — session history database
-- `~/.hermes/cron/jobs.json` — scheduled tasks
+---
 
 ## Tech Stack
 
-- **Electron** 39 — cross-platform desktop shell
-- **React** 19 — UI framework
-- **TypeScript** 5.9 — type safety across main and renderer processes
-- **Tailwind CSS** 4 — utility-first styling
-- **Vite** 7 + electron-vite — fast dev server and build tooling
-- **better-sqlite3** — local session storage with FTS5 full-text search
-- **i18next** — internationalization framework
-- **Vitest** — test runner
+| Layer      | Technology              |
+| ---------- | ----------------------- |
+| Runtime    | Electron 39             |
+| Frontend   | React 19                |
+| Language   | TypeScript 5.9          |
+| Bundler    | Vite 7                  |
+| 3D Engine  | Three.js                |
 
-## Notes
+---
 
-- The desktop app depends on the upstream Hermes Agent project for agent behavior and tool execution.
-- The built-in installer runs the official Hermes install script with `--skip-setup`, then completes provider configuration in the GUI.
-- Local model providers do not require an API key, but the compatible server must already be running.
-- Alternative npm registry routes are supported for environments with restricted network access.
+## Agent Setup
+
+If you're an AI agent helping a user set up this app, see **[AGENT_SETUP.md](./AGENT_SETUP.md)** for comprehensive platform-specific instructions covering installation, provider configuration, gateway setup, and troubleshooting.
+
+---
 
 ## Contributing
 
-Contributions are welcome! Check out the [Contributing Guide](CONTRIBUTING.md) to get started. If you're not sure where to begin, take a look at the [open issues](https://github.com/fathah/hermes-desktop/issues). Found a bug or have a feature request? [File an issue](https://github.com/fathah/hermes-desktop/issues/new).
+Contributions are welcome! Here's how to get started:
 
-## Related Project
+1. **Fork** the repository.
+2. **Create a branch** for your feature or fix:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+3. **Commit** your changes with clear, descriptive messages.
+4. **Push** to your fork and open a **Pull Request** against `main`.
 
-For the core agent, docs, and CLI workflows, see the main Hermes Agent repository:
+Please keep PRs focused — one feature or fix per PR. For larger changes, open an issue first to discuss the approach.
 
-- https://github.com/NousResearch/hermes-agent
+---
+
+## Acknowledgments
+
+Originally forked from [NousResearch/hermes-desktop](https://github.com/NousResearch/hermes-desktop). This project has since evolved significantly with new features, integrations, and a different product direction.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE).

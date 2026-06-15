@@ -16,6 +16,7 @@ export default {
   schedules: "Programaciones",
   gateway: "Gateway",
   settings: "Configuración",
+  missionControl: "Control de Misión",
   collapseSidebar: "Contraer barra lateral",
   expandSidebar: "Expandir barra lateral",
 } as const;

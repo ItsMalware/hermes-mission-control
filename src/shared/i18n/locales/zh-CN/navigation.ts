@@ -16,6 +16,7 @@ export default {
   schedules: "计划任务",
   gateway: "网关",
   settings: "设置",
+  missionControl: "任务控制",
   collapseSidebar: "折叠侧边栏",
   expandSidebar: "展开侧边栏",
 } as const;

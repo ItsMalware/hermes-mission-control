@@ -4,11 +4,17 @@ import {
   Check,
   Clock,
   Timer,
+  Search,
+  Workflow,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
 import Memory from "../Memory/Memory";
+import { VaultGraph3D } from "./VaultGraph3D";
+import SEOView from "./SEOView";
+import NotebookView from "./NotebookView";
+import { Target, BookOpen } from "lucide-react";
 
-type SelfTool = "journal" | "vault-memory" | "daily-review";
+type SelfTool = "journal" | "daily-review" | "note-search" | "vault-graph" | "vault-memory" | "seo-pipeline" | "notebook";
 
 interface SelfProps {
   profile?: string;
@@ -41,16 +47,40 @@ const SELF_TOOLS: Array<{
     summary: "Daily notes for your Obsidian vault.",
   },
   {
+    id: "daily-review",
+    label: "Daily Review",
+    icon: Timer,
+    summary: "A compact end-of-day operating check.",
+  },
+  {
+    id: "note-search",
+    label: "Note Search",
+    icon: Search,
+    summary: "Find and preview any Obsidian note.",
+  },
+  {
+    id: "vault-graph",
+    label: "Vault Graph",
+    icon: Workflow,
+    summary: "Interactive pseudo-3D vault connection map.",
+  },
+  {
     id: "vault-memory",
     label: "Vault Memory",
     icon: Brain,
     summary: "Hermes memory and vault-backed recall.",
   },
   {
-    id: "daily-review",
-    label: "Daily Review",
-    icon: Timer,
-    summary: "A compact end-of-day operating check.",
+    id: "seo-pipeline",
+    label: "SEO Pipeline",
+    icon: Target,
+    summary: "Manage SEO content pipelines.",
+  },
+  {
+    id: "notebook",
+    label: "Notebook",
+    icon: BookOpen,
+    summary: "Interact with the local notebook environment.",
   },
 ];
 
@@ -190,11 +220,204 @@ function NoteEditor({
   );
 }
 
+interface NoteSearchProps {
+  initialSelectedPath: string | null;
+  onClearInitialPath: () => void;
+}
+
+function NoteSearch({
+  initialSelectedPath,
+  onClearInitialPath,
+}: NoteSearchProps): React.JSX.Element {
+  const [query, setQuery] = useState("");
+  const [notes, setNotes] = useState<any[]>([]);
+  const [selectedNote, setSelectedNote] = useState<any | null>(null);
+  const [selectedContent, setSelectedContent] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+
+  const loadRecent = async () => {
+    setLoading(true);
+    try {
+      const recent = await window.hermesAPI.selfRecentNotes(30);
+      setNotes(recent);
+      if (recent.length > 0 && !initialSelectedPath) {
+        handleSelectNote(recent[0]);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRecent();
+  }, []);
+
+  useEffect(() => {
+    if (!query) {
+      loadRecent();
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const results = await window.hermesAPI.selfSearchNotes(query, 30);
+        setNotes(results);
+        if (results.length > 0) {
+          handleSelectNote(results[0]);
+        } else {
+          setSelectedNote(null);
+          setSelectedContent("");
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Handle graph click redirection
+  useEffect(() => {
+    if (initialSelectedPath) {
+      const loadInitial = async () => {
+        setLoading(true);
+        try {
+          const title =
+            initialSelectedPath.split("/").pop()?.replace(".md", "") ||
+            initialSelectedPath;
+          const noteObj = {
+            title,
+            relPath: initialSelectedPath,
+            preview: "",
+          };
+          await handleSelectNote(noteObj);
+          setQuery(title);
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setLoading(false);
+          onClearInitialPath();
+        }
+      };
+      void loadInitial();
+    }
+  }, [initialSelectedPath]);
+
+  const handleSelectNote = async (note: any) => {
+    setSelectedNote(note);
+    try {
+      const content = await window.hermesAPI.selfReadNoteByPath(note.relPath);
+      setSelectedContent(content);
+    } catch (err) {
+      console.error(err);
+      setSelectedContent("Failed to load note content.");
+    }
+  };
+
+  return (
+    <div
+      className="self-panel"
+      style={{ display: "flex", gap: 20, height: 600, minHeight: 600 }}
+    >
+      <div
+        style={{
+          flex: "0 0 320px",
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+        }}
+      >
+        <div className="self-search-bar">
+          <input
+            className="self-search-input"
+            type="text"
+            placeholder="Search notes by title or content..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        {loading && notes.length === 0 ? (
+          <div className="self-graph-loading" style={{ minHeight: 150 }}>
+            <div className="loading-spinner" />
+          </div>
+        ) : (
+          <div className="self-notes-list" style={{ flex: 1, overflowY: "auto" }}>
+            {notes.map((n) => (
+              <div
+                key={n.relPath}
+                className={`self-note-item ${selectedNote?.relPath === n.relPath ? "active" : ""}`}
+                style={{
+                  borderColor:
+                    selectedNote?.relPath === n.relPath
+                      ? "var(--accent)"
+                      : undefined,
+                  background:
+                    selectedNote?.relPath === n.relPath
+                      ? "rgba(168, 85, 247, 0.08)"
+                      : undefined,
+                }}
+                onClick={() => handleSelectNote(n)}
+              >
+                <div className="self-note-item-title">{n.title}</div>
+                <div className="self-note-item-preview">{n.preview}</div>
+                <div className="self-note-item-path">{n.relPath}</div>
+              </div>
+            ))}
+            {notes.length === 0 && (
+              <div className="artifacts-empty" style={{ padding: 20 }}>
+                No notes found.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div
+        className="self-note-view-pane"
+        style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}
+      >
+        {selectedNote ? (
+          <>
+            <div className="self-note-view-header">
+              <div>
+                <strong style={{ fontSize: 14 }}>{selectedNote.title}</strong>
+                <div style={{ fontSize: 11, opacity: 0.6 }}>
+                  {selectedNote.relPath}
+                </div>
+              </div>
+              <button
+                className="btn-ghost"
+                onClick={() =>
+                  window.hermesAPI.openFileInEditor(selectedNote.relPath)
+                }
+              >
+                Open File
+              </button>
+            </div>
+            <div className="self-note-view-body" style={{ flex: 1, overflowY: "auto" }}>
+              {selectedContent}
+            </div>
+          </>
+        ) : (
+          <div className="artifacts-empty" style={{ margin: "auto" }}>
+            Select a note to preview.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Self({ profile }: SelfProps): React.JSX.Element {
   const [active, setActive] = useState<SelfTool>("journal");
   const [workspace, setWorkspace] = useState<SelfWorkspaceInfo | null>(null);
   const [workspaceError, setWorkspaceError] = useState("");
   const activeTool = SELF_TOOLS.find((tool) => tool.id === active)!;
+
+  // Selected path from vault graph click redirection
+  const [selectedPathFromGraph, setSelectedPathFromGraph] = useState<string | null>(null);
 
   const loadWorkspace = useCallback(async () => {
     try {
@@ -280,6 +503,34 @@ function Self({ profile }: SelfProps): React.JSX.Element {
           workspace={workspace}
           onWorkspaceChange={chooseWorkspace}
         />
+      )}
+
+      {active === "note-search" && (
+        <NoteSearch
+          initialSelectedPath={selectedPathFromGraph}
+          onClearInitialPath={() => setSelectedPathFromGraph(null)}
+        />
+      )}
+
+      {active === "vault-graph" && (
+        <VaultGraph3D
+          onSelectNote={(relPath) => {
+            setSelectedPathFromGraph(relPath);
+            setActive("note-search");
+          }}
+        />
+      )}
+
+      {active === "seo-pipeline" && (
+        <div className="self-panel" style={{ height: "calc(100vh - 200px)" }}>
+          <SEOView />
+        </div>
+      )}
+
+      {active === "notebook" && (
+        <div className="self-panel" style={{ height: "calc(100vh - 200px)", padding: 0 }}>
+          <NotebookView />
+        </div>
       )}
     </div>
   );

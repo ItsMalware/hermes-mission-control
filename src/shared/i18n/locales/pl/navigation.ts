@@ -14,6 +14,7 @@ export default {
   kanban: "Kanban",
   gateway: "Bramka",
   settings: "Ustawienia",
+  missionControl: "Centrum dowodzenia",
   collapseSidebar: "Zwin pasek boczny",
   expandSidebar: "Rozwiń pasek boczny",
 } as const;

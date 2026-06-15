@@ -158,7 +158,23 @@ import {
   setSelfVaultRoot,
   type SelfNoteKind,
   writeSelfNote,
+  selfSearchNotes,
+  selfRecentNotes,
+  selfReadNoteByPath,
+  selfGetVaultGraph,
 } from "./self";
+import {
+  notebookLmHealth,
+  notebookLmListNotebooks,
+  notebookLmCreateNotebook,
+  notebookLmLibrary,
+  notebookLmStudioStatus,
+  notebookLmAsk,
+  notebookLmStudioCreate,
+  notebookLmDownloadArtifact,
+  notebookLmSetupAuth,
+} from "./notebooklm";
+import { queryNotionTickets } from "./notion-tickets";
 import {
   runConfigHealthCheck,
   autoFixIssue,
@@ -360,6 +376,9 @@ function createWindow(): void {
 
   mainWindow.on("ready-to-show", () => {
     mainWindow!.show();
+    if (is.dev) {
+      mainWindow!.webContents.openDevTools();
+    }
   });
 
   mainWindow.webContents.on("render-process-gone", (_event, details) => {
@@ -466,6 +485,7 @@ function createWindow(): void {
     Menu.buildFromTemplate(template).popup();
   });
 
+  console.log("[DEBUG LOAD] is.dev:", is.dev, "ELECTRON_RENDERER_URL:", process.env["ELECTRON_RENDERER_URL"], "rendererHtmlPath:", rendererHtmlPath);
   if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
     mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   } else {
@@ -1697,6 +1717,79 @@ function setupIPC(): void {
     (_event, kind: SelfNoteKind, date: string | undefined, content: string) =>
       writeSelfNote(kind, date, content),
   );
+  ipcMain.handle("self-search-notes", (_event, query: string, limit?: number) =>
+    selfSearchNotes(query, limit),
+  );
+  ipcMain.handle("self-recent-notes", (_event, limit?: number) =>
+    selfRecentNotes(limit),
+  );
+  ipcMain.handle("self-read-note-by-path", (_event, relPath: string) =>
+    selfReadNoteByPath(relPath),
+  );
+  ipcMain.handle("self-get-vault-graph", () =>
+    selfGetVaultGraph(),
+  );
+
+  // ── NotebookLM MCP bridge ─────────────────────────────────────────
+  ipcMain.handle("notebooklm-health", () => notebookLmHealth());
+  ipcMain.handle("notebooklm-setup-auth", () => notebookLmSetupAuth());
+  ipcMain.handle("notebooklm-list-notebooks", () =>
+    notebookLmListNotebooks(),
+  );
+  ipcMain.handle(
+    "notebooklm-create-notebook",
+    (_event, title: string) => notebookLmCreateNotebook(title),
+  );
+  ipcMain.handle("notebooklm-library", () => notebookLmLibrary());
+  ipcMain.handle(
+    "notebooklm-studio-status",
+    (_event, notebookId: string) =>
+      notebookLmStudioStatus(notebookId),
+  );
+  ipcMain.handle(
+    "notebooklm-ask",
+    (
+      _event,
+      notebookId: string,
+      question: string,
+      notebookName?: string,
+    ) => notebookLmAsk(notebookId, question, notebookName),
+  );
+  ipcMain.handle(
+    "notebooklm-studio-create",
+    (
+      _event,
+      notebookId: string,
+      artifactType: string,
+      customPrompt?: string,
+    ) => notebookLmStudioCreate(notebookId, artifactType, customPrompt),
+  );
+  ipcMain.handle(
+    "notebooklm-download-artifact",
+    (
+      _event,
+      notebookId: string,
+      artifactId: string,
+      artifactType: string,
+      title?: string,
+      notebookName?: string,
+    ) =>
+      notebookLmDownloadArtifact(
+        notebookId,
+        artifactId,
+        artifactType,
+        title,
+        notebookName,
+      ),
+  );
+
+  // ── Notion Tickets ─────────────────────────────────────────────────
+  ipcMain.handle(
+    "notion-query-tickets",
+    (_event, databaseId: string, profile?: string) =>
+      queryNotionTickets(databaseId, profile),
+  );
+
   ipcMain.handle(
     "add-model",
     (
@@ -2231,40 +2324,50 @@ function setupUpdater(): void {
     return;
   }
 
-  // Dynamic import to avoid electron-updater issues in dev mode
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { autoUpdater } = require("electron-updater") as {
-    autoUpdater: AppUpdater;
-  };
+  // Dynamic import to avoid electron-updater issues in dev mode.
+  // Wrap in try-catch so a missing app-update.yml (ENOENT in unpacked
+  // builds) doesn't crash the app — we just skip the updater gracefully.
+  let autoUpdater: AppUpdater | null = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require("electron-updater") as { autoUpdater: AppUpdater };
+    autoUpdater = mod.autoUpdater;
 
-  // Log the updater's own lifecycle to <userData>/logs/updater.log so a
-  // failed update (e.g. issue #271) leaves something to diagnose.
-  autoUpdater.logger = updaterLogger;
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
+    // Log the updater's own lifecycle to <userData>/logs/updater.log so a
+    // failed update (e.g. issue #271) leaves something to diagnose.
+    autoUpdater.logger = updaterLogger;
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = true;
 
-  autoUpdater.on("update-available", (info) => {
-    mainWindow?.webContents.send("update-available", {
-      version: info.version,
-      releaseNotes: info.releaseNotes,
+    autoUpdater.on("update-available", (info) => {
+      mainWindow?.webContents.send("update-available", {
+        version: info.version,
+        releaseNotes: info.releaseNotes,
+      });
     });
-  });
 
-  autoUpdater.on("download-progress", (progress) => {
-    mainWindow?.webContents.send("update-download-progress", {
-      percent: Math.round(progress.percent),
+    autoUpdater.on("download-progress", (progress) => {
+      mainWindow?.webContents.send("update-download-progress", {
+        percent: Math.round(progress.percent),
+      });
     });
-  });
 
-  autoUpdater.on("update-downloaded", () => {
-    mainWindow?.webContents.send("update-downloaded");
-  });
+    autoUpdater.on("update-downloaded", () => {
+      mainWindow?.webContents.send("update-downloaded");
+    });
 
-  autoUpdater.on("error", (err) => {
-    mainWindow?.webContents.send("update-error", err.message);
-  });
+    autoUpdater.on("error", (err) => {
+      mainWindow?.webContents.send("update-error", err.message);
+    });
+  } catch (initErr) {
+    updaterLogger.warn(
+      "Auto-updater initialization failed (missing app-update.yml?): " +
+        (initErr instanceof Error ? initErr.message : String(initErr)),
+    );
+  }
 
   ipcMain.handle("check-for-updates", async () => {
+    if (!autoUpdater) return null;
     try {
       const result = await autoUpdater.checkForUpdates();
       return result?.updateInfo?.version || null;
@@ -2274,6 +2377,7 @@ function setupUpdater(): void {
   });
 
   ipcMain.handle("download-update", async () => {
+    if (!autoUpdater) return false;
     try {
       await autoUpdater.downloadUpdate();
       return true;
@@ -2285,6 +2389,7 @@ function setupUpdater(): void {
   });
 
   ipcMain.handle("install-update", () => {
+    if (!autoUpdater) return;
     // Bracket the suspect call: if the log shows this line but the app
     // never relaunches, the failure is in quitAndInstall / the installer.
     updaterLogger.info(
@@ -2293,9 +2398,11 @@ function setupUpdater(): void {
     autoUpdater.quitAndInstall(false, true);
   });
 
-  setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
-  }, 5000);
+  if (autoUpdater) {
+    setTimeout(() => {
+      autoUpdater!.checkForUpdates().catch(() => {});
+    }, 5000);
+  }
 }
 
 // Opt-in Chrome DevTools Protocol port for E2E testing. Set

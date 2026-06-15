@@ -3,6 +3,7 @@ export default {
   aiClis: "AI CLIs",
   artifacts: "Artifacts",
   self: "Self",
+  workspace: "Workspace",
   sessions: "Sessions",
   discover: "Discover",
   agents: "Profiles",
@@ -17,6 +18,7 @@ export default {
   kanban: "Kanban",
   gateway: "Gateway",
   settings: "Settings",
+  missionControl: "Mission Control",
   collapseSidebar: "Collapse sidebar",
   expandSidebar: "Expand sidebar",
 } as const;

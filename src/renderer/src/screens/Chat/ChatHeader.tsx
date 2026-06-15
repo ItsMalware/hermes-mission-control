@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Trash2 as Trash, Plus, Zap } from "lucide-react";
+import { Trash2 as Trash, Plus, Zap, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 import type { UsageState } from "./types";
 
@@ -11,6 +11,8 @@ interface ChatHeaderProps {
   onToggleFast: () => void;
   onNewChat?: () => void;
   onClear: () => void;
+  historyVisible: boolean;
+  onToggleHistory: () => void;
 }
 
 function UsageBadge({ usage }: { usage: UsageState }): React.JSX.Element {
@@ -37,6 +39,8 @@ export const ChatHeader = memo(function ChatHeader({
   onToggleFast,
   onNewChat,
   onClear,
+  historyVisible,
+  onToggleHistory,
 }: ChatHeaderProps): React.JSX.Element {
   const { t } = useI18n();
 
@@ -51,6 +55,13 @@ export const ChatHeader = memo(function ChatHeader({
         {usage && <UsageBadge usage={usage} />}
       </div>
       <div className="chat-header-actions">
+        <button
+          className={`btn-ghost chat-history-btn ${historyVisible ? "active" : ""}`}
+          onClick={onToggleHistory}
+          title={t("chat.toggleHistory")}
+        >
+          {historyVisible ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+        </button>
         <div className="chat-fast-wrapper">
           <button
             className={`btn-ghost chat-fast-btn ${fastMode ? "chat-fast-active" : ""}`}

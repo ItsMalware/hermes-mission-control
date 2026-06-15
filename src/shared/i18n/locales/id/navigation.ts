@@ -16,6 +16,7 @@ export default {
   kanban: "Kanban",
   gateway: "Gateway",
   settings: "Pengaturan",
+  missionControl: "Mission Control",
   collapseSidebar: "Ciutkan sidebar",
   expandSidebar: "Perluas sidebar",
 } as const;

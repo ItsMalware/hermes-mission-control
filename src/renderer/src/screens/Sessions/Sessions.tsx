@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo, memo } from "react";
 import { Plus, Search, X, ChatBubble, Trash, Pencil } from "../../assets/icons";
+import { Pin } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
 interface CachedSession {
@@ -138,6 +139,10 @@ const SessionCard = memo(function SessionCard({
   selected = false,
   onToggleSelected,
   selectTitle,
+  pinned = false,
+  onTogglePin,
+  pinTitle,
+  unpinTitle,
 }: {
   session: CachedSession;
   isActive: boolean;
@@ -158,6 +163,10 @@ const SessionCard = memo(function SessionCard({
   selected?: boolean;
   onToggleSelected?: (id: string) => void;
   selectTitle?: string;
+  pinned?: boolean;
+  onTogglePin?: (id: string) => void;
+  pinTitle?: string;
+  unpinTitle?: string;
 }) {
   const activate = (): void => {
     if (selectionMode) {
@@ -243,6 +252,21 @@ const SessionCard = memo(function SessionCard({
             {formatModel(session.model)}
           </span>
         )}
+        {!selectionMode && onTogglePin && !isRenaming && (
+          <button
+            type="button"
+            className={`btn-ghost sessions-card-pin${pinned ? " sessions-card-pin--active" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePin(session.id);
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+            title={pinned ? unpinTitle : pinTitle}
+            aria-label={pinned ? unpinTitle : pinTitle}
+          >
+            <Pin size={14} fill={pinned ? "currentColor" : "none"} />
+          </button>
+        )}
         {!selectionMode && onRename && !isRenaming && (
           <button
             type="button"
@@ -319,6 +343,29 @@ function Sessions({
   const searchRequestId = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Pinned sessions state
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('hermes.pinned-sessions');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('hermes.pinned-sessions', JSON.stringify([...pinnedIds]));
+  }, [pinnedIds]);
+
+  const togglePin = useCallback((id: string) => {
+    setPinnedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   // Rename state
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -601,7 +648,14 @@ function Sessions({
   }, [searchQuery, profile]);
 
   const isShowingSearch = searchQuery.trim().length > 0;
-  const grouped = groupSessions(sessions);
+  const grouped = groupSessions(sessions).map(group => ({
+    ...group,
+    sessions: [...group.sessions].sort((a, b) => {
+      const aPinned = pinnedIds.has(a.id) ? 0 : 1;
+      const bPinned = pinnedIds.has(b.id) ? 0 : 1;
+      return aPinned - bPinned;
+    }),
+  }));
   const visibleSessionIds = useMemo(() => {
     const ids = isShowingSearch
       ? searchResults.map((result) => result.sessionId)
@@ -908,6 +962,10 @@ function Sessions({
                   selected={selectedSessionIds.has(s.id)}
                   onToggleSelected={toggleSessionSelected}
                   selectTitle={t("sessions.selectSession")}
+                  pinned={pinnedIds.has(s.id)}
+                  onTogglePin={togglePin}
+                  pinTitle={t("chat.pinSession")}
+                  unpinTitle={t("chat.unpinSession")}
                 />
               ))}
             </div>

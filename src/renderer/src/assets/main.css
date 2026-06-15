@@ -121,46 +121,69 @@
   --panel-border: rgba(15, 118, 110, 0.18);
 }
 
-/* ----- Google Sans ----- */
+/* ----- Felis (sans-serif body font) ----- */
 @font-face {
-  font-family: "Google Sans";
-  src: url("./fonts/GoogleSans-Regular.ttf") format("truetype");
+  font-family: "Felis";
+  src: url("./fonts/felis-light-webfont.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Felis";
+  src: url("./fonts/felis-regular-webfont.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "Google Sans";
-  src: url("./fonts/GoogleSans-Italic.ttf") format("truetype");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Google Sans";
-  src: url("./fonts/GoogleSans-Medium.ttf") format("truetype");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Google Sans";
-  src: url("./fonts/GoogleSans-MediumItalic.ttf") format("truetype");
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Google Sans";
-  src: url("./fonts/GoogleSans-SemiBold.ttf") format("truetype");
+  font-family: "Felis";
+  src: url("./fonts/felis-semibold-webfont.woff2") format("woff2");
   font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "Google Sans";
-  src: url("./fonts/GoogleSans-Bold.ttf") format("truetype");
+  font-family: "Felis";
+  src: url("./fonts/felis-bold-webfont.woff2") format("woff2");
   font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ----- sE-Khafr (display/heading font) ----- */
+@font-face {
+  font-family: "sE-Khafr";
+  src: url("./fonts/sekhaft-regular-webfont.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "sE-Khafr";
+  src: url("./fonts/sekhaft-medium-webfont.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "sE-Khafr";
+  src: url("./fonts/sekhaft-semibold-webfont.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "sE-Khafr";
+  src: url("./fonts/sekhaft-bold-webfont.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "sE-Khafr";
+  src: url("./fonts/sekhaft-light-webfont.woff2") format("woff2");
+  font-weight: 300;
   font-style: normal;
   font-display: swap;
 }
@@ -173,8 +196,10 @@
   --radius-xl: 20px;
   --transition: 150ms ease;
   --font-sans:
-    "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Felis", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     sans-serif;
+  --font-display:
+    "sE-Khafr", "Felis", -apple-system, sans-serif;
   --font-mono:
     "SF Mono", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
   --app-wallpaper: url("./cozy-hermes-bg.webp");
@@ -395,6 +420,7 @@ body {
 }
 
 .welcome-title {
+  font-family: var(--font-display);
   font-size: 32px;
   font-weight: 700;
   letter-spacing: -0.5px;
@@ -960,7 +986,28 @@ body {
 .layout {
   display: flex;
   flex: 1;
+  height: 100vh;
   overflow: hidden;
+}
+
+/* ── Custom scrollbar for content panes ────────── */
+.layout > div {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.layout > div::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.layout > div::-webkit-scrollbar-track {
+  background: transparent;
+}
+.layout > div::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+}
+.layout > div::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
 }
 
 .sidebar {
@@ -973,6 +1020,8 @@ body {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  height: 100vh;
+  overflow: hidden;
   box-shadow:
     inset -1px 0 0 rgba(190, 242, 232, 0.08),
     0 18px 36px rgba(0, 0, 0, 0.18);
@@ -1037,7 +1086,7 @@ body {
   background: none;
   width: 100%;
   text-align: left;
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
 }
 
 .sidebar-nav-item:hover {
@@ -1144,6 +1193,7 @@ body {
 
 .content {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1800,6 +1850,52 @@ body {
   height: 100%;
   min-height: 0;
   position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Chat history drawer ──────────────────────────────────── */
+.chat-layout-wrapper {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.chat-sessions-drawer {
+  width: 300px;
+  min-width: 260px;
+  max-width: 340px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-deeper, rgba(0,0,0,0.15));
+  overflow: hidden;
+  animation: slideInDrawer 0.2s ease-out;
+}
+
+@keyframes slideInDrawer {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+.chat-history-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.chat-history-btn.active {
+  background: rgba(253, 224, 71, 0.12);
+  color: var(--accent, #fde047);
+}
+
+.chat-history-btn:hover {
+  background: rgba(255,255,255,0.06);
 }
 
 .conversation-tabs {
@@ -2416,6 +2512,7 @@ body {
 }
 
 .chat-header-title {
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
@@ -2589,6 +2686,7 @@ body {
 }
 
 .chat-empty-text {
+  font-family: var(--font-display);
   font-size: 22px;
   font-weight: 600;
   color: var(--text-primary);
@@ -3043,8 +3141,8 @@ body {
 
 .chat-input-wrapper {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-bright);
   border-radius: var(--radius-lg);
@@ -3129,6 +3227,26 @@ body {
   background: var(--bg-active);
 }
 
+/* ── Chat input toolbar ──────────────────────────────── */
+.chat-input-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.chat-input-toolbar-spacer {
+  flex: 1;
+}
+
+.chat-input-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
 /* ── Attachments ────────────────────────────────────── */
 
 .chat-attach-btn {
@@ -3156,6 +3274,47 @@ body {
 .chat-attach-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.chat-mic-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+
+.chat-mic-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.chat-mic-btn--recording {
+  color: var(--error);
+  animation: pulse-recording 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-recording {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.chat-mic-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chat-voice-error {
+  margin-top: 4px;
 }
 
 .chat-attachment-strip {
@@ -9062,3 +9221,262 @@ body {
     border-top: 1px solid var(--border);
   }
 }
+
+/* ========================================================================
+   SETTINGS TABBED LAYOUT
+   ======================================================================== */
+.settings-split-container {
+  display: flex;
+  height: 100%;
+}
+
+.settings-sidebar {
+  width: 240px;
+  border-right: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.settings-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  font-size: 13.5px;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.settings-sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary, #f8fafc);
+}
+
+.settings-sidebar-item.active {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c4b5fd;
+  font-weight: 500;
+  border-left: 2px solid #a855f7;
+  padding-left: 10px;
+}
+
+.settings-main-content {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+/* ========================================================================
+   SELF NOTES SEARCH LAYOUT
+   ======================================================================== */
+.self-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 8px);
+  padding: 8px 12px;
+  margin-bottom: 16px;
+}
+
+.self-search-input {
+  background: transparent;
+  border: none;
+  color: var(--text-primary, #f8fafc);
+  flex: 1;
+  outline: none;
+  font-size: 13.5px;
+}
+
+.self-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.self-note-item {
+  padding: 12px;
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 8px);
+  background: var(--panel-bg, rgba(255, 255, 255, 0.02));
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.self-note-item:hover {
+  border-color: rgba(168, 85, 247, 0.5);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.self-note-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #f8fafc);
+  margin-bottom: 4px;
+}
+
+.self-note-item-preview {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  line-height: 1.4;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.self-note-item-path {
+  font-size: 10px;
+  color: var(--text-muted, #94a3b8);
+  opacity: 0.6;
+}
+
+.self-note-view-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 8px);
+  background: var(--panel-bg, rgba(255, 255, 255, 0.02));
+  overflow: hidden;
+}
+
+.self-note-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
+}
+
+.self-note-view-body {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-primary, #f8fafc);
+}
+
+/* ========================================================================
+   SELF 3D VAULT GRAPH VISUALIZER
+   ======================================================================== */
+.self-graph-container {
+  position: relative;
+  width: 100%;
+  height: 500px;
+  background: var(--panel-bg, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.self-graph-canvas {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+}
+
+.self-graph-canvas:active {
+  cursor: grabbing;
+}
+
+.self-graph-stats {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  gap: 16px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 14px;
+  border-radius: 6px;
+  z-index: 10;
+}
+
+.self-stat-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-muted, #94a3b8);
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.self-stat-val {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary, #f8fafc);
+}
+
+.self-graph-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 12px;
+  border-radius: 6px;
+  z-index: 10;
+  font-size: 11px;
+  color: var(--text-muted, #94a3b8);
+}
+
+.self-graph-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.self-graph-legend .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.self-graph-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  color: var(--text-muted, #94a3b8);
+  font-size: 13px;
+  background: var(--panel-bg, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 8px);
+}
+

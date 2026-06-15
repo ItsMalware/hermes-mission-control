@@ -1,5 +1,5 @@
-appId: com.nousresearch.hermes
-productName: Hermes OS
+appId: com.indigoint.hermes-mission-control
+productName: Hermes Mission Control
 directories:
   buildResources: build
 files:
@@ -11,6 +11,9 @@ files:
   - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
 asarUnpack:
   - resources/**
+  - node_modules/better-sqlite3/**
+  - node_modules/bindings/**
+  - node_modules/prebuild-install/**
 win:
   executableName: hermes-agent
   target:
@@ -46,8 +49,8 @@ linux:
     - snap
     - deb
     - rpm
-  maintainer: electronjs.org
-  vendor: Nous Research
+  maintainer: Indigo Intelligence
+  vendor: Indigo Intelligence
   category: Utility
   synopsis: Self-improving AI assistant desktop app
   description: >-

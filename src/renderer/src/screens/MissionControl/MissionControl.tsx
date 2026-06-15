@@ -12,6 +12,7 @@ import {
   Sparkles,
   Timer,
   Users,
+  Wrench,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
 import Memory from "../Memory/Memory";
@@ -647,7 +648,7 @@ function MissionControl({
                 <span>{activeKeys.length} keys active</span>
               </button>
               <button onClick={() => go("tools")}>
-                <LayoutDashboard size={15} />
+                <Wrench size={15} />
                 <strong>Toolkit</strong>
                 <span>Skills & tools</span>
               </button>

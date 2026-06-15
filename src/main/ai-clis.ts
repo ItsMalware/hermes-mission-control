@@ -79,11 +79,12 @@ const AI_CLIS: CliDefinition[] = [
     promptArgs: (prompt) => ["exec", prompt],
   },
   {
-    id: "free-claude-code",
-    name: "Free Claude Code",
-    command: "fcc-server",
+    id: "opencode",
+    name: "OpenCode",
+    command: "opencode",
     versionArgs: ["--version"],
-    description: "OpenRouter-compatible Claude Code wrapper.",
+    description: "Open-source AI coding assistant for the terminal.",
+    promptArgs: (prompt) => ["-m", prompt],
   },
 ];
 
