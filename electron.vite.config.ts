@@ -1,0 +1,46 @@
+import { resolve } from "path";
+import { defineConfig } from "electron-vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+
+export default defineConfig({
+  main: {
+    build: {
+      rollupOptions: {
+        external: ["better-sqlite3"],
+      },
+    },
+  },
+  preload: {
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve("src/preload/index.ts"),
+          askpass: resolve("src/preload/askpass.ts"),
+        },
+      },
+    },
+  },
+  renderer: {
+    resolve: {
+      alias: {
+        "@renderer": resolve("src/renderer/src"),
+      },
+      // Ensure a single Three.js instance across our code, @react-three/fiber,
+      // drei and troika — multiple copies break `instanceof THREE.*` checks in
+      // the ported office agent renderer.
+      dedupe: ["three"],
+    },
+    plugins: [tailwindcss(), react()],
+    optimizeDeps: {
+      include: [
+        "use-sync-external-store/shim/with-selector",
+        "zustand",
+        "zustand/traditional",
+        "scheduler",
+        "stats.js"
+      ],
+      exclude: ["three", "@react-three/fiber", "@react-three/drei", "troika-three-text"],
+    },
+  },
+});

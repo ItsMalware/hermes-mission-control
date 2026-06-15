@@ -1,0 +1,8 @@
+extends: electron-builder.yml
+appId: com.nousresearch.hermes.mission-control-lab
+productName: Hermes Mission Control Lab
+directories:
+  output: dist-lab
+mac:
+  artifactName: ${name}-mission-control-lab-${version}-${arch}-${os}.${ext}
+publish: []
