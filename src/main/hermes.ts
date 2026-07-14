@@ -1976,6 +1976,7 @@ async function sendMessageViaTuiGateway(
       storedSessionId = String(resumed.resumed || resumeSessionId);
       hasSessionInfo = !!resumed.info;
     } else {
+      const mc = getModelConfig(profile);
       const created = await client.request<{
         info?: unknown;
         session_id?: string;
@@ -1984,6 +1985,10 @@ async function sendMessageViaTuiGateway(
         cols: 96,
         ...(contextFolder ? { cwd: contextFolder } : {}),
         ...(history?.length ? { messages: apiHistory(history) } : {}),
+        ...(mc.model ? { model: mc.model } : {}),
+        ...(mc.provider && mc.provider !== "auto"
+          ? { provider: mc.provider }
+          : {}),
       });
       activeSessionId = String(created.session_id || "");
       storedSessionId = String(created.stored_session_id || activeSessionId);
@@ -2394,7 +2399,8 @@ async function sendMessageViaBestApi(
     shouldUseTuiGatewayClient() &&
     !isRemoteMode() &&
     !attachments?.length &&
-    !approvalCommand
+    !approvalCommand &&
+    !isGatewayModelStale(profile)
   ) {
     try {
       return await sendMessageViaTuiGateway(
@@ -2903,6 +2909,7 @@ export function startGatewayDetailed(profile?: string): GatewayStartResult {
   proc.unref();
   gatewayProcesses.set(key, proc);
   appStartedProfiles.add(key);
+  gatewayStartedAt.set(key, Date.now());
   warmTuiGatewayClient(profile);
 
   // Wait a bit then check if API server came up (only meaningful for the
@@ -3084,6 +3091,28 @@ function gatewayRestartProfileKey(profile?: string): string {
 let gatewayRestartQueueTail: Promise<unknown> = Promise.resolve();
 const gatewayRestartByProfile = new Map<string, Promise<boolean>>();
 
+// Track when the model config was last written vs when the gateway was last
+// started, per profile. When config is newer than the gateway, the TUI
+// gateway path (which doesn't pass the model explicitly) would use the
+// gateway's stale in-memory model. Skipping the TUI path in that case
+// forces the API path, which reads getModelConfig() and passes the model
+// in the request body.
+const modelConfigChangedAt = new Map<string, number>();
+const gatewayStartedAt = new Map<string, number>();
+
+export function markModelConfigChanged(profile?: string): void {
+  modelConfigChangedAt.set(profileKey(profile), Date.now());
+}
+
+function isGatewayModelStale(profile?: string): boolean {
+  const key = profileKey(profile);
+  const configTs = modelConfigChangedAt.get(key);
+  if (!configTs) return false;
+  const startTs = gatewayStartedAt.get(key);
+  if (!startTs) return true;
+  return configTs > startTs;
+}
+
 function markGatewayRestartFailed(profile?: string): void {
   const key = profileKey(profile);
   gatewayProcesses.delete(key);
@@ -3198,7 +3227,7 @@ export function restartGateway(
   profile?: string,
   healthTimeoutMs = 30000,
   healthPollMs = 250,
-  stopTimeoutMs = 5000,
+  stopTimeoutMs = 10000,
 ): Promise<boolean> {
   // Same defensive gate as startGateway — the local gateway has no role
   // in remote/SSH mode. Cheap to check; catches IPC paths that don't

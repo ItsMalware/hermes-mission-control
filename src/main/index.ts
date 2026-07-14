@@ -77,6 +77,7 @@ import {
   testRemoteConnection,
   stopHealthPolling,
   restartGateway,
+  markModelConfigChanged,
   notifyProfileSwitched,
   ensureSshTunnelIfNeeded,
   setSshRemoteApiKey,
@@ -255,6 +256,7 @@ import {
   CreateTaskInput,
 } from "./kanban";
 import { getAppLocale, setAppLocale } from "./locale";
+import { getSeoRemoteOrigin, setSeoRemoteOrigin } from "./seo-origin";
 import {
   hardenAttachedWebContents,
   hardenWebviewPreferences,
@@ -485,7 +487,14 @@ function createWindow(): void {
     Menu.buildFromTemplate(template).popup();
   });
 
-  console.log("[DEBUG LOAD] is.dev:", is.dev, "ELECTRON_RENDERER_URL:", process.env["ELECTRON_RENDERER_URL"], "rendererHtmlPath:", rendererHtmlPath);
+  console.log(
+    "[DEBUG LOAD] is.dev:",
+    is.dev,
+    "ELECTRON_RENDERER_URL:",
+    process.env["ELECTRON_RENDERER_URL"],
+    "rendererHtmlPath:",
+    rendererHtmlPath,
+  );
   if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
     mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   } else {
@@ -527,6 +536,10 @@ function setupIPC(): void {
     return true;
   });
   ipcMain.handle("quit-app", () => app.quit());
+  ipcMain.handle("restart-app", () => {
+    app.relaunch();
+    app.quit();
+  });
 
   // Hermes engine info
   ipcMain.handle("get-hermes-version", async () => {
@@ -622,6 +635,12 @@ function setupIPC(): void {
   ipcMain.handle("get-locale", () => getAppLocale());
   ipcMain.handle("set-locale", (_event, locale: AppLocale) =>
     setAppLocale(locale),
+  );
+
+  // Shared OpenSEO instance origin (SEO tab webview allowlist)
+  ipcMain.handle("get-seo-remote-origin", () => getSeoRemoteOrigin());
+  ipcMain.handle("set-seo-remote-origin", (_event, origin: string | null) =>
+    setSeoRemoteOrigin(origin),
   );
 
   ipcMain.handle("get-env", (_event, profile?: string) => {
@@ -754,14 +773,22 @@ function setupIPC(): void {
       const prev = getModelConfig(profile);
       setModelConfig(provider, model, baseUrl, profile);
 
-      // Restart gateway when provider, model, or endpoint changes so it picks up new config
-      if (
-        isGatewayRunning(profile) &&
-        (prev.provider !== provider ||
-          prev.model !== model ||
-          prev.baseUrl !== baseUrl)
-      ) {
-        restartGateway(profile);
+      const modelChanged =
+        prev.provider !== provider ||
+        prev.model !== model ||
+        prev.baseUrl !== baseUrl;
+
+      if (modelChanged) {
+        markModelConfigChanged(profile);
+      }
+
+      // Restart gateway when provider, model, or endpoint changes so it
+      // picks up new config. AWAIT the restart and propagate its result:
+      // previously this was fire-and-forget, so a failed restart (e.g.
+      // "gateway did not stop before restart") left the gateway serving
+      // the OLD model while the UI showed the new one.
+      if (isGatewayRunning(profile) && modelChanged) {
+        return await restartGateway(profile);
       }
 
       return true;
@@ -1631,7 +1658,11 @@ function setupIPC(): void {
   );
   ipcMain.handle(
     "set-fallback-providers",
-    (_event, entries: Array<{ provider: string; model: string }>, profile?: string) => {
+    (
+      _event,
+      entries: Array<{ provider: string; model: string }>,
+      profile?: string,
+    ) => {
       setFallbackProviders(entries, profile);
       return true;
     },
@@ -1726,43 +1757,28 @@ function setupIPC(): void {
   ipcMain.handle("self-read-note-by-path", (_event, relPath: string) =>
     selfReadNoteByPath(relPath),
   );
-  ipcMain.handle("self-get-vault-graph", () =>
-    selfGetVaultGraph(),
-  );
+  ipcMain.handle("self-get-vault-graph", () => selfGetVaultGraph());
 
   // ── NotebookLM MCP bridge ─────────────────────────────────────────
   ipcMain.handle("notebooklm-health", () => notebookLmHealth());
   ipcMain.handle("notebooklm-setup-auth", () => notebookLmSetupAuth());
-  ipcMain.handle("notebooklm-list-notebooks", () =>
-    notebookLmListNotebooks(),
-  );
-  ipcMain.handle(
-    "notebooklm-create-notebook",
-    (_event, title: string) => notebookLmCreateNotebook(title),
+  ipcMain.handle("notebooklm-list-notebooks", () => notebookLmListNotebooks());
+  ipcMain.handle("notebooklm-create-notebook", (_event, title: string) =>
+    notebookLmCreateNotebook(title),
   );
   ipcMain.handle("notebooklm-library", () => notebookLmLibrary());
-  ipcMain.handle(
-    "notebooklm-studio-status",
-    (_event, notebookId: string) =>
-      notebookLmStudioStatus(notebookId),
+  ipcMain.handle("notebooklm-studio-status", (_event, notebookId: string) =>
+    notebookLmStudioStatus(notebookId),
   );
   ipcMain.handle(
     "notebooklm-ask",
-    (
-      _event,
-      notebookId: string,
-      question: string,
-      notebookName?: string,
-    ) => notebookLmAsk(notebookId, question, notebookName),
+    (_event, notebookId: string, question: string, notebookName?: string) =>
+      notebookLmAsk(notebookId, question, notebookName),
   );
   ipcMain.handle(
     "notebooklm-studio-create",
-    (
-      _event,
-      notebookId: string,
-      artifactType: string,
-      customPrompt?: string,
-    ) => notebookLmStudioCreate(notebookId, artifactType, customPrompt),
+    (_event, notebookId: string, artifactType: string, customPrompt?: string) =>
+      notebookLmStudioCreate(notebookId, artifactType, customPrompt),
   );
   ipcMain.handle(
     "notebooklm-download-artifact",
