@@ -1963,6 +1963,7 @@ async function sendMessageViaTuiGateway(
   });
 
   try {
+    const mc = getModelConfig(profile);
     if (resumeSessionId) {
       const resumed = await client.request<{
         info?: unknown;
@@ -1971,12 +1972,15 @@ async function sendMessageViaTuiGateway(
       }>("session.resume", {
         cols: 96,
         session_id: resumeSessionId,
+        ...(mc.model ? { model: mc.model } : {}),
+        ...(mc.provider && mc.provider !== "auto"
+          ? { provider: mc.provider }
+          : {}),
       });
       activeSessionId = String(resumed.session_id || "");
       storedSessionId = String(resumed.resumed || resumeSessionId);
       hasSessionInfo = !!resumed.info;
     } else {
-      const mc = getModelConfig(profile);
       const created = await client.request<{
         info?: unknown;
         session_id?: string;
