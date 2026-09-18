@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hermes-renderer",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "-w", "apps/desktop", "dev:renderer"],
+      "port": 5174
+    }
+  ]
+}
