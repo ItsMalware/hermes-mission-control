@@ -32,11 +32,9 @@ const AI_CLIS = [
 ] as const
 
 function launchCli(tool: (typeof AI_CLIS)[number]) {
-  navigator.clipboard.writeText(tool.cmd).then(
-    () => host.notify({ title: 'Copied', message: `${tool.cmd} — paste in terminal` }),
-    () => host.notify({ title: tool.label, message: `Run: ${tool.cmd}` })
-  )
-  host.navigate('/command-center')
+  // Open a terminal that boots straight into the CLI so the user can chat with
+  // it, instead of copying the command and bouncing to another surface.
+  host.openCli(tool.cmd, tool.label)
 }
 
 /* ------------------------------------------------------------------ */
