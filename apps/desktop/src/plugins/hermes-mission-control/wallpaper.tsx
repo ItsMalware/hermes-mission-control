@@ -1,6 +1,4 @@
-import { atom, useValue } from '@hermes/plugin-sdk'
-
-import wallpaperUrl from './cozy-hermes-bg.webp'
+import { atom } from '@hermes/plugin-sdk'
 
 export const $wallpaperEnabled = atom(
   typeof localStorage !== 'undefined'
@@ -14,15 +12,14 @@ $wallpaperEnabled.subscribe(on => {
   }
 })
 
+/**
+ * No-op: the wallpaper is a SINGLE global layer mounted once on the body by the
+ * plugin's `mountGlobalWallpaper()`. Pages used to render their own `<Wallpaper/>`
+ * too, which stacked a second fixed full-viewport copy — doubling the effective
+ * opacity on plugin pages (darker sidebar + surfaces) and making them not match
+ * the chat tab, which has only the global one. Rendering nothing keeps every tab
+ * on the one shared wallpaper.
+ */
 export function Wallpaper() {
-  const on = useValue($wallpaperEnabled)
-  if (!on) return null
-
-  return (
-    <div
-      aria-hidden
-      className="hmc-wallpaper"
-      style={{ backgroundImage: `url(${wallpaperUrl})` }}
-    />
-  )
+  return null
 }

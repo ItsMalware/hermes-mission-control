@@ -6,24 +6,110 @@
   pointer-events: none;
   background-size: cover;
   background-position: center;
-  opacity: 0.32;
+  opacity: 0.30;
 }
 
 /* Make app surfaces translucent so the wallpaper bleeds through everywhere.
    Layer stack (bottom→top): html bg (opaque base) → body (transparent) →
-   wallpaper div (0.32 opacity) → single controller div (translucent surface).
-   No other element should paint a background between wallpaper and content. */
+   wallpaper div (0.30 opacity) → single controller div (translucent surface).
+   The controller surface stays fairly solid for chat legibility; the plugin
+   pages below drop it further so their glass panels have wallpaper to frost. */
 :root {
   --color-background: transparent !important;
-  --ui-chat-surface-background: color-mix(in srgb, var(--ui-bg-chrome) 74%, transparent) !important;
-  --ui-editor-surface-background: color-mix(in srgb, var(--ui-bg-chrome) 74%, transparent) !important;
-  --ui-terminal-surface-background: color-mix(in srgb, var(--ui-bg-chrome) 74%, transparent) !important;
-  --ui-surface-background: color-mix(in srgb, var(--ui-bg-editor) 74%, transparent) !important;
-  --ui-sidebar-surface-background: color-mix(in srgb, var(--ui-bg-sidebar) 76%, transparent) !important;
+  --ui-chat-surface-background: color-mix(in srgb, var(--ui-bg-chrome) 82%, transparent) !important;
+  /* The workspace/session PANE surface (pane-shell tree-group) sits in its own
+     stacking context ABOVE the global wallpaper, so any opacity here washes the
+     wallpaper out in the chat/main pane. The plugin pages hide this by painting
+     their own in-page <Wallpaper/> on top. Keep it transparent so the single
+     global wallpaper shows through chat at the same strength as those pages. */
+  --ui-editor-surface-background: transparent !important;
+  --ui-terminal-surface-background: color-mix(in srgb, var(--ui-bg-chrome) 82%, transparent) !important;
+  --ui-surface-background: color-mix(in srgb, var(--ui-bg-editor) 82%, transparent) !important;
+  --ui-sidebar-surface-background: color-mix(in srgb, var(--ui-bg-sidebar) 92%, transparent) !important;
+
+  /* ── Shared glassmorphism tokens ──────────────────────────────────────────
+     A real frosted-glass tile: a translucent tint that lets the blurred
+     wallpaper through, a bright top-edge highlight, and layered shadows for
+     depth. backdrop-filter is what turns a flat square into glass, so panels
+     must sit over a transparent-enough surface for the blur to bite. */
+  --hmc-glass-bg: color-mix(in srgb, var(--ui-bg-chrome) 55%, transparent);
+  --hmc-glass-blur: saturate(180%) blur(22px);
+  --hmc-glass-radius: 16px;
+  --hmc-glass-border: color-mix(in srgb, #ffffff 55%, transparent);
+  --hmc-glass-shadow:
+    0 12px 40px rgba(31, 38, 66, 0.16),
+    0 2px 8px rgba(31, 38, 66, 0.08),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 65%, transparent);
+}
+
+/* Plugin pages drop the surface behind them so glass panels frost the
+   wallpaper instead of a flat opaque sheet. */
+.hmc-page {
+  background: transparent !important;
+}
+
+/* The shared glass tile look, reused across every plugin panel/card. */
+.hmc-glass,
+.self-panel,
+.mission-panel,
+.self-tool-tabs button,
+.agents-card,
+.agents-clis {
+  background: var(--hmc-glass-bg) !important;
+  backdrop-filter: var(--hmc-glass-blur);
+  -webkit-backdrop-filter: var(--hmc-glass-blur);
+  border: 1px solid var(--hmc-glass-border) !important;
+  border-radius: var(--hmc-glass-radius) !important;
+  box-shadow: var(--hmc-glass-shadow) !important;
+}
+
+/* Chat area parity: match the plugin pages, which keep their page surface
+   transparent and let the wallpaper show at full strength — glass lives only on
+   the content tiles (the composer below), not the whole surface. */
+[data-chat-surface] {
+  background: transparent !important;
+}
+
+/* The composer becomes a floating glass pill matching the content tiles. */
+[data-slot="composer-root"] {
+  background: color-mix(in srgb, var(--ui-bg-chrome) 70%, transparent) !important;
+  backdrop-filter: var(--hmc-glass-blur);
+  -webkit-backdrop-filter: var(--hmc-glass-blur);
+  border: 1px solid var(--hmc-glass-border) !important;
+  box-shadow: var(--hmc-glass-shadow) !important;
+}
+
+/* User message bubbles were a solid white box floating over the wallpaper.
+   Give them the same frosted-glass material so they read as part of the theme. */
+.composer-human-message {
+  background: color-mix(in srgb, var(--ui-bg-chrome) 62%, transparent) !important;
+  backdrop-filter: var(--hmc-glass-blur);
+  -webkit-backdrop-filter: var(--hmc-glass-blur);
+  border-color: var(--hmc-glass-border) !important;
+}
+
+/* The sticky wrapper that pins the current user message to the top of the thread
+   paints its own ~82% opaque surface — that was the white box under the bubble.
+   Make it transparent; the inner glass bubble carries the material, and a light
+   blur keeps content legible as it scrolls underneath the pinned row. */
+[data-slot="aui_user-message-root"] {
+  background: transparent !important;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 body {
   background: transparent !important;
+}
+
+/* Sidebar as frosted glass: the surface var above is bumped to 92% so nav and
+   session cards read cleanly, plus a backdrop blur + saturate for the glass feel
+   and a bright inner edge highlight to catch the light. */
+[data-slot="sidebar"] {
+  backdrop-filter: var(--hmc-glass-blur);
+  -webkit-backdrop-filter: var(--hmc-glass-blur);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, #ffffff 55%, transparent),
+    2px 0 24px rgba(31, 38, 66, 0.10);
 }
 
 /* ── Hermes session card styling ─────────────────────────────────────────── */
@@ -1171,8 +1257,8 @@ body {
 
 .self-tool-tabs button:hover,
 .self-tool-tabs button[data-state='active'] {
-  background: color-mix(in srgb, hsl(var(--primary)) 22%, var(--ui-bg-chrome));
-  border-color: color-mix(in srgb, hsl(var(--primary)) 45%, hsl(var(--border)));
+  background: color-mix(in srgb, hsl(var(--primary)) 20%, var(--hmc-glass-bg)) !important;
+  border-color: color-mix(in srgb, hsl(var(--primary)) 50%, var(--hmc-glass-border)) !important;
   color: var(--foreground);
 }
 
@@ -2162,13 +2248,13 @@ body {
 }
 
 .agents-card:hover {
-  border-color: color-mix(in srgb, hsl(var(--primary)) 40%, hsl(var(--border)));
-  background: hsl(var(--muted));
+  border-color: color-mix(in srgb, hsl(var(--primary)) 45%, var(--hmc-glass-border)) !important;
+  background: color-mix(in srgb, #ffffff 12%, var(--hmc-glass-bg)) !important;
 }
 
 .agents-card.active {
-  border-color: hsl(var(--primary));
-  background: color-mix(in srgb, hsl(var(--primary)) 8%, hsl(var(--card)));
+  border-color: color-mix(in srgb, hsl(var(--primary)) 60%, var(--hmc-glass-border)) !important;
+  background: color-mix(in srgb, hsl(var(--primary)) 14%, var(--hmc-glass-bg)) !important;
 }
 
 .agents-card-header {

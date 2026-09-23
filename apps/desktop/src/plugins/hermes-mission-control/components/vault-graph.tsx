@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { host } from "@hermes/plugin-sdk";
+
+import * as vault from "../services/vault";
 
 export interface GraphNode {
   id: string;
@@ -231,16 +232,16 @@ export function VaultGraph3D({ onSelectNote }: VaultGraph3DProps): React.JSX.Ele
   // Fetch data
   const fetchData = useCallback(async () => {
     try {
-      const g = await host.request<{ nodes: GraphNode[]; links: GraphLink[] }>('self.vaultGraph', {});
-      setData(g);
+      const g = await vault.vaultGraph();
+      if (g.nodes.length === 0) {
+        setError('No notes found in the vault to graph.');
+      } else {
+        setData(g);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (message.toLowerCase().includes('not implemented') || message.toLowerCase().includes('not found')) {
-        setError('Vault graph is not available. The backend may not support this feature yet.');
-      } else {
-        setError(`Failed to load vault graph: ${message}`);
-        console.error("Failed to load vault graph data:", err);
-      }
+      setError(`Failed to load vault graph: ${message}`);
+      console.error("Failed to load vault graph data:", err);
     } finally {
       setLoading(false);
     }

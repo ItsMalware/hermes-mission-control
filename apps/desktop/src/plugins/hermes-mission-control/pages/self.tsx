@@ -16,6 +16,7 @@ import { Wallpaper } from '../wallpaper'
 import { VaultGraph3D } from '../components/vault-graph'
 import { MemoryEditor } from '../components/memory-editor'
 import { SEOEmbed } from './seo'
+import * as vault from '../services/vault'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -142,21 +143,11 @@ function NoteEditor({
     setError('')
     setSaved(false)
     try {
-      const loaded = await host.request<SelfNote>('self.readNote', {
-        kind,
-        date,
-      })
+      const loaded = await vault.readNote(kind, date)
       setNote(loaded)
       setContent(loaded.content)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('not implemented') || msg.includes('not found')) {
-        setError(
-          'Vault not connected. Note operations will be available once the vault backend is wired.'
-        )
-      } else {
-        setError(msg)
-      }
+      setError(err instanceof Error ? err.message : String(err))
       setNote(null)
       setContent('')
     } finally {
@@ -173,24 +164,13 @@ function NoteEditor({
     setError('')
     setSaved(false)
     try {
-      const written = await host.request<SelfNote>('self.writeNote', {
-        kind,
-        date,
-        content,
-      })
+      const written = await vault.writeNote(kind, date, content)
       setNote(written)
       setContent(written.content)
       setSaved(true)
       window.setTimeout(() => setSaved(false), 1800)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('not implemented') || msg.includes('not found')) {
-        setError(
-          'Vault not connected. Save will be available once the vault backend is wired.'
-        )
-      } else {
-        setError(msg)
-      }
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)
     }
@@ -199,7 +179,7 @@ function NoteEditor({
   async function openFile(): Promise<void> {
     if (!note?.path) return
     try {
-      await host.request('self.openFile', { path: note.path })
+      await vault.openFile(note.path)
     } catch {
       // silently ignore if not wired
     }
@@ -309,23 +289,13 @@ function NoteSearch() {
     setLoading(true)
     setError('')
     try {
-      const result = await host.request<{ notes: SearchNote[] }>(
-        'self.recentNotes',
-        { limit: 30 }
-      )
+      const result = await vault.recentNotes(30)
       setNotes(result.notes)
       if (result.notes.length > 0) {
         void handleSelectNote(result.notes[0])
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('not implemented') || msg.includes('not found')) {
-        setError(
-          'Vault not connected. Note search will be available once the vault backend is wired.'
-        )
-      } else {
-        setError(msg)
-      }
+      setError(err instanceof Error ? err.message : String(err))
       setNotes([])
     } finally {
       setLoading(false)
@@ -345,10 +315,7 @@ function NoteSearch() {
       setLoading(true)
       setError('')
       try {
-        const result = await host.request<{ notes: SearchNote[] }>(
-          'self.searchNotes',
-          { query, limit: 30 }
-        )
+        const result = await vault.searchNotes(query, 30)
         setNotes(result.notes)
         if (result.notes.length > 0) {
           void handleSelectNote(result.notes[0])
@@ -357,12 +324,7 @@ function NoteSearch() {
           setSelectedContent('')
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        if (msg.includes('not implemented') || msg.includes('not found')) {
-          setError('Vault not connected.')
-        } else {
-          setError(msg)
-        }
+        setError(err instanceof Error ? err.message : String(err))
       } finally {
         setLoading(false)
       }
@@ -373,10 +335,7 @@ function NoteSearch() {
   async function handleSelectNote(note: SearchNote): Promise<void> {
     setSelectedNote(note)
     try {
-      const result = await host.request<{ content: string }>(
-        'self.readNoteByPath',
-        { relPath: note.relPath }
-      )
+      const result = await vault.readNoteByPath(note.relPath)
       setSelectedContent(result.content)
     } catch {
       setSelectedContent('Failed to load note content.')
@@ -473,9 +432,7 @@ function NoteSearch() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  void host
-                    .request('self.openFile', { path: selectedNote.relPath })
-                    .catch(() => {})
+                  void vault.openFile(selectedNote.relPath).catch(() => {})
                 }}
               >
                 <Codicon name="go-to-file" size="0.75rem" />
@@ -515,21 +472,11 @@ export function SelfPage() {
   useEffect(() => {
     async function load() {
       try {
-        const ws = await host.request<SelfWorkspaceInfo>(
-          'self.getWorkspace',
-          {}
-        )
+        const ws = await vault.getWorkspace()
         setWorkspace(ws)
         setWorkspaceError('')
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        if (msg.includes('not implemented') || msg.includes('not found')) {
-          setWorkspaceError(
-            'Vault backend not connected yet. Workspace detection will be available in a future update.'
-          )
-        } else {
-          setWorkspaceError(msg)
-        }
+        setWorkspaceError(err instanceof Error ? err.message : String(err))
       }
     }
     void load()
@@ -615,9 +562,7 @@ export function SelfPage() {
         <div className="self-panel" style={{ minHeight: 500 }}>
           <VaultGraph3D
             onSelectNote={relPath => {
-              void host
-                .request('self.openFile', { path: relPath })
-                .catch(() => {})
+              void vault.openFile(relPath).catch(() => {})
             }}
           />
         </div>
