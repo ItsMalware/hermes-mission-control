@@ -1141,9 +1141,18 @@ export function ChatSidebar({
       <SidebarContent className="gap-0 overflow-hidden bg-transparent px-2.5">
         <SidebarGroup className="shrink-0 p-0 pb-2 pt-[calc(var(--titlebar-height)+0.375rem)]">
           <SidebarGroupContent>
-            {/* Hermes cat logo */}
-            <div className="flex justify-center pb-3 pt-1">
+            {/* Hermes cat logo + app refresh */}
+            <div className="relative flex justify-center pb-3 pt-1">
               <img src={hermesCatUrl} alt="" className="h-[70px] w-auto object-contain opacity-90" draggable={false} />
+              <button
+                type="button"
+                aria-label="Refresh app"
+                title="Refresh app"
+                onClick={() => window.location.reload()}
+                className="absolute right-0 top-1 grid size-6 place-items-center rounded-md border border-transparent text-(--ui-text-tertiary) transition-colors [-webkit-app-region:no-drag] hover:border-(--ui-stroke-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
+              >
+                <Codicon name="refresh" className="size-3.5" />
+              </button>
             </div>
             <SidebarMenu className="gap-px">
               {SIDEBAR_NAV.map(item => {
