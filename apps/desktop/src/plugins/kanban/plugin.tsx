@@ -80,7 +80,7 @@ function KanbanCount() {
 const plugin: HermesPlugin = {
   id: 'kanban',
   name: 'Kanban',
-  defaultEnabled: false,
+  defaultEnabled: true,
   register(ctx) {
     ctx.i18n.register(KANBAN_LOCALES)
     ctx.onDispose(bindApi(ctx.rest, ctx.storage, ctx.socket))
