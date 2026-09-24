@@ -1,6 +1,7 @@
 import { atom, computed } from 'nanostores'
 
 import { readKey, writeKey } from '@/lib/storage'
+import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { $currentCwd } from '@/store/session'
 
 import { setTerminalTakeover } from '../store'
@@ -200,7 +201,11 @@ export function openCliTerminal(command: string, title?: string): string | null 
   }
 
   const id = createTerminal($currentCwd.get(), { launchCommand: trimmed, title })
+  // Reveal explicitly: setTerminalTakeover only fires the pane-reveal binding on
+  // a CHANGE, so a second CLI launch (takeover already true) would be a no-op and
+  // the terminal would never re-surface. revealTreePane is idempotent.
   setTerminalTakeover(true)
+  revealTreePane('terminal')
 
   return id
 }
