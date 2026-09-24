@@ -184,6 +184,15 @@ declare global {
       writeTextFile?: (path: string, content: string) => Promise<{ path: string }>
       // Move a file/folder to the OS trash (recoverable).
       trashPath?: (path: string) => Promise<boolean>
+      // Headless CLI chat (claude/codex) wrapped as a normal chat box.
+      cliChat?: {
+        send: (payload: {
+          cli: 'claude' | 'codex'
+          message: string
+          sessionId?: string | null
+          cwd?: string | null
+        }) => Promise<{ ok: boolean; text: string; sessionId: string | null; error?: string }>
+      }
       // Git-driven worktree management for the "Start work" flow.
       git?: {
         worktreeList: (repoPath: string) => Promise<HermesGitWorktree[]>

@@ -33,6 +33,7 @@ import nodePty from 'node-pty'
 
 import { classifyActiveRuntime } from './active-runtime-state'
 import { stopBackendChild as stopBackendChildImpl } from './backend-child'
+import { registerCliChatIpc } from './cli-chat'
 import { dashboardFallbackArgs, sourceDeclaresServe } from './backend-command'
 import { createBackendConnectionState } from './backend-connection-state'
 import { buildDesktopBackendEnv, hermesManagedNodePathEntries, normalizeHermesHomeRoot } from './backend-env'
@@ -11386,6 +11387,9 @@ ipcMain.handle('hermes:terminal:cwd', async (_event, id) => {
 })
 
 ipcMain.handle('hermes:terminal:dispose', (_event, id) => disposeTerminalSession(String(id || '')))
+
+// Headless CLI chat (claude/codex) wrapped as a normal chat box in the renderer.
+registerCliChatIpc()
 
 ipcMain.handle('hermes:updates:check', async () =>
   checkUpdates().catch(error => ({

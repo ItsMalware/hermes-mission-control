@@ -4,7 +4,6 @@ import {
   Button,
   Codicon,
   EmptyState,
-  host,
   Loader,
   queryClient,
   useMutation,
@@ -21,6 +20,7 @@ import {
 import type { ProfileInfo } from '../services/hermes-api'
 
 import { Wallpaper } from '../wallpaper'
+import { CliChat } from '../components/cli-chat'
 
 /* ------------------------------------------------------------------ */
 /*  AI CLIs                                                            */
@@ -30,12 +30,6 @@ const AI_CLIS = [
   { icon: 'sparkle', label: 'Codex', cmd: 'codex', desc: 'OpenAI coding agent' },
   { icon: 'code', label: 'Claude Code', cmd: 'claude', desc: 'Anthropic coding agent' },
 ] as const
-
-function launchCli(tool: (typeof AI_CLIS)[number]) {
-  // Open a terminal that boots straight into the CLI so the user can chat with
-  // it, instead of copying the command and bouncing to another surface.
-  host.openCli(tool.cmd, tool.label)
-}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -78,6 +72,20 @@ export function AgentsPage() {
   const [cloneConfig, setCloneConfig] = useState(true)
   const [createError, setCreateError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [activeCli, setActiveCli] = useState<(typeof AI_CLIS)[number] | null>(null)
+
+  if (activeCli) {
+    return (
+      <div className="hmc-page">
+        <Wallpaper />
+        <CliChat
+          cli={activeCli.cmd}
+          label={activeCli.label}
+          onBack={() => setActiveCli(null)}
+        />
+      </div>
+    )
+  }
 
   /* ── data ── */
 
@@ -249,7 +257,7 @@ export function AgentsPage() {
         </div>
         <div className="mission-bucket-grid">
           {AI_CLIS.map((tool) => (
-            <button key={tool.cmd} type="button" onClick={() => launchCli(tool)}>
+            <button key={tool.cmd} type="button" onClick={() => setActiveCli(tool)}>
               <strong><Codicon name={tool.icon} size="1rem" /> {tool.label}</strong>
               <span>{tool.desc}</span>
               <code className="mt-1 block text-[0.65rem] opacity-60">{tool.cmd}</code>
