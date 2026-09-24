@@ -74,19 +74,6 @@ export function AgentsPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [activeCli, setActiveCli] = useState<(typeof AI_CLIS)[number] | null>(null)
 
-  if (activeCli) {
-    return (
-      <div className="hmc-page">
-        <Wallpaper />
-        <CliChat
-          cli={activeCli.cmd}
-          label={activeCli.label}
-          onBack={() => setActiveCli(null)}
-        />
-      </div>
-    )
-  }
-
   /* ── data ── */
 
   const {
@@ -154,6 +141,17 @@ export function AgentsPage() {
   }
 
   /* ── render ── */
+
+  // All hooks above must run every render (React error #300 otherwise), so the
+  // CLI-chat view branches here, after the hook calls.
+  if (activeCli) {
+    return (
+      <div className="hmc-page">
+        <Wallpaper />
+        <CliChat cli={activeCli.cmd} label={activeCli.label} onBack={() => setActiveCli(null)} />
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
