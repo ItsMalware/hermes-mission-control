@@ -1503,7 +1503,9 @@ export function ChatSidebar({
 
         {onChatTab && !showSessionSections && <SidebarBlankState onNewProject={openProjectCreate} />}
 
-        {/* ProfileRail hidden — Hermes uses clean minimal sidebar */}
+        {/* Profile switcher: see and switch agent profiles (self-gates for a
+            single profile vs. the multi-profile rail). */}
+        <ProfileRail />
       </SidebarContent>
       <ProjectDialog />
     </Sidebar>
