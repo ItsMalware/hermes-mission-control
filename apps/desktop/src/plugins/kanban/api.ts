@@ -43,6 +43,9 @@ export const $lanesByProfile = atom<boolean>(false)
  *  auto: empty lanes collapse to a rail, occupied lanes expand. Persisted. */
 export const $collapsedLanes = atom<Record<string, boolean>>({})
 
+// Default the desktop board to the one synced with the Obsidian Mission Control
+// dashboard, so the app and Obsidian show the same tasks out of the box.
+const DEFAULT_BOARD_SLUG = 'founder-ops'
 const BOARD_SLUG_KEY = 'boardSlug'
 const INTRO_KEY = 'introDismissed'
 const LANES_KEY = 'lanesByProfile'
@@ -89,7 +92,12 @@ export function bindApi(r: Rest, storage: PluginStorage, socket: Socket): () => 
     unsubs.push(atom.listen(value => storage.set(key, value)))
   }
 
-  persist($boardSlug, BOARD_SLUG_KEY, '')
+  persist($boardSlug, BOARD_SLUG_KEY, DEFAULT_BOARD_SLUG)
+  // Coerce a legacy empty selection (server-current board) to the default so
+  // existing installs also land on founder-ops until the user picks another.
+  if (!$boardSlug.get()) {
+    $boardSlug.set(DEFAULT_BOARD_SLUG)
+  }
   persist($introDismissed, INTRO_KEY, false)
   persist($lanesByProfile, LANES_KEY, false)
   persist($collapsedLanes, COLLAPSED_KEY, {})
