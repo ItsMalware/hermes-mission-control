@@ -56,8 +56,21 @@ const {
   resetUpdateApplyState,
   startUpdatePoller,
   stopUpdatePoller,
-  $updateStatus
+  $updateStatus,
+  __setUpdatesDisabledForTest
 } = await import('./updates')
+
+// Self-update ships DISABLED (isUpdatesDisabled() === true) in this fork, which
+// would short-circuit every machinery test below. Enable it per-test so the
+// existing coverage still exercises the real check/apply/poll paths; the
+// "updates disabled" describe block flips it back on to assert the shipped gate.
+beforeEach(() => {
+  __setUpdatesDisabledForTest(false)
+})
+
+afterEach(() => {
+  __setUpdatesDisabledForTest(true)
+})
 
 const { setConnection } = await import('./session')
 
@@ -617,5 +630,63 @@ describe('startUpdatePoller', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     expect(checkMock).toHaveBeenCalled()
+  })
+})
+
+describe('updates disabled (shipped default)', () => {
+  beforeEach(() => {
+    storage.clear()
+    notifySpy.mockClear()
+    dismissSpy.mockClear()
+    // Override the file-level enable: assert the gate the fork actually ships.
+    __setUpdatesDisabledForTest(true)
+  })
+
+  afterEach(() => {
+    delete (globalThis as unknown as { window?: unknown }).window
+    vi.useRealTimers()
+  })
+
+  it('never nags about an available update', () => {
+    maybeNotifyUpdateAvailable(status())
+    expect(notifySpy).not.toHaveBeenCalled()
+  })
+
+  it('never nags about a stale backend contract', () => {
+    reportBackendContract(0)
+    expect(notifySpy).not.toHaveBeenCalled()
+  })
+
+  it('refuses applyUpdates() without touching the bridge', async () => {
+    const applyMock = vi.fn()
+    ;(globalThis as unknown as { window: unknown }).window = {
+      hermesDesktop: { updates: { apply: applyMock } }
+    }
+
+    const result = await applyUpdates()
+
+    expect(result).toMatchObject({ ok: false, error: 'updates-disabled' })
+    expect(applyMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses applyBackendUpdate()', async () => {
+    const result = await applyBackendUpdate()
+    expect(result).toMatchObject({ ok: false, error: 'updates-disabled' })
+  })
+
+  it('startUpdatePoller() does not poll', async () => {
+    const checkMock = vi.fn().mockResolvedValue(status())
+    ;(globalThis as unknown as { window: unknown }).window = {
+      hermesDesktop: { updates: { check: checkMock, onProgress: vi.fn() } },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn()
+    }
+    vi.useFakeTimers()
+
+    startUpdatePoller()
+    await vi.advanceTimersByTimeAsync(30 * 60 * 1000)
+
+    expect(checkMock).not.toHaveBeenCalled()
+    stopUpdatePoller()
   })
 })

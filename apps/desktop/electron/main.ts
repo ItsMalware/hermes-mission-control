@@ -2841,7 +2841,23 @@ async function releaseBackendLock(updateRoot, tag) {
 //
 // Detection (checkUpdates / commit changelog / "N behind") stays in the UI;
 // only this apply action changed.
+// Self-update is disabled in this fork (see src/store/updates.ts UPDATES_DISABLED).
+// `hermes update` rebuilds the desktop GUI from the upstream Nous backend
+// checkout and swaps it into /Applications, wiping our customized UI. We port
+// upstream changes by hand and reinstall via scripts/restore-ui.sh instead.
+// This is the hard backstop: even if a renderer path bypasses its guard, the
+// clobbering rebuild never runs. Delete this block to re-enable self-update.
+const SELF_UPDATE_DISABLED = true
+
 async function applyUpdates(opts = {}) {
+  if (SELF_UPDATE_DISABLED) {
+    const message = 'Self-update is disabled in this build; port upstream changes and run scripts/restore-ui.sh.'
+    rememberLog(`[updates] apply refused: ${message}`)
+    emitUpdateProgress({ stage: 'error', message, percent: null })
+
+    return { ok: false, error: 'updates-disabled', message }
+  }
+
   if (updateInFlight) {
     throw new Error('An update is already in progress.')
   }

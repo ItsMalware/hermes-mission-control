@@ -42,6 +42,28 @@ const IDLE: UpdateApplyState = {
   log: []
 }
 
+// Self-update is disabled in this fork. `hermes update` resolves its update
+// root to the upstream Nous backend checkout (~/.hermes/hermes-agent), pulls
+// upstream, then rebuilds the desktop GUI from THAT tree and swaps it into
+// /Applications — wiping our customized UI every time. We instead port upstream
+// changes into this repo by hand and reinstall via scripts/restore-ui.sh.
+//
+// isUpdatesDisabled() hard-gates every auto-check, nag, and apply entry point so
+// neither the background poller nor a stray click can trigger the clobbering
+// rebuild. The Electron main process (electron/main.ts applyUpdates) refuses as a
+// backstop even if this renderer guard is bypassed. Upstream changes are ported
+// into this fork by hand and reinstalled via scripts/restore-ui.sh — never
+// through this flow. Only tests toggle the flag (via __setUpdatesDisabledForTest)
+// to exercise the still-present machinery.
+let updatesDisabled = true
+
+export const isUpdatesDisabled = (): boolean => updatesDisabled
+
+/** Test-only: exercise the update machinery that ships disabled. */
+export const __setUpdatesDisabledForTest = (value: boolean): void => {
+  updatesDisabled = value
+}
+
 export const $desktopVersion = atom<DesktopVersionInfo | null>(null)
 export const $updateApply = atom<UpdateApplyState>(IDLE)
 export const $updateChecking = atom<boolean>(false)
@@ -142,6 +164,14 @@ function isInstallMethodToastSnoozed(): boolean {
  * doesn't nag on every thread switch.
  */
 export function reportBackendContract(contract: number | undefined): void {
+  // Self-update disabled: the "backend out of date" toast's one-click action
+  // runs the clobbering update, so never surface it in this fork.
+  if (isUpdatesDisabled()) {
+    dismissNotification(SKEW_TOAST_ID)
+
+    return
+  }
+
   if ((contract ?? 0) >= REQUIRED_BACKEND_CONTRACT) {
     dismissNotification(SKEW_TOAST_ID)
     // Backend caught up — forget any prior snooze so a future regression warns
@@ -200,6 +230,11 @@ export function reportInstallMethodWarning(message: string | undefined): void {
  * on every new commit. The snooze is persisted, so it survives relaunches too.
  */
 export function maybeNotifyUpdateAvailable(status: DesktopUpdateStatus | null) {
+  // Self-update disabled: no "update available" nag in this fork.
+  if (isUpdatesDisabled()) {
+    return
+  }
+
   if (!status || status.supported === false || status.error || !status.targetSha) {
     return
   }
@@ -385,6 +420,10 @@ export async function checkUpdates(): Promise<DesktopUpdateStatus | null> {
 }
 
 export async function applyUpdates(opts: DesktopUpdateApplyOptions = {}): Promise<DesktopUpdateApplyResult> {
+  if (isUpdatesDisabled()) {
+    return { ok: false, error: 'updates-disabled', message: 'Self-update is disabled in this build.' }
+  }
+
   const bridge = window.hermesDesktop?.updates
 
   if (!bridge) {
@@ -548,6 +587,10 @@ function ingestBackendActionStatus(status: Awaited<ReturnType<typeof getActionSt
 }
 
 export async function applyBackendUpdate(): Promise<DesktopUpdateApplyResult> {
+  if (isUpdatesDisabled()) {
+    return { ok: false, error: 'updates-disabled', message: 'Self-update is disabled in this build.' }
+  }
+
   dismissNotification(UPDATE_TOAST_ID)
   $backendUpdateApply.set({
     ...IDLE,
@@ -667,6 +710,11 @@ let lastConnectionMode: string | undefined
 
 /** Wire up background polling + progress streaming. Idempotent. */
 export function startUpdatePoller(): void {
+  // Self-update disabled: don't poll, nag, or stream update progress at all.
+  if (isUpdatesDisabled()) {
+    return
+  }
+
   if (pollerStarted || typeof window === 'undefined') {
     return
   }
