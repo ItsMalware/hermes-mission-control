@@ -323,6 +323,8 @@ export const ja = defineLocale({
       terminalFontReset: '既定値を使用',
       translucencyTitle: 'ウィンドウの透過',
       translucencyDesc: 'ウィンドウ全体を透過させてデスクトップを表示します。macOS と Windows のみ。',
+      userBubbleTitle: 'メッセージの吹き出し',
+      userBubbleDesc: '自分のメッセージの透け具合。0 で不透明、100 で輪郭だけが残ります。',
       backdropTitle: 'チャット背景',
       backdropDesc: '会話の背後に表示される淡い彫像の画像。',
       reactionsTitle: 'メッセージリアクション',

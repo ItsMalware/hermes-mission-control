@@ -355,6 +355,8 @@ export interface Translations {
       terminalFontReset: string
       translucencyTitle: string
       translucencyDesc: string
+      userBubbleTitle: string
+      userBubbleDesc: string
       backdropTitle: string
       backdropDesc: string
       reactionsTitle: string

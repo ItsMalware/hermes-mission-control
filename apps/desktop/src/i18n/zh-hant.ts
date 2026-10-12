@@ -315,6 +315,8 @@ export const zhHant = defineLocale({
       terminalFontReset: '使用預設字型',
       translucencyTitle: '視窗透明',
       translucencyDesc: '讓整個視窗透出桌面。僅支援 macOS 與 Windows。',
+      userBubbleTitle: '訊息氣泡',
+      userBubbleDesc: '你自己訊息的透明程度。0 為不透明；100 時只保留輪廓。',
       backdropTitle: '聊天背景',
       backdropDesc: '對話後方那張淡淡的雕像圖片。',
       reactionsTitle: '訊息回應',

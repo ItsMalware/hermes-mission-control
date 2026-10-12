@@ -439,6 +439,8 @@ export const zh: Translations = {
       terminalFontReset: '使用默认字体',
       translucencyTitle: '窗口透明',
       translucencyDesc: '让整个窗口透出桌面。仅支持 macOS 和 Windows。',
+      userBubbleTitle: '消息气泡',
+      userBubbleDesc: '你自己消息的透明程度。0 为不透明；100 时只保留轮廓。',
       backdropTitle: '聊天背景',
       backdropDesc: '对话后方那张淡淡的雕像图片。',
       reactionsTitle: '消息回应',

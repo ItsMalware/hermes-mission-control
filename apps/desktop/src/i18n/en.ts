@@ -447,6 +447,8 @@ export const en: Translations = {
       terminalFontReset: 'Use default',
       translucencyTitle: 'Window Translucency',
       translucencyDesc: 'See your desktop through the whole window. macOS and Windows only.',
+      userBubbleTitle: 'Message Bubble',
+      userBubbleDesc: 'How see-through your own messages are. Solid at 0; only the outline remains at 100.',
       backdropTitle: 'Chat Backdrop',
       backdropDesc: 'The faint statue image behind the conversation.',
       reactionsTitle: 'Message Reactions',
