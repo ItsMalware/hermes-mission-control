@@ -391,6 +391,13 @@ export const ar = defineLocale({
     appearance: {
       title: 'المظهر',
       intro: 'خصص مظهر Hermes Desktop.',
+      chatFontTitle: 'خط المحادثة',
+      chatFontDesc:
+        'اختر خطًا مثبتًا للمحادثة ولبقية التطبيق. مفيد للخطوط سهلة القراءة مثل OpenDyslexic؛ اتركه فارغًا لاستخدام خط السمة.',
+      chatFontPlaceholder: 'OpenDyslexic أو سلسلة خطوط CSS',
+      chatFontPreview: 'معاينة',
+      chatFontSample: 'نص تجريبي للخط ABC أ ب ج 0123456789',
+      chatFontReset: 'استخدام خط السمة',
       colorMode: 'نمط الألوان',
       colorModeDesc: 'اختر الوضع الفاتح أو الداكن أو اتبع النظام.',
       toolViewTitle: 'عرض الأدوات',
@@ -627,6 +634,11 @@ export const ar = defineLocale({
       emptyDesc: 'لا يحتوي هذا القسم على إعدادات قابلة للتعديل.',
       failedLoad: 'فشل تحميل الإعدادات',
       autosaveFailed: 'فشل الحفظ التلقائي',
+      minimizeToTrayTitle: 'التصغير إلى شريط النظام',
+      minimizeToTrayDesc:
+        'عند تصغير النوافذ أو إغلاق النافذة الرئيسية، يتم إخفاؤها في شريط النظام (شريط القوائم على macOS) مع إبقاء Hermes قيد التشغيل. للخروج استخدم «إنهاء Hermes» من قائمة الشريط أو Cmd+Q. معطّل افتراضيًا وينطبق على هذا الجهاز فقط.',
+      minimizeToTrayUnavailable:
+        'شريط النظام غير متاح. ستُصغّر النوافذ وتُغلق بشكل طبيعي. أوقف هذا الخيار ثم شغّله لإعادة المحاولة.',
       imported: 'تم استيراد الإعدادات',
       invalidJson: 'JSON غير صالح'
     },
@@ -2139,6 +2151,15 @@ export const ar = defineLocale({
   },
   preview: {
     tab: 'معاينة',
+    newTab: 'علامة تبويب جديدة',
+    newBrowserTab: 'علامة تبويب متصفح جديدة',
+    browserBack: 'رجوع',
+    browserForward: 'تقدم',
+    browserReload: 'إعادة تحميل',
+    browserStop: 'إيقاف',
+    browserAddressPlaceholder: 'ابحث أو أدخل عنوانًا',
+    browserCopyUrl: 'نسخ العنوان',
+    browserPopOut: 'فتح في نافذة جديدة',
     closeTab: label => `إغلاق ${label}`,
     closeOthers: 'إغلاق الأخرى',
     closeToRight: 'إغلاق ما على اليمين',

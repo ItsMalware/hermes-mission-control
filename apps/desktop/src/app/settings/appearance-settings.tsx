@@ -25,7 +25,9 @@ import { installVscodeThemeFromMarketplace } from '@/themes/install'
 import type { DesktopTheme } from '@/themes/types'
 import { $marketplaceInstalls, isUserTheme, removeUserTheme } from '@/themes/user-themes'
 
+import { ChatFontSetting } from './chat-font-setting'
 import { MODE_OPTIONS } from './constants'
+import { MinimizeToTraySetting } from './minimize-to-tray-setting'
 import { PetSettings } from './pet-settings'
 import { ListRow, SectionHeading, SettingsContent } from './primitives'
 import { TerminalFontSetting } from './terminal-font-setting'
@@ -433,6 +435,8 @@ export function AppearanceSettings() {
             title={a.uiScaleTitle}
           />
 
+          <ChatFontSetting />
+
           <TerminalFontSetting />
 
           <ListRow
@@ -566,6 +570,8 @@ export function AppearanceSettings() {
             description={a.embedsDesc}
             title={a.embedsTitle}
           />
+
+          <MinimizeToTraySetting />
         </div>
       </div>
 

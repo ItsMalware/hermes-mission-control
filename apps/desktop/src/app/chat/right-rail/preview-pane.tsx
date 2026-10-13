@@ -10,9 +10,18 @@ import { Bug } from '@/lib/icons'
 import { rafCoalesce } from '@/lib/raf-coalesce'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
-import { $previewServerRestart, failPreviewServerRestart, type PreviewTarget } from '@/store/preview'
+import {
+  $previewServerRestart,
+  canPopOutBrowser,
+  commitBrowserTabLocation,
+  failPreviewServerRestart,
+  noteBrowserPage,
+  popOutBrowserTab,
+  type PreviewTarget
+} from '@/store/preview'
 
 import { ArtifactPreview } from './preview-artifact'
+import { PreviewBrowserBar } from './preview-browser-bar'
 import {
   clampConsoleHeight,
   compactUrl,
@@ -25,12 +34,19 @@ import { type ConsoleEntry, createPreviewConsoleState } from './preview-console-
 import { LocalFilePreview, PreviewEmptyState } from './preview-file'
 
 type PreviewWebview = HTMLElement & {
+  canGoBack?: () => boolean
+  canGoForward?: () => boolean
   closeDevTools?: () => void
+  getTitle?: () => string
   getURL?: () => string
+  goBack?: () => void
+  goForward?: () => void
   isDevToolsOpened?: () => boolean
+  loadURL?: (url: string) => void
   openDevTools?: () => void
   reload?: () => void
   reloadIgnoringCache?: () => void
+  stop?: () => void
 }
 
 interface PreviewPaneProps {
@@ -38,6 +54,9 @@ interface PreviewPaneProps {
   onRestartServer?: (url: string, context?: string) => Promise<string>
   reloadRequest?: number
   setTitlebarToolGroup?: SetTitlebarToolGroup
+  /** The owning tab's id — required for Browser tabs so live navigation can be
+   *  tracked and persisted back onto the right tab (ids are unique per tab). */
+  tabId?: string
   target: PreviewTarget
 }
 
@@ -49,6 +68,23 @@ interface PreviewLoadErrorState {
 
 const FILE_RELOAD_DEBOUNCE_MS = 200
 const SERVER_RESTART_TIMEOUT_MS = 45_000
+
+// Webview guests present a plain-Chrome User-Agent: Electron's default UA carries
+// `Hermes Mission Control/<v>` and `Electron/<v>` tokens that anti-bot services
+// (Cloudflare on LinkedIn, Google, etc.) flag as automation and 403. Strip only
+// those two tokens from the real UA, so the Chrome/AppleWebKit/platform versions
+// still match this exact engine (a mismatched hardcoded version is itself a tell).
+// Remove every non-standard product token after "(KHTML, like Gecko)" up to
+// "Chrome/", plus a trailing "Electron/…" — Electron injects the app name
+// ("Hermes/3.0.0") there AND an Electron token after Chrome, both of which
+// anti-bot services flag. What's left is a pristine Chrome UA whose
+// Chrome/AppleWebKit/platform versions still match this exact engine.
+const BROWSER_USER_AGENT =
+  typeof navigator !== 'undefined'
+    ? navigator.userAgent
+        .replace(/(\(KHTML, like Gecko\) )(?:(?!Chrome\/)\S+ )+/, '$1')
+        .replace(/ Electron\/\S+/g, '')
+    : ''
 
 function loadErrorTitle(error: PreviewLoadErrorState, copy: Translations['preview']['web']): string {
   const description = error.description.toLowerCase()
@@ -127,10 +163,14 @@ export function PreviewPane({
   onRestartServer,
   reloadRequest = 0,
   setTitlebarToolGroup,
+  tabId,
   target
 }: PreviewPaneProps) {
   const { t } = useI18n()
   const copy = t.preview.web
+  const isBrowser = target.browser === true
+  const [canGoBack, setCanGoBack] = useState(false)
+  const [canGoForward, setCanGoForward] = useState(false)
   const [consoleState] = useState(() => createPreviewConsoleState())
   const consoleBodyRef = useRef<HTMLDivElement | null>(null)
   const consoleShouldStickRef = useRef(true)
@@ -519,6 +559,8 @@ export function PreviewPane({
     host.replaceChildren()
     webviewRef.current = null
     setCurrentUrl(target.url)
+    setCanGoBack(false)
+    setCanGoForward(false)
     setDevtoolsOpen(false)
     setLoadError(null)
     consoleState.reset()
@@ -533,6 +575,11 @@ export function PreviewPane({
     const webview = document.createElement('webview') as PreviewWebview
     webview.className = 'flex h-full w-full flex-1 bg-transparent'
     webview.setAttribute('partition', 'persist:hermes-preview')
+
+    if (BROWSER_USER_AGENT) {
+      webview.setAttribute('useragent', BROWSER_USER_AGENT)
+    }
+
     webview.setAttribute('src', target.url)
     webview.setAttribute('webpreferences', 'contextIsolation=yes,nodeIntegration=no,sandbox=yes')
 
@@ -562,12 +609,29 @@ export function PreviewPane({
       }
     }
 
+    const syncBrowserChrome = (url?: string) => {
+      setCanGoBack(Boolean(webview.canGoBack?.()))
+      setCanGoForward(Boolean(webview.canGoForward?.()))
+
+      if (isBrowser && tabId) {
+        noteBrowserPage(tabId, { title: webview.getTitle?.() || '', url: url || webview.getURL?.() || '' })
+      }
+    }
+
     const onNavigate = (event: Event) => {
       const detail = event as Event & { url?: string }
 
       if (detail.url) {
         setLoadError(null)
         setCurrentUrl(detail.url)
+      }
+
+      syncBrowserChrome(detail.url)
+    }
+
+    const onTitle = () => {
+      if (isBrowser && tabId) {
+        noteBrowserPage(tabId, { title: webview.getTitle?.() || '', url: webview.getURL?.() || '' })
       }
     }
 
@@ -603,6 +667,7 @@ export function PreviewPane({
     webview.addEventListener('did-fail-load', onFail)
     webview.addEventListener('did-navigate', onNavigate)
     webview.addEventListener('did-navigate-in-page', onNavigate)
+    webview.addEventListener('page-title-updated', onTitle)
     webview.addEventListener('did-start-loading', onStart)
     webview.addEventListener('did-stop-loading', onStop)
     host.appendChild(webview)
@@ -613,11 +678,19 @@ export function PreviewPane({
       webview.removeEventListener('did-fail-load', onFail)
       webview.removeEventListener('did-navigate', onNavigate)
       webview.removeEventListener('did-navigate-in-page', onNavigate)
+      webview.removeEventListener('page-title-updated', onTitle)
       webview.removeEventListener('did-start-loading', onStart)
       webview.removeEventListener('did-stop-loading', onStop)
+
+      // A Browser tab mounts only while active (the rail shows one webview), so
+      // persist where it settled before teardown — re-selecting reopens there.
+      if (isBrowser && tabId) {
+        commitBrowserTabLocation(tabId, webview.getURL?.() || '', webview.getTitle?.())
+      }
+
       webview.remove()
     }
-  }, [appendConsoleEntry, consoleState, copy, isWebPreview, target.url])
+  }, [appendConsoleEntry, consoleState, copy, isBrowser, isWebPreview, tabId, target.url])
 
   return (
     <aside className="relative flex h-full w-full min-w-0 flex-col overflow-hidden bg-transparent text-muted-foreground">
@@ -637,6 +710,32 @@ export function PreviewPane({
               </Tip>
             </div>
           </div>
+        )}
+
+        {isBrowser && (
+          <PreviewBrowserBar
+            canGoBack={canGoBack}
+            canGoForward={canGoForward}
+            loading={loading}
+            onBack={() => webviewRef.current?.goBack?.()}
+            onForward={() => webviewRef.current?.goForward?.()}
+            onNavigate={url => webviewRef.current?.loadURL?.(url)}
+            onPopOut={tabId && canPopOutBrowser() ? () => popOutBrowserTab(tabId) : undefined}
+            onReloadOrStop={() => {
+              const webview = webviewRef.current
+
+              if (!webview) {
+                return
+              }
+
+              if (loading) {
+                webview.stop?.()
+              } else {
+                webview.reload?.()
+              }
+            }}
+            url={currentUrl}
+          />
         )}
 
         <div

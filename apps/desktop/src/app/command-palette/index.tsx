@@ -68,6 +68,7 @@ import {
 import { $bindings, bindingsFor } from '@/store/keybinds'
 import { $dismissedAutoProjectIds, filterVisibleProjects } from '@/store/layout'
 import { openPetGenerate } from '@/store/pet-generate'
+import { newBrowserTab } from '@/store/preview'
 import { $projectTree, goToProject, openFolderAsProject, requestStartWorkSession } from '@/store/projects'
 import { $connection } from '@/store/session'
 import { runGatewayRestart } from '@/store/system-actions'
@@ -756,6 +757,13 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
             keywords: ['chat', 'create'],
             label: cc.nav.newChat.title,
             run: go(NEW_CHAT_ROUTE)
+          },
+          {
+            icon: Globe,
+            id: 'nav-new-browser',
+            keywords: ['browser', 'web', 'url', 'internet', 'open', 'tab'],
+            label: t.preview.newBrowserTab,
+            run: () => void newBrowserTab()
           },
           ...(canOpenNewWindow()
             ? [

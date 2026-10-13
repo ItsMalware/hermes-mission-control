@@ -48,6 +48,13 @@ import {
 import { waitForDashboardPortAnnouncement } from './backend-ready'
 import { shouldLatchBackendStartFailure, shouldLatchRemoteReauthFailure } from './backend-start-failure'
 import { detectRemoteDisplay, isWindowsBinaryPathInWsl, isWslEnvironment } from './bootstrap-platform'
+import {
+  BROWSER_WINDOW_HEIGHT,
+  BROWSER_WINDOW_MIN_HEIGHT,
+  BROWSER_WINDOW_MIN_WIDTH,
+  BROWSER_WINDOW_WIDTH,
+  buildBrowserWindowUrl
+} from './browser-windows'
 import { decideBootstrapRepair } from './bootstrap-repair-guard'
 import { runBootstrap } from './bootstrap-runner'
 import { applyConnectionChange, resolveTerminalConnection } from './connection-apply'
@@ -160,6 +167,7 @@ import { FirstRunSetupResetError, runPrimaryBackendStartup } from './primary-bac
 import { rehomePrimaryConnection } from './primary-connection-rehome'
 import { decideProfileDeleteAction, profileNameFromDeleteRequest, resolveRouteProfile } from './profile-delete-routing'
 import { fetchPrimaryProfileSessions } from './profile-session-routing'
+import { createMinimizeToTray } from './minimize-to-tray'
 import { createQuickEntryShortcut, quickEntryWindowBounds, sanitizeQuickEntrySettings } from './quick-entry'
 import { type ActiveWork, mergeActiveWork, normalizeActiveWork, quitPromptFor } from './quit-guard'
 import * as remoteLifecycle from './remote-lifecycle'
@@ -2616,6 +2624,23 @@ let isQuittingForHandoff = false
 // (the app.quit() that follows re-enters before-quit and must pass through).
 let quitPromptOpen = false
 let quitConfirmedWithActiveWork = false
+
+// Minimize/close-to-tray (device-local, off by default). Closures resolve
+// their window/icon references lazily, so instantiating here — before the
+// windows exist — is fine; registerWindow() is called after each window is
+// built and start() reads the persisted preference once the main window is up.
+const minimizeToTray = createMinimizeToTray({
+  preferencesPath: path.join(app.getPath('userData'), 'minimize-to-tray.json'),
+  getIconPath: () => APP_ICON_PATHS.find(candidate => fileExists(candidate)),
+  restoreMainWindow: () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show()
+      focusWindow(mainWindow)
+    }
+  },
+  isQuittingForHandoff: () => isQuittingForHandoff,
+  log: message => rememberLog(message)
+})
 
 // Resolve the staged updater binary the desktop may hand an update to. On
 // Windows that binary owns ALL repo mutation — running `hermes update` +
@@ -9287,6 +9312,12 @@ function createWindow() {
     webPreferences: chatWindowWebPreferences(PRELOAD_PATH)
   })
 
+  // Closing the main window hides it to the tray when the feature is enabled;
+  // start() reads the persisted (off-by-default) preference. Both are no-ops
+  // until the user turns it on in Settings → Appearance.
+  minimizeToTray.registerWindow(mainWindow, { closeToTray: true })
+  void minimizeToTray.start()
+
   if (IS_MAC) {
     mainWindow.setWindowButtonPosition?.(WINDOW_BUTTON_POSITION)
 
@@ -10819,6 +10850,55 @@ ipcMain.handle('hermes:openPreviewInBrowser', async (_event, url) => {
   }
 })
 
+// Popped-out in-app Browser windows (standalone address bar + webview). A
+// strong reference keeps an open window alive; it drops on close.
+const browserPopoutWindows = new Set<any>()
+
+function createBrowserPopoutWindow(url: string) {
+  const win = new BrowserWindow({
+    width: BROWSER_WINDOW_WIDTH,
+    height: BROWSER_WINDOW_HEIGHT,
+    minWidth: BROWSER_WINDOW_MIN_WIDTH,
+    minHeight: BROWSER_WINDOW_MIN_HEIGHT,
+    title: 'Hermes Browser',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: getTitleBarOverlayOptions(),
+    trafficLightPosition: IS_MAC ? WINDOW_BUTTON_POSITION : undefined,
+    opacity: windowOpacity(),
+    icon: getAppIconPath(),
+    show: false,
+    backgroundColor: getWindowBackgroundColor(),
+    webPreferences: chatWindowWebPreferences(PRELOAD_PATH)
+  })
+
+  browserPopoutWindows.add(win)
+  minimizeToTray.registerWindow(win)
+  wireCommonWindowHandlers(win, zoomWiringForWindowKind('chat'))
+  win.once('ready-to-show', () => {
+    if (!win.isDestroyed()) {
+      win.show()
+    }
+  })
+  win.on('closed', () => browserPopoutWindows.delete(win))
+
+  loadWindowUrl(
+    win,
+    buildBrowserWindowUrl(url, {
+      devServer: DEV_SERVER,
+      rendererIndexPath: DEV_SERVER ? undefined : resolveRendererIndex()
+    }),
+    'Browser window'
+  )
+
+  return win
+}
+
+ipcMain.handle('hermes:browser-popout:open', (_event, url) => {
+  createBrowserPopoutWindow(typeof url === 'string' && url.trim() ? url : 'about:blank')
+
+  return true
+})
+
 // User-configurable default project directory. The renderer reads this on
 // settings mount and seeds the value into the picker; writing back persists
 // it via writeDefaultProjectDir so resolveHermesCwd picks it up on the next
@@ -11998,6 +12078,10 @@ app.on('before-quit', event => {
   if (heldQuitForActiveWork(event)) {
     return
   }
+
+  // The active-work guard accepted the quit: stop hiding windows to the tray
+  // so teardown can close them for real.
+  minimizeToTray.beginQuit()
 
   if ((sshConnections.size > 0 || sshBootstrapCoordinator.promises().length > 0) && !sshQuitTeardownDone) {
     event.preventDefault()

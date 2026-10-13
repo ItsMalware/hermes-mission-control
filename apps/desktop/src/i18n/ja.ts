@@ -321,6 +321,13 @@ export const ja = defineLocale({
       terminalFontPlaceholder: 'MesloLGS NF または CSS フォントスタック',
       terminalFontPreview: 'グリフのプレビュー',
       terminalFontReset: '既定値を使用',
+      chatFontTitle: 'チャットフォント',
+      chatFontDesc:
+        'チャットとアプリ全体に使うインストール済みフォントを選択します。OpenDyslexic などの読みやすいフォントに便利です。空欄ならテーマのフォントを使います。',
+      chatFontPlaceholder: 'OpenDyslexic または CSS フォントスタック',
+      chatFontPreview: 'プレビュー',
+      chatFontSample: 'いろはにほへと ちりぬるを 0123456789',
+      chatFontReset: 'テーマのフォントを使用',
       translucencyTitle: 'ウィンドウの透過',
       translucencyDesc: 'ウィンドウ全体を透過させてデスクトップを表示します。macOS と Windows のみ。',
       userBubbleTitle: 'メッセージの吹き出し',
@@ -660,6 +667,11 @@ export const ja = defineLocale({
       emptyDesc: 'このセクションには調整できる設定がありません。',
       failedLoad: '設定の読み込みに失敗しました',
       autosaveFailed: '自動保存に失敗しました',
+      minimizeToTrayTitle: 'トレイに最小化',
+      minimizeToTrayDesc:
+        'ウィンドウの最小化やメインウィンドウを閉じる操作でシステムトレイ（macOS ではメニューバー）に隠し、Hermes を実行し続けます。終了するにはトレイメニューの「Hermes を終了」または Cmd+Q を使います。初期設定はオフで、このデバイスにのみ適用されます。',
+      minimizeToTrayUnavailable:
+        'システムトレイを利用できないため、通常どおり最小化・終了します。再試行するには一度オフにしてからオンにしてください。',
       imported: '設定をインポートしました',
       invalidJson: '設定 JSON が無効です',
       keepAwakeTitle: 'コンピューターをスリープさせない',
@@ -2393,6 +2405,15 @@ export const ja = defineLocale({
 
   preview: {
     tab: 'プレビュー',
+    newTab: '新しいタブ',
+    newBrowserTab: '新しいブラウザタブ',
+    browserBack: '戻る',
+    browserForward: '進む',
+    browserReload: '再読み込み',
+    browserStop: '停止',
+    browserAddressPlaceholder: '検索またはアドレスを入力',
+    browserCopyUrl: 'URL をコピー',
+    browserPopOut: '新しいウィンドウで開く',
     closeTab: label => `${label} を閉じる`,
     closeOthers: '他を閉じる',
     closeToRight: '右側を閉じる',

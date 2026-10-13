@@ -149,6 +149,14 @@ declare global {
       setKeepAwake?: (on: boolean) => void
       setPreviewShortcutActive?: (active: boolean) => void
       openExternal: (url: string) => Promise<void>
+      browserPopout?: {
+        open: (url: string) => Promise<boolean>
+      }
+      minimizeToTray?: {
+        get: () => Promise<{ enabled: boolean; available: boolean }>
+        set: (on: boolean) => Promise<{ enabled: boolean; available: boolean }>
+        onChanged: (callback: (status: { enabled: boolean; available: boolean }) => void) => () => void
+      }
       pluginSetting: {
         get: (key: string) => Promise<unknown>
         set: (key: string, value: unknown) => Promise<{ ok: boolean }>

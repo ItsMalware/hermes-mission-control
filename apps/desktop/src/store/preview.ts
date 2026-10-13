@@ -1,5 +1,6 @@
 import { atom, computed } from 'nanostores'
 
+import { translateNow } from '@/i18n'
 import { persistentAtom } from '@/lib/persisted'
 import { normalize } from '@/lib/text'
 
@@ -21,6 +22,11 @@ import { setPaneOpen } from './panes'
 
 export interface PreviewTarget {
   binary?: boolean
+  /** A user-opened Browser tab (address bar + back/forward), as opposed to a
+   *  fixed `url` preview handed over by a tool or link. Browser tabs get a
+   *  unique id (see {@link newBrowserTab}) so several can coexist, and the user
+   *  navigates them freely; their live location is tracked in {@link $browserPages}. */
+  browser?: boolean
   byteSize?: number
   /** Inline image bytes (a `data:` URL) when the renderer already holds them —
    * e.g. a pasted/dropped screenshot whose only on-disk copy is a transient
@@ -180,6 +186,127 @@ export function openPreview(target: PreviewTarget, source: PreviewRecordSource =
   $previewOpenRequest.set($previewOpenRequest.get() + 1)
 }
 
+// ── In-app Browser ─────────────────────────────────────────────────────────
+// A Browser tab is a `url` tab the user drives (address bar + back/forward),
+// as opposed to a fixed `url` preview a tool handed over. It gets a unique id
+// so several can coexist, and its live location is tracked here rather than in
+// the target (the pane builds its webview from `target.url`, so folding every
+// in-page hop back into the target would tear the guest down).
+
+export interface BrowserPage {
+  title: string
+  url: string
+}
+
+/** What each Browser tab is SHOWING right now (live navigation). Memory-only —
+ *  a restored tab reports again on its first load. */
+export const $browserPages = atom<Record<string, BrowserPage>>({})
+
+export function noteBrowserPage(tabId: string, page: BrowserPage) {
+  const current = $browserPages.get()[tabId]
+
+  if (current?.title === page.title && current.url === page.url) {
+    return
+  }
+
+  $browserPages.set({ ...$browserPages.get(), [tabId]: page })
+}
+
+export function forgetBrowserPage(tabId: string) {
+  const { [tabId]: gone, ...rest } = $browserPages.get()
+
+  if (gone) {
+    $browserPages.set(rest)
+  }
+}
+
+/** Persist the location a Browser tab settled on back onto its tab, so a reload
+ *  (or a pop-out hand-off) reopens where the user left it and the tab label
+ *  tracks the page title. Not called for every in-page hop — only settle points. */
+export function commitBrowserTabLocation(tabId: string, url: string, title?: string) {
+  const nextUrl = url.trim()
+
+  if (!tabId || !nextUrl) {
+    return
+  }
+
+  const tabs = $previewTabs.get()
+  const index = tabs.findIndex(tab => tab.id === tabId)
+
+  if (index === -1) {
+    return
+  }
+
+  const tab = tabs[index]
+  const nextTitle = title?.trim()
+
+  if (tab.target.kind !== 'url' || (tab.target.url === nextUrl && (!nextTitle || tab.target.label === nextTitle))) {
+    return
+  }
+
+  $previewTabs.set(
+    tabs.map((item, i) =>
+      i === index
+        ? { ...item, target: { ...item.target, ...(nextTitle ? { label: nextTitle } : {}), url: nextUrl } }
+        : item
+    )
+  )
+}
+
+export const BROWSER_HOME_URL = 'about:blank'
+
+let browserTabSeq = 0
+
+function nextBrowserTabId(): RightRailTabId {
+  browserTabSeq += 1
+
+  return `url:browser-${Date.now().toString(36)}-${browserTabSeq}`
+}
+
+/** Open a fresh in-app Browser tab (address bar + back/forward), not tied to
+ *  any chat artifact. Returns the new tab id. */
+export function newBrowserTab(url: string = BROWSER_HOME_URL): RightRailTabId {
+  const id = nextBrowserTabId()
+  const target: PreviewTarget = { browser: true, kind: 'url', label: translateNow('preview.newTab'), source: id, url }
+
+  $previewTabs.set([...$previewTabs.get(), { id, target }])
+  setPaneOpen(PREVIEW_PANE_ID, true)
+  selectRightRailTab(id)
+  $previewOpenRequest.set($previewOpenRequest.get() + 1)
+
+  return id
+}
+
+/** True when the main process can host a standalone Browser window. */
+export function canPopOutBrowser(): boolean {
+  return typeof window !== 'undefined' && Boolean(window.hermesDesktop?.browserPopout)
+}
+
+/** Pop a Browser tab into its own OS window (standalone address bar + webview)
+ *  at its current location, then dock the tab closed — a clean hand-off that
+ *  avoids syncing tab state across windows. */
+export function popOutBrowserTab(tabId: string) {
+  const bridge = typeof window !== 'undefined' ? window.hermesDesktop?.browserPopout : undefined
+
+  if (!bridge) {
+    return
+  }
+
+  const tab = $previewTabs.get().find(item => item.id === tabId)
+
+  if (!tab || tab.target.kind !== 'url') {
+    return
+  }
+
+  const url = $browserPages.get()[tabId]?.url || tab.target.url
+
+  void bridge.open(url).then(ok => {
+    if (ok) {
+      closeRightRailTab(tab.id)
+    }
+  })
+}
+
 export function closeRightRailTab(tabId: RightRailTabId) {
   const current = $previewTabs.get()
   const index = current.findIndex(tab => tab.id === tabId)
@@ -187,6 +314,8 @@ export function closeRightRailTab(tabId: RightRailTabId) {
   if (index === -1) {
     return
   }
+
+  forgetBrowserPage(tabId)
 
   const next = current.filter(tab => tab.id !== tabId)
 

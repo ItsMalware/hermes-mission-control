@@ -445,6 +445,13 @@ export const en: Translations = {
       terminalFontPlaceholder: 'MesloLGS NF or a CSS font stack',
       terminalFontPreview: 'Glyph preview',
       terminalFontReset: 'Use default',
+      chatFontTitle: 'Chat Font',
+      chatFontDesc:
+        "Choose an installed font for chat and the rest of the app. Handy for readability faces such as OpenDyslexic; leave blank to use the theme's font.",
+      chatFontPlaceholder: 'OpenDyslexic or a CSS font stack',
+      chatFontPreview: 'Preview',
+      chatFontSample: 'The quick brown fox jumps over the lazy dog. 0123456789',
+      chatFontReset: 'Use theme font',
       translucencyTitle: 'Window Translucency',
       translucencyDesc: 'See your desktop through the whole window. macOS and Windows only.',
       userBubbleTitle: 'Message Bubble',
@@ -561,6 +568,11 @@ export const en: Translations = {
       emptyDesc: 'This section has no adjustable settings.',
       failedLoad: 'Settings failed to load',
       autosaveFailed: 'Autosave failed',
+      minimizeToTrayTitle: 'Minimize to tray',
+      minimizeToTrayDesc:
+        'Minimize windows or close the main window to hide them in the system tray (menu bar on macOS) and keep Hermes running. Use Quit Hermes from the tray menu or Cmd+Q to exit. Off by default; applies only to this device.',
+      minimizeToTrayUnavailable:
+        'The system tray is unavailable. Windows will minimize and close normally. Turn this off and on to retry.',
       imported: 'Config imported',
       invalidJson: 'Invalid config JSON',
       keepAwakeTitle: 'Keep computer awake',
@@ -2569,6 +2581,15 @@ export const en: Translations = {
 
   preview: {
     tab: 'Preview',
+    newTab: 'New Tab',
+    newBrowserTab: 'New browser tab',
+    browserBack: 'Back',
+    browserForward: 'Forward',
+    browserReload: 'Reload',
+    browserStop: 'Stop',
+    browserAddressPlaceholder: 'Search or enter address',
+    browserCopyUrl: 'Copy URL',
+    browserPopOut: 'Open in new window',
     closeTab: label => `Close ${label}`,
     closeOthers: 'Close others',
     closeToRight: 'Close to the right',

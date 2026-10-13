@@ -353,6 +353,12 @@ export interface Translations {
       terminalFontPlaceholder: string
       terminalFontPreview: string
       terminalFontReset: string
+      chatFontTitle: string
+      chatFontDesc: string
+      chatFontPlaceholder: string
+      chatFontPreview: string
+      chatFontSample: string
+      chatFontReset: string
       translucencyTitle: string
       translucencyDesc: string
       userBubbleTitle: string
@@ -464,6 +470,9 @@ export interface Translations {
       emptyDesc: string
       failedLoad: string
       autosaveFailed: string
+      minimizeToTrayTitle: string
+      minimizeToTrayDesc: string
+      minimizeToTrayUnavailable: string
       imported: string
       invalidJson: string
       keepAwakeTitle: string
@@ -2167,6 +2176,15 @@ export interface Translations {
 
   preview: {
     tab: string
+    newTab: string
+    newBrowserTab: string
+    browserBack: string
+    browserForward: string
+    browserReload: string
+    browserStop: string
+    browserAddressPlaceholder: string
+    browserCopyUrl: string
+    browserPopOut: string
     closeTab: (label: string) => string
     closeOthers: string
     closeToRight: string

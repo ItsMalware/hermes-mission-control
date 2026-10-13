@@ -41,7 +41,9 @@ if (import.meta.env.MODE !== 'production' || import.meta.env.VITE_PERF_PROBE ===
 
 const winParam = new URLSearchParams(window.location.search).get('win')
 
-if (winParam === 'overlay') {
+if (winParam === 'browser') {
+  void import('./app/chat/browser-popout-shell').then(({ mountBrowserPopout }) => mountBrowserPopout())
+} else if (winParam === 'overlay') {
   void import('./app/pet-overlay/overlay-root').then(({ mountPetOverlay }) => mountPetOverlay())
 } else if (winParam === 'quick') {
   void import('./app/quick-entry/quick-entry-root').then(({ mountQuickEntry }) => mountQuickEntry())

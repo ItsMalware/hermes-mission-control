@@ -138,6 +138,19 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   setKeepAwake: on => ipcRenderer.send('hermes:keep-awake', on),
   setPreviewShortcutActive: active => ipcRenderer.send('hermes:previewShortcutActive', Boolean(active)),
   openExternal: url => ipcRenderer.invoke('hermes:openExternal', url),
+  browserPopout: {
+    open: url => ipcRenderer.invoke('hermes:browser-popout:open', url)
+  },
+  minimizeToTray: {
+    get: () => ipcRenderer.invoke('hermes:minimize-to-tray:get'),
+    set: on => ipcRenderer.invoke('hermes:minimize-to-tray:set', on),
+    onChanged: callback => {
+      const listener = (_event, status) => callback(status)
+      ipcRenderer.on('hermes:minimize-to-tray:changed', listener)
+
+      return () => ipcRenderer.removeListener('hermes:minimize-to-tray:changed', listener)
+    }
+  },
   pluginSetting: {
     get: (key: string) => ipcRenderer.invoke('hermes:plugin:getSetting', key),
     set: (key: string, value: unknown) => ipcRenderer.invoke('hermes:plugin:setSetting', key, value),

@@ -23,6 +23,7 @@ import {
   closeRightRail,
   closeRightRailTab,
   closeRightRailTabsToRight,
+  newBrowserTab,
   type PreviewTarget
 } from '@/store/preview'
 import { $dirtyPreviewUrls } from '@/store/preview-edit'
@@ -144,6 +145,16 @@ export function ChatPreviewRail({ onRestartServer, setTitlebarToolGroup }: ChatP
             )
           })}
         </div>
+        <Tip label={t.preview.newBrowserTab}>
+          <button
+            aria-label={t.preview.newBrowserTab}
+            className="ml-0.5 grid size-6 shrink-0 self-center place-items-center rounded-md text-(--ui-text-tertiary) transition-colors hover:bg-(--ui-control-hover-background) hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring [-webkit-app-region:no-drag]"
+            onClick={() => newBrowserTab()}
+            type="button"
+          >
+            <Codicon name="add" size="0.75rem" />
+          </button>
+        </Tip>
         <button
           aria-label={t.preview.closePane}
           className="mr-1.5 grid size-6 shrink-0 self-center place-items-center rounded-md text-(--ui-text-tertiary) opacity-0 transition-opacity hover:bg-(--ui-control-hover-background) hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-hover/rail-tabs:opacity-100 [-webkit-app-region:no-drag]"
@@ -160,6 +171,7 @@ export function ChatPreviewRail({ onRestartServer, setTitlebarToolGroup }: ChatP
           onRestartServer={isPreview ? onRestartServer : undefined}
           reloadRequest={previewReloadRequest}
           setTitlebarToolGroup={setTitlebarToolGroup}
+          tabId={activeTab.id}
           target={activeTab.target}
         />
       </div>
