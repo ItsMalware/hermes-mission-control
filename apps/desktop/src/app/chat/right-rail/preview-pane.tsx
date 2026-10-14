@@ -580,6 +580,13 @@ export function PreviewPane({
       webview.setAttribute('useragent', BROWSER_USER_AGENT)
     }
 
+    // Browser tabs let pages open popups (sign-in / SSO windows); the main
+    // process routes those http(s) window.open calls into real child windows
+    // (see web-contents-created handler). Tool/file previews stay popup-free.
+    if (isBrowser) {
+      webview.setAttribute('allowpopups', 'true')
+    }
+
     webview.setAttribute('src', target.url)
     webview.setAttribute('webpreferences', 'contextIsolation=yes,nodeIntegration=no,sandbox=yes')
 

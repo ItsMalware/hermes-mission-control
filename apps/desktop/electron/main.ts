@@ -11958,6 +11958,49 @@ app.whenReady().then(() => {
   installMediaPermissions()
   registerMediaProtocol()
   installEmbedReferer()
+
+  // In-app Browser: pin the webview guest session to a clean Chrome User-Agent
+  // (same strip as the renderer, but on the SESSION so window.open popups —
+  // which don't inherit the per-webview `useragent` attribute — are clean too),
+  // and turn http(s) popups into real child windows so sign-in / SSO flows
+  // (LinkedIn, Google) work. Guest webviews block popups by default, so the
+  // Browser webview also carries the `allowpopups` attribute (see preview-pane).
+  try {
+    const cleanBrowserUa = app.userAgentFallback
+      .replace(/(\(KHTML, like Gecko\) )(?:(?!Chrome\/)\S+ )+/, '$1')
+      .replace(/ Electron\/\S+/g, '')
+    session.fromPartition('persist:hermes-preview').setUserAgent(cleanBrowserUa)
+  } catch (error) {
+    rememberLog(`[browser] could not pin preview session user-agent: ${error}`)
+  }
+
+  app.on('web-contents-created', (_event, contents) => {
+    if (typeof contents.getType === 'function' && contents.getType() !== 'webview') {
+      return
+    }
+
+    contents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//i.test(url)) {
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 520,
+            height: 640,
+            autoHideMenuBar: true,
+            backgroundColor: getWindowBackgroundColor(),
+            title: 'Hermes Browser'
+          }
+        }
+      }
+
+      // Non-web schemes (mailto:, custom protocols) hand off to the OS, as the
+      // rest of the app does for external links.
+      openExternalUrl(url)
+
+      return { action: 'deny' }
+    })
+  })
+
   registerDeepLinkProtocol()
   ensureWslWindowsFonts()
   configureSpellChecker()
