@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>133 KVB Nashville — 5D Cost & Programme Model</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+  :root {
+    --bg-dark: #0f172a;
+    --bg-panel: #1e293b;
+    --bg-card: #334155;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent: #38bdf8;
+    --border: #475569;
+    --green: #10b981;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { background: var(--bg-dark); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Top Header & Tabs */
+  header {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.3px; color: #fff; }
+  .brand span { font-size: 12px; background: var(--bg-card); padding: 3px 8px; border-radius: 4px; color: var(--accent); font-weight: 600; }
+  .tabs { display: flex; gap: 6px; }
+  .tab-btn {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid transparent;
+    padding: 7px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
+  .tab-btn.active { background: var(--accent); color: #0f172a; border-color: var(--accent); }
+  .tab-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Tab Content Containers */
+  .tab-content { display: none; flex: 1; overflow: auto; padding: 16px 20px; }
+  .tab-content.active { display: flex; flex-direction: column; gap: 16px; }
+
+  /* Common UI Cards & Tables */
+  .card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .card-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--accent); display: flex; justify-content: space-between; align-items: center; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .kpi-box { background: var(--bg-card); padding: 10px 14px; border-radius: 6px; border-left: 3px solid var(--accent); }
+  .kpi-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+  .kpi-val { font-size: 18px; font-weight: 700; margin-top: 4px; }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; }
+  th { background: rgba(0,0,0,0.25); color: var(--text-muted); font-weight: 600; position: sticky; top: 0; z-index: 2; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:hover { background: rgba(255,255,255,0.03); }
+  tr.total-row { background: rgba(56, 189, 248, 0.12); font-weight: 700; border-top: 2px solid var(--accent); }
+
+  .badge { padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; display: inline-block; }
+  .bg-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+  .bg-amber { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+  .bg-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+  .bg-blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
+  /* Non-colour (glyph) cue for RAG/status so colour-blind users can read it */
+  .rag-glyph { font-weight: 700; margin-right: 3px; font-size: 11px; line-height: 1; display: inline-block; }
+  .legend-row .rag-glyph { font-size: 12px; margin-right: 2px; }
+
+  /* 5D Workspace Layout */
+  #tab-5d { padding: 10px 16px; gap: 10px; overflow: hidden; }
+  .controls-bar {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  .slider-group { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 320px; }
+  .slider-group input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+  .date-badge { background: var(--bg-dark); border: 1px solid var(--accent); color: var(--accent); padding: 4px 10px; border-radius: 5px; font-weight: 700; font-size: 13px; min-width: 110px; text-align: center; }
+  .mode-switch { display: flex; background: var(--bg-dark); border-radius: 6px; padding: 2px; border: 1px solid var(--border); }
+  .mode-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 4px; }
+  .mode-btn.active { background: var(--accent); color: #0f172a; }
+
+  .wp-toggles { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 11px; }
+  .wp-toggle { display: flex; align-items: center; gap: 4px; background: var(--bg-card); padding: 3px 8px; border-radius: 4px; cursor: pointer; user-select: none; }
+  .wp-toggle input { cursor: pointer; accent-color: var(--accent); }
+
+  .workspace-5d {
+    display: grid;
+    grid-template-columns: 42% 58%;
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+  }
+  .viewer-panel {
+    background: #090d16;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #three-container { flex: 1; width: 100%; height: 100%; position: relative; }
+  .viewer-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    pointer-events: none;
+    max-width: 270px;
+  }
+  .legend-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .swatch { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+
+  .right-5d {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+  }
+  .gantt-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    flex: 1.15;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .scurve-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    flex: 0.95;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .canvas-wrap { flex: 1; position: relative; width: 100%; height: 100%; overflow: hidden; }
+  canvas.chart-canvas { width: 100%; height: 100%; display: block; }
+  .play-btn { background: var(--bg-card); color: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; font-weight: 600; }
+  .play-btn:hover { background: var(--accent); color: #000; }
+  .play-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* 3D drill-down detail popup (right side of the viewer panel) */
+  .viewer-detail {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 250px;
+    max-width: 62%;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 10px 12px 11px;
+    font-size: 11px;
+    pointer-events: auto;
+    z-index: 6;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+  }
+  .viewer-detail[hidden] { display: none; }
+  .viewer-detail .vd-close {
+    position: absolute; top: 4px; right: 5px;
+    background: transparent; border: none; color: var(--text-muted);
+    font-size: 16px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .viewer-detail .vd-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .viewer-detail .vd-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .vd-title { font-weight: 700; font-size: 12.5px; margin-bottom: 2px; padding-right: 16px; }
+  .vd-sub { color: var(--text-muted); margin-bottom: 7px; }
+  .vd-row { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .vd-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+  .vd-wp-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+
+  /* EVM (CPI / SPI) KPI strip */
+  .evm-strip {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px 14px;
+    flex-shrink: 0;
+    font-size: 12px;
+  }
+  .evm-idx { display: flex; align-items: center; gap: 5px; font-weight: 700; font-size: 13px; padding: 2px 9px; border-radius: 5px; background: var(--bg-card); }
+  .evm-idx .evm-glyph { font-size: 12px; }
+  .evm-metric { color: var(--text-muted); }
+  .evm-metric strong { color: var(--text-main); font-variant-numeric: tabular-nums; font-weight: 700; }
+  .evm-good { color: var(--green); }
+  .evm-warn { color: var(--amber); }
+  .evm-bad { color: var(--red); }
+
+  /* Shared reusable chart tooltip (Gantt + S-curve) */
+  #chart-tooltip {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    background: rgba(15, 23, 42, 0.96);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 11px;
+    color: var(--text-main);
+    max-width: 260px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    display: none;
+  }
+  #chart-tooltip .tt-title { font-weight: 700; margin-bottom: 3px; color: var(--accent); }
+  #chart-tooltip .tt-row { display: flex; justify-content: space-between; gap: 12px; }
+  #chart-tooltip .tt-row span:last-child { font-variant-numeric: tabular-nums; }
+
+  /* ---- Responsive degradation. All rules below live inside @media so the
+     desktop layout above is left completely unchanged. ---- */
+  @media (max-width: 1100px) {
+    body { overflow: auto; }
+    .tab-content { overflow: auto; }
+    #tab-5d { overflow: auto; }
+    .workspace-5d { grid-template-columns: 1fr; }
+    .viewer-panel { min-height: 360px; }
+    .right-5d { min-height: 500px; }
+    .gantt-panel { min-height: 280px; }
+    .scurve-panel { min-height: 240px; }
+  }
+  @media (max-width: 900px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .grid-4 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>133 KVB HOTEL & RESIDENCES (NASHVILLE)</h1>
+    <span>5D QS Cost & Programme Model | Status Date: 31 Mar 2026 (Month 15)</span>
+  </div>
+  <div class="tabs" role="tablist" aria-label="Model sections">
+    <button class="tab-btn" role="tab" data-tab="building" id="tabbtn-building" aria-controls="tab-building" aria-selected="false" onclick="switchTab('building')">1. Building</button>
+    <button class="tab-btn" role="tab" data-tab="programme" id="tabbtn-programme" aria-controls="tab-programme" aria-selected="false" onclick="switchTab('programme')">2. Programme</button>
+    <button class="tab-btn" role="tab" data-tab="costplan" id="tabbtn-costplan" aria-controls="tab-costplan" aria-selected="false" onclick="switchTab('costplan')">3. Cost Plan</button>
+    <button class="tab-btn active" role="tab" data-tab="5d" id="tabbtn-5d" aria-controls="tab-5d" aria-selected="true" onclick="switchTab('5d')">4. 5D Model</button>
+  </div>
+</header>
+
+<!-- ==================== TAB 1: BUILDING ==================== -->
+<div id="tab-building" class="tab-content" role="tabpanel" aria-labelledby="tabbtn-building" tabindex="0">
+  <div class="grid-4">
+    <div class="kpi-box">
+      <div class="kpi-label">Total Gross Floor Area</div>
+      <div class="kpi-val">856,286 GSF</div>
+      <div class="kpi-sub">787,194 GSF Enclosed (133 KVB Matrix, 5/15/26)</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Storeys & Total Height</div>
+      <div class="kpi-val">38 Levels / 492.0 ft</div>
+      <div class="kpi-sub">L1–L38 (no L11) + 38M Mech & Roof</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Program Mix</div>
+      <div class="kpi-val">148 Keys / 124 Condos</div>
+      <div class="kpi-sub">241,650 GSF Hotel | 453,188 GSF Condo</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Above-Grade Parking</div>
+      <div class="kpi-val">338 Spaces (L1–L4)</div>
+      <div class="kpi-sub">151,788 GSF Garage + Loading</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">QS Engineering & Architectural Assumptions (From Drawings)</div>
+      <ul style="font-size:12.5px; line-height:1.65; padding-left:18px; color:#cbd5e1;">
+        <li><strong>Substructure & Foundations:</strong> Drilled concrete caissons socketed into Nashville limestone bedrock with thick reinforced concrete mat foundations beneath the dual high-rise elevator/stair cores (1,355 GSF core footprint per floor) and transfer columns.</li>
+        <li><strong>Superstructure Frame Type:</strong> Cast-in-place post-tensioned (PT) reinforced concrete flat-plate slabs (8"–10" thick) with high-strength concrete shear walls (8,000–10,000 psi). Acoustic and structural transfer slabs/girders located at <strong>Level 5</strong> (parking/ballroom podium to hotel tower step-back), <strong>Level 14</strong> (hotel to residential grid transition), and <strong>Level 32</strong> (upper tier setback).</li>
+        <li><strong>External Facade System:</strong> Unitized aluminum and high-performance low-E glass curtain wall with bronze/terracotta vertical architectural fins on the tower (per Elkus Manfredi rendering), architectural metal louver screening on Podium Parking Levels 1–4, and expansive outdoor Amenity Terraces at Level 5 (hotel pool deck) and Level 38 (residential sky amenity & pool terrace).</li>
+        <li><strong>MEP & Vertical Transportation:</strong> Central plant split between Level 13 (Mechanical/Back-of-House transfer floor) and the Level 38M roof mechanical penthouse. Dedicated high-speed traction lift groups serving Hotel (L1–L13), Podium Parking/Ballroom, and Residential Tower (L1–L38).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Vertical Massing & Zone Summary (Extracted from 133 KVB Matrix)</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Building Zone</th>
+            <th>Levels</th>
+            <th>Primary Use</th>
+            <th class="num">Typ. Footprint (GSF)</th>
+            <th class="num">Storey Height</th>
+            <th class="num">Zone Total GSF</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Zone 1: Podium</strong></td>
+            <td>L1 – L4</td>
+            <td>Lobby, Retail, 338-Sp Parking, Ballroom, BOH</td>
+            <td class="num">56,651 – 62,591</td>
+            <td class="num">18.0' – 30.0'</td>
+            <td class="num">230,341</td>
+          </tr>
+          <tr>
+            <td><strong>Zone 2: Hotel Tower</strong></td>
+            <td>L5 – L13</td>
+            <td>Hotel Amenity (L5), 148 Keys (L6–12), L13 Mech</td>
+            <td class="num">18,900 (L5: 59,288)</td>
+            <td class="num">11.0' – 18.0'</td>
+            <td class="num">194,290</td>
+          </tr>
+          <tr>
+            <td><strong>Zone 3: Lower Condo</strong></td>
+            <td>L14 – L25</td>
+            <td>Residences (6 units/floor)</td>
+            <td class="num">16,800</td>
+            <td class="num">12.0'</td>
+            <td class="num">201,600</td>
+          </tr>
+          <tr>
+            <td><strong>Zone 4: Upper Condo & Crown</strong></td>
+            <td>L26 – 38M + Roof</td>
+            <td>Residences, Duplexes, Penthouses, L38 Sky Amenity, Mech</td>
+            <td class="num">3,855 – 16,800</td>
+            <td class="num">12.0' – 20.0'</td>
+            <td class="num">230,055</td>
+          </tr>
+          <tr class="total-row">
+            <td colspan="3">TOTAL BUILDING (L1–L38 + 38M + ROOF)</td>
+            <td class="num">Max: 62,591</td>
+            <td class="num">492.0 ft Total</td>
+            <td class="num">856,286</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="flex:1; overflow:auto;">
+    <div class="card-title">Complete Floor-by-Floor Schedule (133 KVB Nash Matrix Revised)</div>
+    <table id="floor-schedule-table">
+      <thead>
+        <tr>
+          <th>Level</th>
+          <th>Description / Use</th>
+          <th class="num">Hotel Keys</th>
+          <th class="num">Res Units</th>
+          <th class="num">Total GSF</th>
+          <th class="num">Enclosed GSF</th>
+          <th class="num">Floor-to-Floor (ft)</th>
+          <th class="num">Top Elev (ft)</th>
+          <th>Linked 3D Frame & Facade Activities</th>
+        </tr>
+      </thead>
+      <tbody id="floor-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ==================== TAB 2: PROGRAMME ==================== -->
+<div id="tab-programme" class="tab-content" role="tabpanel" aria-labelledby="tabbtn-programme" tabindex="0">
+  <div class="card" style="flex:1; overflow:auto;">
+    <div class="card-title">
+      <span>Accepted Baseline Programme & Month 15 Update (Status Date: 31 March 2026)</span>
+      <span style="font-size:12px; color:var(--text-muted);">Calendar: 5-Day Working Week | Total Duration: 650 Working Days (01 Jan 2025 – 30 Jun 2027)</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Act ID</th>
+          <th>Work Package</th>
+          <th>Activity Description</th>
+          <th>Logic Links (Pred)</th>
+          <th class="num">Dur (Days)</th>
+          <th>Baseline Start</th>
+          <th>Baseline Finish</th>
+          <th class="num">Budget (BAC)</th>
+          <th class="num">Daily Rate (£/d)</th>
+          <th class="num">Plan % (31 Mar 26)</th>
+          <th class="num">Actual % (31 Mar 26)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="prog-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ==================== TAB 3: COST PLAN ==================== -->
+<div id="tab-costplan" class="tab-content" role="tabpanel" aria-labelledby="tabbtn-costplan" tabindex="0">
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">NRM Elemental Cost Plan to Programme Activity Allocation</div>
+      <div style="overflow:auto; max-height: 72vh;">
+        <table>
+          <thead>
+            <tr>
+              <th>NRM</th>
+              <th>Element Description</th>
+              <th class="num">Element Total (£)</th>
+              <th>Split Basis / Rule</th>
+              <th>Target Activity</th>
+              <th class="num">Allocated (£)</th>
+            </tr>
+          </thead>
+          <tbody id="nrm-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Month 15 Cost Report & Earned Value Reconciliation (At 31 Mar 2026)</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Package</th>
+            <th class="num">Budget (BAC)</th>
+            <th class="num">Planned Value (PV)</th>
+            <th class="num">Earned Value (EV)</th>
+            <th class="num">Actual Cost (AC)</th>
+            <th class="num">Variance (AC - EV)</th>
+            <th class="num">Overrun %</th>
+            <th>RAG Status</th>
+          </tr>
+        </thead>
+        <tbody id="pkg-cost-tbody"></tbody>
+      </table>
+
+      <div style="margin-top: 18px;">
+        <div class="card-title">Activity-Level Earned Value Breakdown (At 31 Mar 2026)</div>
+        <div style="overflow:auto; max-height: 40vh;">
+          <table>
+            <thead>
+              <tr>
+                <th>Act ID</th>
+                <th>Activity</th>
+                <th class="num">Budget (£)</th>
+                <th class="num">Plan %</th>
+                <th class="num">Planned (PV)</th>
+                <th class="num">Act %</th>
+                <th class="num">Earned (EV)</th>
+                <th class="num">Actual (AC)</th>
+              </tr>
+            </thead>
+            <tbody id="act-ev-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB 4: 5D MODEL ==================== -->
+<div id="tab-5d" class="tab-content active" role="tabpanel" aria-labelledby="tabbtn-5d" tabindex="0">
+  <div class="controls-bar">
+    <div class="slider-group">
+      <button class="play-btn" id="play-btn" onclick="togglePlay()">&#9654; Play 5D</button>
+      <span style="font-size:12px; color:var(--text-muted);">Timeline:</span>
+      <input type="range" id="date-slider" min="0" max="650" value="325" oninput="onSliderChange(this.value)">
+      <div class="date-badge" id="current-date-label">31 Mar 2026</div>
+      <button class="play-btn" onclick="jumpToReportDate()" title="Jump to Month 15 Report Date">Reset to 31 Mar 26</button>
+    </div>
+
+    <div class="mode-switch">
+      <button class="mode-btn active" id="btn-mode-planned" onclick="setMode('planned')">Planned (4D Status)</button>
+      <button class="mode-btn" id="btn-mode-actual" onclick="setMode('actual')">Actual (31 Mar 26 Cost RAG)</button>
+    </div>
+
+    <div class="wp-toggles">
+      <span style="color:var(--text-muted); font-weight:600;">Packages:</span>
+      <label class="wp-toggle"><input type="checkbox" checked onchange="toggleWP('WP1', this.checked)"> WP1 Substructure</label>
+      <label class="wp-toggle"><input type="checkbox" checked onchange="toggleWP('WP2', this.checked)"> WP2 Frame</label>
+      <label class="wp-toggle"><input type="checkbox" checked onchange="toggleWP('WP3', this.checked)"> WP3 Facade</label>
+      <label class="wp-toggle"><input type="checkbox" checked onchange="toggleWP('WP4', this.checked)"> WP4 MEP & Lifts</label>
+      <label class="wp-toggle"><input type="checkbox" checked onchange="toggleWP('WP5', this.checked)"> WP5 Fit-Out</label>
+      <label class="wp-toggle"><input type="checkbox" checked onchange="toggleWP('WP6', this.checked)"> WP6 Ext Works</label>
+    </div>
+
+    <div class="export-group" style="display:flex; gap:8px; align-items:center;">
+      <button class="play-btn" onclick="exportPNG()" title="Export the 3D view as a PNG image">&#128247; Export PNG</button>
+      <button class="play-btn" onclick="exportCSV()" title="Export the activity earned-value table as CSV">&#8681; Export CSV</button>
+    </div>
+  </div>
+
+  <div class="workspace-5d">
+    <!-- Left: Three.js 3D Building Viewer -->
+    <div class="viewer-panel">
+      <div id="three-container"></div>
+      <div class="viewer-overlay" id="viewer-legend">
+        <!-- Dynamically populated by JS based on Planned vs Actual mode -->
+      </div>
+      <!-- 3D click drill-down detail popup (populated on pick) -->
+      <div class="viewer-detail" id="viewer-detail" role="dialog" aria-label="Activity detail" hidden></div>
+    </div>
+
+    <!-- Right: Synchronized Gantt + S-Curve -->
+    <div class="right-5d">
+      <!-- Earned-value KPI strip (CPI / SPI + PV/EV/AC + variances at report date) -->
+      <div class="evm-strip" id="evm-kpi-strip" aria-label="Earned value performance indices at report date"></div>
+      <div class="gantt-panel">
+        <div class="panel-header">
+          <span>Baseline Programme Gantt Chart & Logic Links</span>
+          <span id="gantt-kpi-summary" style="color:#cbd5e1; font-weight:500;"></span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="gantt-canvas" class="chart-canvas" role="img" aria-label="Baseline programme Gantt chart with logic links and a synchronized status date line; per-activity progress summary shown in the panel header."></canvas>
+        </div>
+      </div>
+
+      <div class="scurve-panel">
+        <div class="panel-header" style="padding:0 0 6px 0; margin-bottom:4px;">
+          <span>Monthly Cashflow Histogram & Cumulative 5D S-Curve (PV / EV / AC)</span>
+          <span id="scurve-kpi-summary" style="color:#cbd5e1; font-weight:500;"></span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="scurve-canvas" class="chart-canvas" role="img" aria-label="Monthly cashflow histogram with cumulative 5D S-curves for Planned Value, Earned Value and Actual Cost; current PV, EV and AC totals shown in the panel header."></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================================
+// 1. ARCHITECTURAL FLOOR SCHEDULE (38 LEVELS FROM 133 KVB MATRIX)
+// ============================================================================
+// Floor-by-floor schedule transcribed verbatim from the client "133 KVB Nash
+// Matrix Revised" (5/15/2026). Notes: there is NO Level 11 in the scheme; `gsf`
+// = Total (GSF), `enc` = Total Enclosed, `f2f` = client Floor-to-Floor column
+// (L2 left blank in the sheet → sane 12.0 fill), `elev` = client Bldg Ht (top of
+// level). Keys 148 (L6–L10 = 26 ea, L12 = 18); Resi 124.
+const floorData = [
+  { lvl: "1",   desc: "Lobby & Resi Parking",            keys: 0,  res: 0, gsf: 56651, enc: 56651, f2f: 18.0, elev: 18.0,  zone: 1 },
+  { lvl: "2",   desc: "Resi Entry & Parking",            keys: 0,  res: 0, gsf: 50374, enc: 50374, f2f: 12.0, elev: 18.0,  zone: 1 },
+  { lvl: "3",   desc: "Hotel & Function Parking",        keys: 0,  res: 0, gsf: 60725, enc: 60725, f2f: 16.0, elev: 34.0,  zone: 1 },
+  { lvl: "4",   desc: "Loading Dock / BOH / Meeting Rooms", keys: 0, res: 0, gsf: 62591, enc: 60131, f2f: 30.0, elev: 64.0,  zone: 1 },
+  { lvl: "5",   desc: "Hotel Amenity & Restaurant",      keys: 0,  res: 0, gsf: 59288, enc: 21046, f2f: 15.0, elev: 79.0,  zone: 2 },
+  { lvl: "6",   desc: "Hotel Rooms",                     keys: 26, res: 0, gsf: 21602, enc: 18767, f2f: 11.0, elev: 90.0,  zone: 2 },
+  { lvl: "7",   desc: "Hotel Rooms",                     keys: 26, res: 0, gsf: 18900, enc: 18900, f2f: 11.0, elev: 101.0, zone: 2 },
+  { lvl: "8",   desc: "Hotel Rooms",                     keys: 26, res: 0, gsf: 18900, enc: 18900, f2f: 11.0, elev: 112.0, zone: 2 },
+  { lvl: "9",   desc: "Hotel Rooms",                     keys: 26, res: 0, gsf: 18900, enc: 18900, f2f: 11.0, elev: 123.0, zone: 2 },
+  { lvl: "10",  desc: "Hotel Rooms",                     keys: 26, res: 0, gsf: 18900, enc: 18900, f2f: 11.0, elev: 134.0, zone: 2 },
+  { lvl: "12",  desc: "Hotel Rooms (Suites)",            keys: 18, res: 0, gsf: 18900, enc: 18900, f2f: 16.0, elev: 150.0, zone: 2 },
+  { lvl: "13",  desc: "Mechanical / Storage / Amenity",  keys: 0,  res: 0, gsf: 18900, enc: 16800, f2f: 18.0, elev: 168.0, zone: 2 },
+  { lvl: "14",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 180.0, zone: 3 },
+  { lvl: "15",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 192.0, zone: 3 },
+  { lvl: "16",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 204.0, zone: 3 },
+  { lvl: "17",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 216.0, zone: 3 },
+  { lvl: "18",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 228.0, zone: 3 },
+  { lvl: "19",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 240.0, zone: 3 },
+  { lvl: "20",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 252.0, zone: 3 },
+  { lvl: "21",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 264.0, zone: 3 },
+  { lvl: "22",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 276.0, zone: 3 },
+  { lvl: "23",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 288.0, zone: 3 },
+  { lvl: "24",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 300.0, zone: 3 },
+  { lvl: "25",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 312.0, zone: 3 },
+  { lvl: "26",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 324.0, zone: 4 },
+  { lvl: "27",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 336.0, zone: 4 },
+  { lvl: "28",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 348.0, zone: 4 },
+  { lvl: "29",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 360.0, zone: 4 },
+  { lvl: "30",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 372.0, zone: 4 },
+  { lvl: "31",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 384.0, zone: 4 },
+  { lvl: "32",  desc: "Residences",                      keys: 0,  res: 6, gsf: 16800, enc: 16800, f2f: 12.0, elev: 396.0, zone: 4 },
+  { lvl: "33",  desc: "Duplex (Lower)",                  keys: 0,  res: 4, gsf: 16800, enc: 14700, f2f: 14.0, elev: 398.0, zone: 4 },
+  { lvl: "34",  desc: "Duplex (Upper)",                  keys: 0,  res: 0, gsf: 14700, enc: 14700, f2f: 14.0, elev: 412.0, zone: 4 },
+  { lvl: "35",  desc: "Penthouse Split",                 keys: 0,  res: 2, gsf: 16800, enc: 14700, f2f: 14.0, elev: 426.0, zone: 4 },
+  { lvl: "36",  desc: "Penthouse Split",                 keys: 0,  res: 2, gsf: 16800, enc: 14700, f2f: 14.0, elev: 440.0, zone: 4 },
+  { lvl: "37",  desc: "Penthouse (Full)",               keys: 0,  res: 2, gsf: 16800, enc: 14700, f2f: 20.0, elev: 460.0, zone: 4 },
+  { lvl: "38",  desc: "Residential Amenity",             keys: 0,  res: 0, gsf: 16800, enc: 10500, f2f: 16.0, elev: 476.0, zone: 4 },
+  { lvl: "38M", desc: "Roof Mechanical Penthouse",       keys: 0,  res: 0, gsf: 9900,  enc: 5000,  f2f: 16.0, elev: 492.0, zone: 4 },
+  { lvl: "Roof", desc: "Roof",                           keys: 0,  res: 0, gsf: 3855,  enc: 0,     f2f: 0.0,  elev: 492.0, zone: 4 }
+];
+
+// ============================================================================
+// 2. BASELINE PROGRAMME & MONTH 15 PROGRESS / COST ACTUALS
+// Working Days 1 to 650 (01 Jan 2025 to 30 Jun 2027). Month 15 = Day 325 (31 Mar 2026)
+// ============================================================================
+const REPORT_DAY = 325; // 31 March 2026 (Exactly 15 months / 325 working days in)
+
+const activities = [
+  { id: "A100", wp: "WP0", name: "Time-Related Preliminaries", pred: "-", s: 1, f: 650, budget: 29000000, actPct: 50.0, ac: 14355000 },
+  { id: "A101", wp: "WP1", name: "Enabling Works & Bulk Excavation", pred: "-", s: 1, f: 45, budget: 3200000, actPct: 100.0, ac: 3136000 },
+  { id: "A102", wp: "WP1", name: "Substructure: Caissons, Caps & Mat Slab", pred: "A101 FS-5", s: 41, f: 110, budget: 14800000, actPct: 100.0, ac: 14504000 },
+  { id: "A103", wp: "WP2", name: "Concrete Frame: Podium (L1–L4)", pred: "A102 FS", s: 111, f: 175, budget: 12000000, actPct: 100.0, ac: 13080000 },
+  { id: "A104", wp: "WP2", name: "Concrete Frame: Mid-Rise Hotel (L5–L13)", pred: "A103 FS", s: 176, f: 245, budget: 12000000, actPct: 100.0, ac: 13080000 },
+  { id: "A105", wp: "WP2", name: "Concrete Frame: High-Rise Condo (L14–L25)", pred: "A104 FS", s: 246, f: 325, budget: 12000000, actPct: 70.0, ac: 9156000 },
+  { id: "A106", wp: "WP2", name: "Concrete Frame: Upper Tower & Crown (L26–38M)", pred: "A105 FS", s: 326, f: 410, budget: 12000000, actPct: 0.0, ac: 0 },
+  { id: "A107", wp: "WP3", name: "Facade & Envelope: Podium Screens (L1–L4)", pred: "A103 FS+5", s: 181, f: 245, budget: 9000000, actPct: 100.0, ac: 9315000 },
+  { id: "A108", wp: "WP3", name: "Facade & L5 Terrace: Mid-Rise (L5–L13)", pred: "A107 FS", s: 246, f: 320, budget: 11000000, actPct: 60.0, ac: 6831000 },
+  { id: "A109", wp: "WP3", name: "Facade Curtain Wall: High-Rise (L14–L25)", pred: "A108 FS", s: 321, f: 395, budget: 9000000, actPct: 3.3333333333, ac: 310500 },
+  { id: "A110", wp: "WP3", name: "Facade & L38/38M Roofs: Upper (L26–38M)", pred: "A109 FS", s: 396, f: 475, budget: 11000000, actPct: 0.0, ac: 0 },
+  { id: "A111", wp: "WP4", name: "MEP Rough-In & Plant: Podium & L13 Plant", pred: "A103 FS+20", s: 196, f: 310, budget: 16000000, actPct: 90.0, ac: 14112000 },
+  { id: "A112", wp: "WP4", name: "MEP Risers & Rough-In: Lower Tower (L5–L20)", pred: "A104 FS+20", s: 266, f: 380, budget: 14000000, actPct: 15.0, ac: 2058000 },
+  { id: "A113", wp: "WP4", name: "MEP Rough-In & Plant: Upper & L38M Roof", pred: "A105 FS+20", s: 346, f: 490, budget: 14000000, actPct: 0.0, ac: 0 },
+  { id: "A114", wp: "WP4", name: "Vertical Transportation (Hotel & Condo Lifts)", pred: "A104 FS-15", s: 231, f: 480, budget: 8500000, actPct: 17.3529411765, ac: 1445500 },
+  { id: "A115", wp: "WP5", name: "Internal Fit-Out: Podium, Lobby & Ballroom", pred: "A107 FS-10", s: 236, f: 365, budget: 10000000, actPct: 45.0, ac: 4635000 },
+  { id: "A116", wp: "WP5", name: "Internal Fit-Out: Hotel 148 Keys (L5–L13)", pred: "A108 FS-20", s: 301, f: 465, budget: 19000000, actPct: 0.0, ac: 0 },
+  { id: "A117", wp: "WP5", name: "Internal Fit-Out: Residences (L14–L25)", pred: "A109 FS-25", s: 371, f: 535, budget: 12500000, actPct: 0.0, ac: 0 },
+  { id: "A118", wp: "WP5", name: "Internal Fit-Out: Residences & PH (L26–L38)", pred: "A110 FS-35", s: 441, f: 615, budget: 12500000, actPct: 0.0, ac: 0 },
+  { id: "A119", wp: "WP6", name: "External Works, Testing & Commissioning", pred: "A118 FS-40", s: 576, f: 650, budget: 3500000, actPct: 0.0, ac: 0 }
+];
+
+// Compute derived fields for each activity
+activities.forEach(a => {
+  a.dur = a.f - a.s + 1;
+  a.dailyRate = a.budget / a.dur;
+  a.planPctAtReport = getPlannedPct(a, REPORT_DAY) * 100;
+  a.pvAtReport = a.budget * (a.planPctAtReport / 100);
+  a.evAtReport = Math.round(a.budget * (a.actPct / 100));
+});
+
+const workPackages = {
+  WP0: { name: "WP0: Preliminaries", color: "#94a3b8", visible: true },
+  WP1: { name: "WP1: Substructure", color: "#a855f7", visible: true },
+  WP2: { name: "WP2: Concrete Frame", color: "#3b82f6", visible: true },
+  WP3: { name: "WP3: Facade & Roofs", color: "#06b6d4", visible: true },
+  WP4: { name: "WP4: MEP & Lifts", color: "#eab308", visible: true },
+  WP5: { name: "WP5: Internal Fit-Out", color: "#ec4899", visible: true },
+  WP6: { name: "WP6: External Works", color: "#10b981", visible: true }
+};
+
+// Calculate Package Summary Totals at Report Date
+Object.keys(workPackages).forEach(wpKey => {
+  const acts = activities.filter(a => a.wp === wpKey);
+  const bac = acts.reduce((s, a) => s + a.budget, 0);
+  const pv = acts.reduce((s, a) => s + a.pvAtReport, 0);
+  const ev = acts.reduce((s, a) => s + a.evAtReport, 0);
+  const ac = acts.reduce((s, a) => s + a.ac, 0);
+  const diff = ac - ev;
+  const overrunPct = ev > 0 ? (diff / ev) * 100 : 0;
+  let rag = "green";
+  if (overrunPct > 5.0) rag = "red";
+  else if (overrunPct > 0.0) rag = "amber";
+  workPackages[wpKey] = { ...workPackages[wpKey], bac, pv, ev, ac, diff, overrunPct, rag };
+});
+
+// NRM Cost Plan Table Data
+const nrmLines = [
+  { ref: "0.1", desc: "Facilitating Works & Site Preparation", total: 3200000, rule: "100% direct to site enabling & excavation", allocs: [{ act: "A101", val: 3200000 }] },
+  { ref: "1.1", desc: "Substructure (Caissons, Pile Caps, Mat Slab)", total: 14800000, rule: "100% direct to substructure foundations", allocs: [{ act: "A102", val: 14800000 }] },
+  { ref: "2.1", desc: "Frame, Upper Floors & Structural Transfer Slabs", total: 48000000, rule: "25% per structural zone (GSF + transfer girder complexity)", allocs: [
+    { act: "A103", val: 12000000 }, { act: "A104", val: 12000000 }, { act: "A105", val: 12000000 }, { act: "A106", val: 12000000 }
+  ]},
+  { ref: "2.5", desc: "External Walls, Unitized Curtain Wall & Louvers", total: 36000000, rule: "25% per vertical envelope zone", allocs: [
+    { act: "A107", val: 9000000 }, { act: "A108", val: 9000000 }, { act: "A109", val: 9000000 }, { act: "A110", val: 9000000 }
+  ]},
+  { ref: "2.3", desc: "Roof Finishings & L5 / L36 Outdoor Amenity Decks", total: 4000000, rule: "50% L5 Pool Terrace (21,247 SF) / 50% L36 & 36M Roofs", allocs: [
+    { act: "A108", val: 2000000 }, { act: "A110", val: 2000000 }
+  ]},
+  { ref: "3.0", desc: "Internal Walls, Partitions & Finishes", total: 42000000, rule: "19.05% Podium/Ballroom, 33.33% Hotel, 47.62% Condos", allocs: [
+    { act: "A115", val: 8000000 }, { act: "A116", val: 14000000 }, { act: "A117", val: 10000000 }, { act: "A118", val: 10000000 }
+  ]},
+  { ref: "4.0", desc: "Fittings, Furnishings & Equipment (FF&E)", total: 12000000, rule: "16.67% Ballroom/Lobby, 41.67% Hotel Keys, 41.67% Condos", allocs: [
+    { act: "A115", val: 2000000 }, { act: "A116", val: 5000000 }, { act: "A117", val: 2500000 }, { act: "A118", val: 2500000 }
+  ]},
+  { ref: "5.1", desc: "Mechanical, Electrical & Plumbing (MEP) Services", total: 44000000, rule: "36.36% Podium & L13 Plant, 31.82% Lower, 31.82% Upper/Roof", allocs: [
+    { act: "A111", val: 16000000 }, { act: "A112", val: 14000000 }, { act: "A113", val: 14000000 }
+  ]},
+  { ref: "5.10", desc: "Lift & Conveyor Installations (Dual Cores)", total: 8500000, rule: "100% direct to Vertical Transportation", allocs: [{ act: "A114", val: 8500000 }] },
+  { ref: "8.0", desc: "External Works, Streetscape & Commissioning", total: 3500000, rule: "100% direct to External Works & Commissioning", allocs: [{ act: "A119", val: 3500000 }] },
+  { ref: "9.0", desc: "Main Contractor Time-Related Preliminaries", total: 29000000, rule: "100% spread evenly over 650 working days", allocs: [{ act: "A100", val: 29000000 }] }
+];
+
+// ============================================================================
+// 3. HELPER FUNCTIONS (DATES, FORMATTING, DAILY/MONTHLY CASHFLOW)
+// ============================================================================
+function getPlannedPct(act, day) {
+  if (day < act.s) return 0;
+  if (day >= act.f) return 1;
+  return (day - act.s + 1) / act.dur;
+}
+
+// Map working day (0..650) to Calendar Date between 01 Jan 2025 and 30 Jun 2027
+const START_EPOCH = new Date(2025, 0, 1).getTime();
+const END_EPOCH = new Date(2027, 5, 30).getTime();
+
+function dayToDateStr(day) {
+  if (day <= 0) return "01 Jan 2025";
+  if (day === 325) return "31 Mar 2026";
+  if (day >= 650) return "30 Jun 2027";
+  const frac = day / 650;
+  const d = new Date(START_EPOCH + frac * (END_EPOCH - START_EPOCH));
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function fmtGBP(val) {
+  const sign = val < 0 ? "-" : "";
+  return sign + "£" + Math.round(Math.abs(val)).toLocaleString("en-GB");
+}
+
+// Precompute 30 Monthly Buckets (21.67 working days per month average; exact 650 days across 30 months)
+const monthNames = [
+  "Jan 25","Feb 25","Mar 25","Apr 25","May 25","Jun 25","Jul 25","Aug 25","Sep 25","Oct 25","Nov 25","Dec 25",
+  "Jan 26","Feb 26","Mar 26","Apr 26","May 26","Jun 26","Jul 26","Aug 26","Sep 26","Oct 26","Nov 26","Dec 26",
+  "Jan 27","Feb 27","Mar 27","Apr 27","May 27","Jun 27"
+];
+
+const monthlyData = [];
+let cumPV = 0;
+for (let m = 0; m < 30; m++) {
+  const startDay = Math.round((m * 650) / 30) + 1;
+  const endDay = Math.round(((m + 1) * 650) / 30);
+  let mPV = 0;
+  for (let d = startDay; d <= endDay; d++) {
+    activities.forEach(a => {
+      if (d >= a.s && d <= a.f) mPV += a.dailyRate;
+    });
+  }
+  cumPV += mPV;
+  monthlyData.push({ m, label: monthNames[m], startDay, endDay, mPV, cumPV });
+}
+
+// Compute smooth historical EV and AC curves from Month 1 to Month 15 (31 Mar 2026)
+// Anchored strictly so Month 15 (index 14, endDay 325) equals exact report EV (£103,275,000) and AC (£106,018,000)
+monthlyData.forEach((md, idx) => {
+  if (idx < 15) {
+    let evSum = 0;
+    let acSum = 0;
+    const d = md.endDay;
+    activities.forEach(a => {
+      // Scale progress up to actual % at day 325 based on how much of the activity's elapsed window has occurred by day d
+      let ratio = 0;
+      if (d >= REPORT_DAY) {
+        ratio = 1;
+      } else if (d >= a.s) {
+        const elapsedByReport = Math.max(1, Math.min(REPORT_DAY, a.f) - a.s + 1);
+        const elapsedByD = Math.min(d, a.f) - a.s + 1;
+        ratio = Math.min(1, elapsedByD / elapsedByReport);
+      }
+      evSum += a.evAtReport * ratio;
+      acSum += a.ac * ratio;
+    });
+    md.cumEV = Math.round(evSum);
+    md.cumAC = Math.round(acSum);
+  } else {
+    md.cumEV = null;
+    md.cumAC = null;
+  }
+});
+
+// ============================================================================
+// 4. POPULATE HTML TABLES (BUILDING, PROGRAMME, COST PLAN)
+// ============================================================================
+function populateTables() {
+  // 1. Floor Schedule Table
+  const fBody = document.getElementById("floor-tbody");
+  let fHtml = "";
+  floorData.forEach(f => {
+    const frameAct = f.zone === 1 ? "A103" : f.zone === 2 ? "A104" : f.zone === 3 ? "A105" : "A106";
+    const facAct = f.zone === 1 ? "A107" : f.zone === 2 ? "A108" : f.zone === 3 ? "A109" : "A110";
+    fHtml += `<tr>
+      <td><strong>Level ${f.lvl}</strong></td>
+      <td>${f.desc}</td>
+      <td class="num">${f.keys || "-"}</td>
+      <td class="num">${f.res || "-"}</td>
+      <td class="num">${f.gsf.toLocaleString()}</td>
+      <td class="num">${f.enc.toLocaleString()}</td>
+      <td class="num">${f.f2f.toFixed(1)}'</td>
+      <td class="num">${f.elev.toFixed(1)}'</td>
+      <td><span class="badge bg-blue">${frameAct}</span> <span class="badge bg-green">${facAct}</span></td>
+    </tr>`;
+  });
+  const fTotKeys = floorData.reduce((s, f) => s + f.keys, 0);
+  const fTotRes = floorData.reduce((s, f) => s + f.res, 0);
+  const fTotGsf = floorData.reduce((s, f) => s + f.gsf, 0);
+  const fTotEnc = floorData.reduce((s, f) => s + f.enc, 0);
+  const fTopElev = Math.max(...floorData.map(f => f.elev));
+  fHtml += `<tr class="total-row">
+    <td colspan="2">TOTAL (L1–L38 + 38M + ROOF, no L11)</td>
+    <td class="num">${fTotKeys}</td>
+    <td class="num">${fTotRes}</td>
+    <td class="num">${fTotGsf.toLocaleString()}</td>
+    <td class="num">${fTotEnc.toLocaleString()}</td>
+    <td class="num">-</td>
+    <td class="num">${fTopElev.toFixed(1)}'</td>
+    <td>All Zones Linked</td>
+  </tr>`;
+  fBody.innerHTML = fHtml;
+
+  // 2. Programme Table
+  const pBody = document.getElementById("prog-tbody");
+  let pHtml = "";
+  activities.forEach(a => {
+    let stBadge = `<span class="badge bg-blue"><span class="rag-glyph" aria-hidden="true">○</span>Not Started</span>`;
+    if (a.actPct >= 100) stBadge = `<span class="badge bg-green"><span class="rag-glyph" aria-hidden="true">✔</span>Complete</span>`;
+    else if (a.actPct > 0) stBadge = `<span class="badge bg-amber"><span class="rag-glyph" aria-hidden="true">◑</span>In Progress (${a.actPct.toFixed(1)}%)</span>`;
+    pHtml += `<tr>
+      <td><strong>${a.id}</strong></td>
+      <td>${a.wp}</td>
+      <td>${a.name}</td>
+      <td>${a.pred}</td>
+      <td class="num">${a.dur}</td>
+      <td>${dayToDateStr(a.s)}</td>
+      <td>${dayToDateStr(a.f)}</td>
+      <td class="num">${fmtGBP(a.budget)}</td>
+      <td class="num">${fmtGBP(a.dailyRate)}</td>
+      <td class="num">${a.planPctAtReport.toFixed(1)}%</td>
+      <td class="num">${a.actPct.toFixed(1)}%</td>
+      <td>${stBadge}</td>
+    </tr>`;
+  });
+  // Single source of truth: derive the total row from activities[] (no hardcoded figures)
+  const progTotalDays = Math.max(...activities.map(a => a.f)) - Math.min(...activities.map(a => a.s)) + 1;
+  const progTotBAC = activities.reduce((s, a) => s + a.budget, 0);
+  const progTotPV = activities.reduce((s, a) => s + a.pvAtReport, 0);
+  const progTotEV = activities.reduce((s, a) => s + a.evAtReport, 0);
+  const progPlanPct = (progTotPV / progTotBAC) * 100;
+  const progActPct = (progTotEV / progTotBAC) * 100;
+  pHtml += `<tr class="total-row">
+    <td colspan="4">BASELINE PROGRAMME TOTAL</td>
+    <td class="num">${progTotalDays} Days</td>
+    <td>01 Jan 2025</td>
+    <td>30 Jun 2027</td>
+    <td class="num">${fmtGBP(progTotBAC)}</td>
+    <td class="num">-</td>
+    <td class="num">${progPlanPct.toFixed(1)}%</td>
+    <td class="num">${progActPct.toFixed(1)}%</td>
+    <td>Month 15 Update</td>
+  </tr>`;
+  pBody.innerHTML = pHtml;
+
+  // 3. NRM Cost Plan Table
+  const nBody = document.getElementById("nrm-tbody");
+  let nHtml = "";
+  let checkTotal = 0;
+  nrmLines.forEach(line => {
+    line.allocs.forEach((al, idx) => {
+      checkTotal += al.val;
+      nHtml += `<tr>
+        <td>${idx === 0 ? `<strong>${line.ref}</strong>` : ""}</td>
+        <td>${idx === 0 ? line.desc : ""}</td>
+        <td class="num">${idx === 0 ? fmtGBP(line.total) : ""}</td>
+        <td style="font-size:11px; color:#cbd5e1;">${idx === 0 ? line.rule : ""}</td>
+        <td><span class="badge bg-blue">${al.act}</span></td>
+        <td class="num">${fmtGBP(al.val)}</td>
+      </tr>`;
+    });
+  });
+  nHtml += `<tr class="total-row">
+    <td colspan="2">NRM COST PLAN TOTAL (CHECK = £0 DIFF)</td>
+    <td class="num">£245,000,000</td>
+    <td colspan="2">100% Allocated Across 19 Activities</td>
+    <td class="num">${fmtGBP(checkTotal)}</td>
+  </tr>`;
+  nBody.innerHTML = nHtml;
+
+  // 4. Package Cost Report Table
+  const pkgBody = document.getElementById("pkg-cost-tbody");
+  let pkgHtml = "";
+  let tBAC = 0, tPV = 0, tEV = 0, tAC = 0;
+  Object.keys(workPackages).forEach(k => {
+    const w = workPackages[k];
+    tBAC += w.bac; tPV += w.pv; tEV += w.ev; tAC += w.ac;
+    const badgeClass = w.rag === "red" ? "bg-red" : w.rag === "amber" ? "bg-amber" : "bg-green";
+    const ragLabel = w.rag === "red" ? "RED (>5% Over)" : w.rag === "amber" ? "AMBER (0–5% Over)" : "GREEN (On/Under)";
+    // Non-colour glyph cue: ▲ red (>5% over), △ amber (0–5% over), ▼ green (on/under)
+    const ragGlyph = w.rag === "red" ? "▲" : w.rag === "amber" ? "△" : "▼";
+    pkgHtml += `<tr>
+      <td><strong>${w.name}</strong></td>
+      <td class="num">${fmtGBP(w.bac)}</td>
+      <td class="num">${fmtGBP(w.pv)}</td>
+      <td class="num">${fmtGBP(w.ev)}</td>
+      <td class="num">${fmtGBP(w.ac)}</td>
+      <td class="num">${fmtGBP(w.diff)}</td>
+      <td class="num">${w.overrunPct > 0 ? "+" : ""}${w.overrunPct.toFixed(2)}%</td>
+      <td><span class="badge ${badgeClass}"><span class="rag-glyph" aria-hidden="true">${ragGlyph}</span>${ragLabel}</span></td>
+    </tr>`;
+  });
+  const totDiff = tAC - tEV;
+  const totOver = (totDiff / tEV) * 100;
+  pkgHtml += `<tr class="total-row">
+    <td>TOTAL COST REPORT (31 MAR 2026)</td>
+    <td class="num">${fmtGBP(tBAC)}</td>
+    <td class="num">${fmtGBP(tPV)}</td>
+    <td class="num">${fmtGBP(tEV)}</td>
+    <td class="num">${fmtGBP(tAC)}</td>
+    <td class="num">+${fmtGBP(totDiff)}</td>
+    <td class="num">+${totOver.toFixed(2)}%</td>
+    <td><span class="badge bg-amber">Exact Match (£0 Diff)</span></td>
+  </tr>`;
+  pkgBody.innerHTML = pkgHtml;
+
+  // 5. Activity EV Breakdown Table
+  const evBody = document.getElementById("act-ev-tbody");
+  let evHtml = "";
+  activities.forEach(a => {
+    evHtml += `<tr>
+      <td><strong>${a.id}</strong></td>
+      <td>${a.name}</td>
+      <td class="num">${fmtGBP(a.budget)}</td>
+      <td class="num">${a.planPctAtReport.toFixed(1)}%</td>
+      <td class="num">${fmtGBP(a.pvAtReport)}</td>
+      <td class="num">${a.actPct.toFixed(1)}%</td>
+      <td class="num">${fmtGBP(a.evAtReport)}</td>
+      <td class="num">${fmtGBP(a.ac)}</td>
+    </tr>`;
+  });
+  evBody.innerHTML = evHtml;
+}
+
+// ============================================================================
+// 5. THREE.JS 3D BUILDING MODEL (38 LEVELS + SUBSTRUCTURE + CORES + FACADE)
+// ============================================================================
+let scene, camera, renderer, controls;
+const meshParts = []; // Stores { mesh, wp, actId, floorIdx, partType }
+
+function initThreeJS() {
+  const container = document.getElementById("three-container");
+  const w = container.clientWidth || 600;
+  const h = container.clientHeight || 500;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x090d16);
+
+  camera = new THREE.PerspectiveCamera(42, w / h, 1, 3000);
+  camera.position.set(240, 190, 290);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  container.appendChild(renderer.domElement);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 95, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  // Render-on-demand: re-render while the user orbits/zooms/pans, then let damping settle.
+  controls.addEventListener("change", () => { continuationFrames = 8; requestRender(); });
+
+  // Lighting
+  const ambLight = new THREE.AmbientLight(0xffffff, 0.65);
+  scene.add(ambLight);
+  const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.85);
+  dirLight1.position.set(200, 400, 250);
+  scene.add(dirLight1);
+  const dirLight2 = new THREE.DirectionalLight(0x90cdf4, 0.35);
+  dirLight2.position.set(-200, 200, -200);
+  scene.add(dirLight2);
+
+  // Ground Grid
+  const grid = new THREE.GridHelper(320, 32, 0x334155, 0x1e293b);
+  scene.add(grid);
+
+  // Scale factor: 1 Three.js unit = 2.2 feet vertically & horizontally
+  const SCALE = 0.45;
+
+  // Helper to register meshes
+  function addPart(geom, x, y, z, wp, actId, partType, isWireframe = false) {
+    const mat = new THREE.MeshPhongMaterial({
+      color: 0x64748b,
+      transparent: true,
+      opacity: 0.85,
+      shininess: 40
+    });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(x, y, z);
+
+    // Subtle edge outline for architectural clarity
+    const edges = new THREE.EdgesGeometry(geom);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.35 });
+    const line = new THREE.LineSegments(edges, lineMat);
+    mesh.add(line);
+
+    scene.add(mesh);
+    meshParts.push({ mesh, line, wp, actId, partType });
+  }
+
+  // 1. WP6 External Works / Streetscape Plaza Plinth
+  const extGeom = new THREE.BoxGeometry(165 * SCALE, 2 * SCALE, 125 * SCALE);
+  addPart(extGeom, 0, -1 * SCALE, 0, "WP6", "A119", "ext");
+
+  // 2. WP1 Excavation & Substructure Mat / Caissons
+  const excGeom = new THREE.BoxGeometry(142 * SCALE, 8 * SCALE, 98 * SCALE);
+  addPart(excGeom, 0, -5 * SCALE, 0, "WP1", "A101", "exc");
+
+  const matGeom = new THREE.BoxGeometry(138 * SCALE, 6 * SCALE, 94 * SCALE);
+  addPart(matGeom, 0, -3 * SCALE, 0, "WP1", "A102", "sub");
+
+  // Deep Caissons (12 visual piles under mat)
+  for (let px = -45; px <= 45; px += 30) {
+    for (let pz = -30; pz <= 30; pz += 30) {
+      const pileG = new THREE.CylinderGeometry(3.5 * SCALE, 3.5 * SCALE, 22 * SCALE, 12);
+      addPart(pileG, px * SCALE, -17 * SCALE, pz * SCALE, "WP1", "A102", "sub");
+    }
+  }
+
+  // 3. WP4 Vertical Transportation Dual Core Spine (Full Height 492 ft)
+  const coreG = new THREE.BoxGeometry(18 * SCALE, 492 * SCALE, 14 * SCALE);
+  addPart(coreG, -10 * SCALE, (492 / 2) * SCALE, 0, "WP4", "A114", "lifts");
+
+  // 4. Build every level (Frame, Facade, MEP, Fit-Out) directly from the client
+  //    matrix. Storey heights come from the `elev` column (so the model tops out
+  //    at the real 492 ft) and each footprint is DERIVED FROM that floor's GSF,
+  //    so the podium/amenity full-plates (L1–L5) read large and the tower +
+  //    crown step back automatically as GSF drops — no hand-tuned per-floor box.
+  const ASPECT = 1.55;             // plan W : D
+  const PLAN_SCALE = SCALE * 0.45; // ft -> scene units for plan dimensions
+  let prevElev = 0;
+  floorData.forEach((f) => {
+    const top = f.elev;
+    const rawH = top - prevElev;            // true storey height from elevations
+    const h = Math.max(rawH, 4) * SCALE;    // clamp so 0-delta levels still show
+    const centerY = (prevElev * SCALE) + h / 2;
+    const slabBottomY = prevElev * SCALE;
+
+    // Footprint from GSF: full-plate podium/amenity (L1–L5, >40k GSF) sits
+    // centred; the slender residential/hotel tower steps back to one corner.
+    const areaFt = f.gsf;
+    const isPodium = areaFt > 40000;
+    const wFt = Math.sqrt(areaFt * ASPECT);
+    const dFt = Math.sqrt(areaFt / ASPECT);
+    const offX = isPodium ? 0 : -40;
+    const offZ = isPodium ? 0 : -12;
+
+    const W = wFt * PLAN_SCALE;
+    const D = dFt * PLAN_SCALE;
+    const X = offX * PLAN_SCALE;
+    const Z = offZ * PLAN_SCALE;
+
+    // Map floor to programme activities (zone-based for frame/facade/fit-out).
+    const frameAct = f.zone === 1 ? "A103" : f.zone === 2 ? "A104" : f.zone === 3 ? "A105" : "A106";
+    const facAct   = f.zone === 1 ? "A107" : f.zone === 2 ? "A108" : f.zone === 3 ? "A109" : "A110";
+    const fitAct   = f.zone === 1 ? "A115" : f.zone === 2 ? "A116" : f.zone === 3 ? "A117" : "A118";
+    const isPlantFloor = (f.lvl === "13" || f.lvl === "38M");
+    const mepAct   = (f.zone === 1 || f.lvl === "13") ? "A111" : (f.elev <= 252) ? "A112" : "A113";
+
+    // A) Concrete Frame Slab + Columns (WP2)
+    const slabG = new THREE.BoxGeometry(W * 0.96, h * 0.24, D * 0.96);
+    addPart(slabG, X, slabBottomY + h * 0.12, Z, "WP2", frameAct, "frame");
+
+    // B) Internal Fit-Out Block (WP5) - inset core volume
+    const fitG = new THREE.BoxGeometry(W * 0.82, h * 0.68, D * 0.82);
+    addPart(fitG, X, centerY, Z, "WP5", fitAct, "fitout");
+
+    // C) MEP Services Ring / Plant Zone (WP4)
+    const mepG = new THREE.BoxGeometry(W * (isPlantFloor ? 0.95 : 0.65), h * (isPlantFloor ? 0.85 : 0.45), D * (isPlantFloor ? 0.95 : 0.65));
+    addPart(mepG, X, centerY, Z, "WP4", mepAct, "mep");
+
+    // D) External Facade Curtain Wall Shell (WP3)
+    const facG = new THREE.BoxGeometry(W, h * 0.94, D);
+    addPart(facG, X, centerY, Z, "WP3", facAct, "facade");
+
+    prevElev = top;
+  });
+
+  window.addEventListener("resize", onWindowResize);
+  requestRender();
+}
+
+function onWindowResize() {
+  const container = document.getElementById("three-container");
+  if (!container || container.clientWidth === 0) return;
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  drawAllCharts();
+  requestRender();
+}
+
+// ---------------------------------------------------------------------------
+// RENDER-ON-DEMAND: instead of a perpetual rAF loop, schedule a single frame
+// when something actually needs drawing. OrbitControls' 'change' event (fired
+// during drag/zoom/pan AND while damping settles) keeps frames coming; a short
+// tail of continuation frames guarantees damping finishes smoothly after the
+// last pointer event.
+// ---------------------------------------------------------------------------
+let renderPending = false;
+let continuationFrames = 0;
+
+function renderOneFrame() {
+  renderPending = false;
+  if (controls) controls.update();
+  if (renderer && scene && camera) renderer.render(scene, camera);
+  if (continuationFrames > 0) {
+    continuationFrames--;
+    requestRender();
+  }
+}
+
+function requestRender() {
+  if (renderPending) return;
+  renderPending = true;
+  requestAnimationFrame(renderOneFrame);
+}
+
+// ============================================================================
+// 6. 5D STATE & MODEL COLORING LOGIC (PLANNED vs ACTUAL RAG)
+// ============================================================================
+let currentDay = REPORT_DAY; // Default to 31 Mar 2026 (Day 325)
+let currentMode = "planned"; // 'planned' or 'actual'
+let playRAF = null;          // requestAnimationFrame handle for timeline playback
+let playLastTs = null;       // last frame timestamp (for framerate-independent delta)
+let playDayFloat = 0;        // fractional day accumulator (currentDay stays integer)
+const PLAY_DAYS_PER_SEC = 50; // ~650 days over ~13s, matching the old setInterval speed
+
+function update3DModel() {
+  const actMap = {};
+  activities.forEach(a => actMap[a.id] = a);
+
+  meshParts.forEach(part => {
+    const wpObj = workPackages[part.wp];
+    if (!wpObj || !wpObj.visible) {
+      part.mesh.visible = false;
+      return;
+    }
+
+    const act = actMap[part.actId];
+    if (!act) return;
+
+    if (currentMode === "planned") {
+      // PLANNED MODE: Color by Complete / In Progress / Not Started at slider date
+      const pct = getPlannedPct(act, currentDay);
+      part.mesh.visible = true;
+      if (pct <= 0) {
+        // Not started: ghostly wireframe
+        part.mesh.material.color.setHex(0x475569);
+        part.mesh.material.opacity = 0.08;
+        part.line.material.opacity = 0.12;
+      } else if (pct < 1) {
+        // In progress: vibrant cyan/blue
+        part.mesh.material.color.setHex(0x38bdf8);
+        part.mesh.material.opacity = part.partType === "facade" ? 0.45 : 0.85;
+        part.line.material.opacity = 0.5;
+      } else {
+        // Complete: solid architectural slate/emerald tint
+        const compColors = {
+          WP1: 0x8b5cf6,
+          WP2: 0x3b82f6,
+          WP3: 0x0ea5e9,
+          WP4: 0xeab308,
+          WP5: 0xec4899,
+          WP6: 0x10b981
+        };
+        part.mesh.material.color.setHex(compColors[part.wp] || 0x10b981);
+        part.mesh.material.opacity = part.partType === "facade" ? 0.38 : 0.82;
+        part.line.material.opacity = 0.35;
+      }
+    } else {
+      // ACTUAL MODE (As-Built at 31 March 2026):
+      // Show model as built at 31 Mar 2026 and colour each package Green (<=0%), Amber (0-5%), Red (>5%)
+      const actPct = act.actPct / 100;
+      if (actPct <= 0) {
+        part.mesh.visible = true;
+        part.mesh.material.color.setHex(0x334155);
+        part.mesh.material.opacity = 0.05;
+        part.line.material.opacity = 0.08;
+      } else {
+        part.mesh.visible = true;
+        const ragHex = wpObj.rag === "red" ? 0xef4444 : wpObj.rag === "amber" ? 0xf59e0b : 0x10b981;
+        part.mesh.material.color.setHex(ragHex);
+        // Scale opacity slightly if activity is partially complete vs 100% complete
+        const baseOp = part.partType === "facade" ? 0.48 : 0.88;
+        part.mesh.material.opacity = actPct < 1 ? baseOp * 0.75 : baseOp;
+        part.line.material.opacity = 0.45;
+      }
+    }
+
+    // Drill-down highlight: bump emissive (and ensure visibility) on the picked
+    // activity's meshes; reset emissive on everything else. Colour/opacity above
+    // are recomputed every call, so this layers cleanly on top of both modes.
+    if (highlightActId && part.actId === highlightActId) {
+      part.mesh.material.emissive.setHex(0x3b82f6);
+      part.mesh.material.emissiveIntensity = 0.9;
+      if (part.mesh.material.opacity < 0.55) part.mesh.material.opacity = 0.55;
+      part.line.material.color.setHex(0x93c5fd);
+      part.line.material.opacity = 0.95;
+    } else {
+      part.mesh.material.emissive.setHex(0x000000);
+      part.line.material.color.setHex(0x0f172a);
+    }
+  });
+
+  // Update Legend Overlay
+  const leg = document.getElementById("viewer-legend");
+  if (currentMode === "planned") {
+    leg.innerHTML = `
+      <div style="font-weight:700; color:#38bdf8; margin-bottom:4px;">PLANNED MODE — ${dayToDateStr(currentDay)} (Day ${currentDay}/650)</div>
+      <div class="legend-row"><span class="swatch" style="background:#0ea5e9;"></span> <strong>Complete:</strong> Activity finished by date</div>
+      <div class="legend-row"><span class="swatch" style="background:#38bdf8; border:1px solid #fff;"></span> <strong>In Progress:</strong> Active on ${dayToDateStr(currentDay)}</div>
+      <div class="legend-row"><span class="swatch" style="background:rgba(148,163,184,0.2); border:1px solid #64748b;"></span> <strong>Not Started:</strong> Ghosted wireframe</div>
+      <div style="margin-top:6px; font-size:10px; color:#94a3b8;">Drag to Orbit • Scroll to Zoom • Right-Click to Pan</div>
+    `;
+  } else {
+    // Build RAG rows from the already-computed workPackages overrun data (single source of truth).
+    // Skip WP0 preliminaries and any package with no earned value at the report date.
+    const ragBuckets = { green: [], amber: [], red: [] };
+    Object.keys(workPackages).forEach(k => {
+      if (k === "WP0") return;
+      const w = workPackages[k];
+      if (!w || !(w.ev > 0)) return;
+      const nm = (w.name.split(":")[1] || w.name).trim(); // e.g. "Concrete Frame"
+      const shortWord = nm.split(" ").pop();              // e.g. "Frame"
+      const pct = w.overrunPct;
+      const label = `${k} ${shortWord} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)`;
+      if (ragBuckets[w.rag]) ragBuckets[w.rag].push(label);
+    });
+    const greenTxt = ragBuckets.green.length ? ragBuckets.green.join(", ") : "—";
+    const amberTxt = ragBuckets.amber.length ? ragBuckets.amber.join(", ") : "—";
+    const redTxt = ragBuckets.red.length ? ragBuckets.red.join(", ") : "—";
+    leg.innerHTML = `
+      <div style="font-weight:700; color:#fbbf24; margin-bottom:4px;">ACTUAL AS-BUILT RAG — 31 Mar 2026</div>
+      <div class="legend-row"><span class="rag-glyph" aria-hidden="true">▼</span><span class="swatch" style="background:#10b981;"></span> <strong>Green (On/Under Budget):</strong> ${greenTxt}</div>
+      <div class="legend-row"><span class="rag-glyph" aria-hidden="true">△</span><span class="swatch" style="background:#f59e0b;"></span> <strong>Amber (0% to 5% Over):</strong> ${amberTxt}</div>
+      <div class="legend-row"><span class="rag-glyph" aria-hidden="true">▲</span><span class="swatch" style="background:#ef4444;"></span> <strong>Red (>5% Over Budget):</strong> ${redTxt}</div>
+      <div class="legend-row"><span class="swatch" style="background:rgba(148,163,184,0.15); border:1px solid #475569;"></span> <strong>Unbuilt at 31 Mar 26:</strong> Wireframe</div>
+    `;
+  }
+  requestRender();
+}
+
+// ============================================================================
+// 7. GANTT CHART CANVAS (WITH LOGIC LINKS & SYNCHRONIZED DATE LINE)
+// ============================================================================
+function drawGanttChart() {
+  const canvas = document.getElementById("gantt-canvas");
+  if (!canvas) return;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width;
+  const H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const leftPad = 230;
+  const rightPad = 18;
+  const topPad = 24;
+  const botPad = 18;
+  const chartW = W - leftPad - rightPad;
+  const chartH = H - topPad - botPad;
+
+  const visibleActs = activities.filter(a => workPackages[a.wp].visible);
+  const rowH = chartH / Math.max(1, visibleActs.length);
+
+  // Stash layout so the mousemove tooltip handler can map pointer->row without
+  // duplicating the geometry maths.
+  ganttLayout = { leftPad, rightPad, topPad, botPad, chartW, chartH, rowH, W, H, acts: visibleActs };
+
+  // Draw Quarter/Month vertical grid lines
+  ctx.font = "12px Inter, sans-serif";
+  ctx.fillStyle = "#94a3b8";
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+
+  for (let m = 0; m <= 30; m += 3) {
+    const x = leftPad + (m / 30) * chartW;
+    ctx.beginPath();
+    ctx.moveTo(x, topPad);
+    ctx.lineTo(x, H - botPad);
+    ctx.stroke();
+    if (m < 30) {
+      ctx.fillText(monthNames[m], x + 3, topPad - 7);
+    }
+  }
+
+  // Map row positions for logic link arrows
+  const posMap = {};
+  visibleActs.forEach((a, idx) => {
+    const yCenter = topPad + idx * rowH + rowH / 2;
+    const xStart = leftPad + ((a.s - 1) / 650) * chartW;
+    const xEnd = leftPad + (a.f / 650) * chartW;
+    posMap[a.id] = { xStart, xEnd, yCenter };
+
+    // Row alternating stripe
+    if (idx % 2 === 1) {
+      ctx.fillStyle = "rgba(255,255,255,0.02)";
+      ctx.fillRect(0, topPad + idx * rowH, W, rowH);
+    }
+
+    // Activity label
+    ctx.fillStyle = "#e2e8f0";
+    ctx.font = "12px Inter, sans-serif";
+    const shortName = `${a.id} ${a.name}`.substring(0, 32);
+    ctx.fillText(shortName, 6, yCenter + 3.5);
+
+    // Baseline Bar background
+    const barH = Math.min(11, rowH * 0.62);
+    ctx.fillStyle = "rgba(148, 163, 184, 0.25)";
+    ctx.fillRect(xStart, yCenter - barH / 2, Math.max(3, xEnd - xStart), barH);
+
+    // Progress Fill based on mode
+    let progFrac = 0;
+    let barColor = workPackages[a.wp].color;
+    if (currentMode === "planned") {
+      progFrac = getPlannedPct(a, currentDay);
+    } else {
+      progFrac = a.actPct / 100;
+      const rag = workPackages[a.wp].rag;
+      barColor = rag === "red" ? "#ef4444" : rag === "amber" ? "#f59e0b" : "#10b981";
+    }
+
+    if (progFrac > 0) {
+      ctx.fillStyle = barColor;
+      ctx.fillRect(xStart, yCenter - barH / 2, Math.max(2, (xEnd - xStart) * progFrac), barH);
+    }
+
+    // Border on bar
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.strokeRect(xStart, yCenter - barH / 2, Math.max(3, xEnd - xStart), barH);
+  });
+
+  // Draw Logic Links (Predecessor -> Successor connectors)
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.45)";
+  ctx.lineWidth = 1;
+  visibleActs.forEach(a => {
+    if (a.pred && a.pred !== "-") {
+      const predId = a.pred.split(" ")[0];
+      const p1 = posMap[predId];
+      const p2 = posMap[a.id];
+      if (p1 && p2) {
+        ctx.beginPath();
+        ctx.moveTo(p1.xEnd, p1.yCenter);
+        ctx.lineTo(p1.xEnd + 4, p1.yCenter);
+        ctx.lineTo(p1.xEnd + 4, p2.yCenter);
+        ctx.lineTo(p2.xStart, p2.yCenter);
+        ctx.stroke();
+      }
+    }
+  });
+
+  // Draw Synchronized Vertical Date Line
+  const dateX = leftPad + (currentDay / 650) * chartW;
+  ctx.strokeStyle = "#38bdf8";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(dateX, topPad - 4);
+  ctx.lineTo(dateX, H - botPad);
+  ctx.stroke();
+
+  // Also mark Report Date (31 Mar 2026) dashed line if slider is elsewhere
+  if (currentDay !== REPORT_DAY) {
+    const repX = leftPad + (REPORT_DAY / 650) * chartW;
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = "#f59e0b";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(repX, topPad);
+    ctx.lineTo(repX, H - botPad);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Update Header Summary
+  let compCount = 0, ipCount = 0, nsCount = 0;
+  activities.forEach(a => {
+    const p = currentMode === "planned" ? getPlannedPct(a, currentDay) : (a.actPct / 100);
+    if (p >= 1) compCount++;
+    else if (p > 0) ipCount++;
+    else nsCount++;
+  });
+  document.getElementById("gantt-kpi-summary").textContent =
+    `Complete: ${compCount} | In Progress: ${ipCount} | Not Started: ${nsCount}`;
+}
+
+// ============================================================================
+// 8. S-CURVE & MONTHLY HISTOGRAM CANVAS (PV BARS + CUMULATIVE PV, EV, AC)
+// ============================================================================
+function drawSCurveChart() {
+  const canvas = document.getElementById("scurve-canvas");
+  if (!canvas) return;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width;
+  const H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const leftPad = 58;
+  const rightPad = 58;
+  const topPad = 18;
+  const botPad = 24;
+  const chartW = W - leftPad - rightPad;
+  const chartH = H - topPad - botPad;
+
+  // Derive axis scales from the data so overruns never clip off-chart
+  const scTotalBAC = activities.reduce((s, a) => s + a.budget, 0);
+  const rawMaxCum = Math.max(
+    scTotalBAC,
+    ...monthlyData.map(md => md.cumAC || 0),
+    ...monthlyData.map(md => md.cumPV)
+  ) * 1.1;
+  const maxCum = Math.ceil(rawMaxCum / 25000000) * 25000000; // round up to a tidy £25M step
+  const maxMonthly = Math.max(...monthlyData.map(md => md.mPV)) * 1.15;
+
+  // Horizontal Grid & Left Axis (Cumulative £M) + Right Axis (Monthly £M)
+  ctx.font = "12px Inter, sans-serif";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = topPad + chartH - (i / 5) * chartH;
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.beginPath();
+    ctx.moveTo(leftPad, y);
+    ctx.lineTo(W - rightPad, y);
+    ctx.stroke();
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText(`£${Math.round((maxCum * i / 5) / 1000000)}M`, 6, y + 3);
+    ctx.fillText(`£${((maxMonthly * i / 5) / 1000000).toFixed(1)}M/m`, W - rightPad + 4, y + 3);
+  }
+
+  // 1. Draw Monthly Planned Value Bars
+  const barSlotW = chartW / 30;
+
+  // Stash layout so the mousemove tooltip handler can map pointer->month bucket.
+  scurveLayout = { leftPad, rightPad, topPad, botPad, chartW, chartH, barSlotW, count: 30 };
+  monthlyData.forEach((md, i) => {
+    const x = leftPad + i * barSlotW + barSlotW * 0.15;
+    const bw = barSlotW * 0.7;
+    const bh = (md.mPV / maxMonthly) * chartH;
+    const y = topPad + chartH - bh;
+
+    ctx.fillStyle = i < 15 ? "rgba(56, 189, 248, 0.28)" : "rgba(148, 163, 184, 0.18)";
+    ctx.fillRect(x, y, bw, bh);
+
+    if (i % 3 === 0) {
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillText(md.label, x - 2, H - 6);
+    }
+  });
+
+  // 2. Draw Cumulative Planned Value (PV) S-Curve (Blue)
+  ctx.strokeStyle = "#38bdf8";
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(leftPad, topPad + chartH);
+  monthlyData.forEach((md, i) => {
+    const x = leftPad + (i + 1) * barSlotW;
+    const y = topPad + chartH - (md.cumPV / maxCum) * chartH;
+    ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // 3. Draw Earned Value (EV - Green) & Actual Cost (AC - Red) up to Month 15 (31 Mar 2026)
+  ctx.strokeStyle = "#10b981";
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(leftPad, topPad + chartH);
+  monthlyData.forEach((md, i) => {
+    if (md.cumEV !== null) {
+      const x = leftPad + (i + 1) * barSlotW;
+      const y = topPad + chartH - (md.cumEV / maxCum) * chartH;
+      ctx.lineTo(x, y);
+    }
+  });
+  ctx.stroke();
+
+  ctx.strokeStyle = "#ef4444";
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(leftPad, topPad + chartH);
+  monthlyData.forEach((md, i) => {
+    if (md.cumAC !== null) {
+      const x = leftPad + (i + 1) * barSlotW;
+      const y = topPad + chartH - (md.cumAC / maxCum) * chartH;
+      ctx.lineTo(x, y);
+    }
+  });
+  ctx.stroke();
+
+  // 4. Draw Synchronized Date Line running through both bars and S-curve
+  const dateX = leftPad + (currentDay / 650) * chartW;
+  ctx.strokeStyle = "#38bdf8";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(dateX, topPad);
+  ctx.lineTo(dateX, topPad + chartH);
+  ctx.stroke();
+
+  // Calculate exact PV at currentDay
+  let curPV = 0;
+  activities.forEach(a => {
+    curPV += a.budget * getPlannedPct(a, currentDay);
+  });
+
+  // Legend & KPI Summary in S-Curve header
+  document.getElementById("scurve-kpi-summary").innerHTML =
+    `<span style="color:#38bdf8;">&#9644; PV (${dayToDateStr(currentDay)}): ${fmtGBP(curPV)}</span> &nbsp;|&nbsp; ` +
+    `<span style="color:#10b981;">&#9644; EV (31 Mar 26): ${fmtGBP(activities.reduce((s, a) => s + a.evAtReport, 0))}</span> &nbsp;|&nbsp; ` +
+    `<span style="color:#ef4444;">&#9644; AC (31 Mar 26): ${fmtGBP(activities.reduce((s, a) => s + a.ac, 0))}</span>`;
+}
+
+function drawAllCharts() {
+  update3DModel();
+  drawGanttChart();
+  drawSCurveChart();
+}
+
+// ============================================================================
+// 9. UI INTERACTION HANDLERS
+// ============================================================================
+function onSliderChange(val) {
+  currentDay = parseInt(val, 10);
+  document.getElementById("current-date-label").textContent = dayToDateStr(currentDay);
+  drawAllCharts();
+}
+
+function jumpToReportDate() {
+  currentDay = REPORT_DAY;
+  document.getElementById("date-slider").value = REPORT_DAY;
+  document.getElementById("current-date-label").textContent = dayToDateStr(REPORT_DAY);
+  drawAllCharts();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById("btn-mode-planned").classList.toggle("active", mode === "planned");
+  document.getElementById("btn-mode-actual").classList.toggle("active", mode === "actual");
+  if (mode === "actual") {
+    jumpToReportDate();
+  } else {
+    drawAllCharts();
+  }
+}
+
+function toggleWP(wpKey, isChecked) {
+  if (workPackages[wpKey]) {
+    workPackages[wpKey].visible = isChecked;
+    drawAllCharts();
+  }
+}
+
+function togglePlay() {
+  const btn = document.getElementById("play-btn");
+  if (playRAF !== null) {
+    // Pause: cancel the rAF loop
+    cancelAnimationFrame(playRAF);
+    playRAF = null;
+    playLastTs = null;
+    btn.innerHTML = "&#9654; Play 5D";
+  } else {
+    // Play: restart from 0 if at the end, then drive with a timestamp delta
+    if (currentDay >= 650) currentDay = 0;
+    playDayFloat = currentDay;
+    playLastTs = null;
+    btn.innerHTML = "&#9208; Pause";
+    const step = (ts) => {
+      if (playLastTs === null) playLastTs = ts;
+      const dt = (ts - playLastTs) / 1000; // seconds since last frame
+      playLastTs = ts;
+      playDayFloat += dt * PLAY_DAYS_PER_SEC;
+      currentDay = Math.min(650, Math.round(playDayFloat));
+      document.getElementById("date-slider").value = currentDay;
+      document.getElementById("current-date-label").textContent = dayToDateStr(currentDay);
+      drawAllCharts(); // recolours the 3D model (which calls requestRender) + redraws charts
+      if (currentDay >= 650) {
+        togglePlay(); // reached the end -> stop and reset the button label
+        return;
+      }
+      playRAF = requestAnimationFrame(step);
+    };
+    playRAF = requestAnimationFrame(step);
+  }
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(el => {
+    el.classList.remove("active");
+    el.setAttribute("aria-selected", "false");
+  });
+  document.getElementById("tab-" + tabId).classList.add("active");
+  // Select the active button by data-tab (no fragile hardcoded index map)
+  const activeBtn = document.querySelector('.tab-btn[data-tab="' + tabId + '"]');
+  if (activeBtn) {
+    activeBtn.classList.add("active");
+    activeBtn.setAttribute("aria-selected", "true");
+  }
+  if (tabId === "5d") {
+    setTimeout(onWindowResize, 50);
+  }
+}
+
+// Left/Right arrow-key navigation across the tablist (wraps around)
+window.addEventListener("DOMContentLoaded", () => {
+  const tablist = document.querySelector(".tabs");
+  if (!tablist) return;
+  tablist.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const btns = Array.from(tablist.querySelectorAll(".tab-btn"));
+    if (!btns.length) return;
+    let curIdx = btns.findIndex(b => b.getAttribute("aria-selected") === "true");
+    if (curIdx < 0) curIdx = 0;
+    const next = e.key === "ArrowRight"
+      ? (curIdx + 1) % btns.length
+      : (curIdx - 1 + btns.length) % btns.length;
+    const nextBtn = btns[next];
+    switchTab(nextBtn.getAttribute("data-tab"));
+    nextBtn.focus();
+    e.preventDefault();
+  });
+});
+
+// ============================================================================
+// 10. 3D DRILL-DOWN, CHART TOOLTIPS, SPI/CPI KPIs & EXPORT
+// ============================================================================
+let ganttLayout = null;      // filled each drawGanttChart run
+let scurveLayout = null;     // filled each drawSCurveChart run
+let highlightActId = null;   // currently picked activity id (null = none)
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+let pickDownX = 0, pickDownY = 0; // mousedown pos to distinguish click from orbit-drag
+
+// ---- 3D raycast picking ----------------------------------------------------
+function pick3DAt(e) {
+  if (!renderer || !camera) return;
+  const dom = renderer.domElement;
+  const r = dom.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return;
+  pointerNDC.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  pointerNDC.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  raycaster.setFromCamera(pointerNDC, camera);
+  const pickables = meshParts.filter(p => p.mesh.visible).map(p => p.mesh);
+  if (!pickables.length) { clearSelection(); return; }
+  const hits = raycaster.intersectObjects(pickables, false); // nearest first; ignore child edge lines
+  if (!hits.length) { clearSelection(); return; }
+  const part = meshParts.find(p => p.mesh === hits[0].object);
+  if (!part) { clearSelection(); return; }
+  selectActivity(part.actId);
+}
+
+function selectActivity(actId) {
+  const a = activities.find(x => x.id === actId);
+  if (!a) return;
+  highlightActId = actId;
+  update3DModel();        // recolour (planned/actual) + reapply highlight; calls requestRender
+  showDetailPopup(a);
+}
+
+function clearSelection() {
+  const d = document.getElementById("viewer-detail");
+  if (highlightActId === null && (!d || d.hidden)) return;
+  highlightActId = null;
+  if (d) d.hidden = true;
+  update3DModel();
+}
+
+function showDetailPopup(a) {
+  const d = document.getElementById("viewer-detail");
+  if (!d) return;
+  const wp = workPackages[a.wp] || { name: a.wp, color: "#94a3b8", rag: "green" };
+  const planPct = getPlannedPct(a, currentDay) * 100;
+  const variance = a.ac - a.evAtReport;
+  const ragGlyph = wp.rag === "red" ? "▲" : wp.rag === "amber" ? "△" : "▼";
+  const ragCls = wp.rag === "red" ? "evm-bad" : wp.rag === "amber" ? "evm-warn" : "evm-good";
+  const ragLabel = wp.rag === "red" ? "RED (>5% over)" : wp.rag === "amber" ? "AMBER (0–5% over)" : "GREEN (on/under)";
+  const vCls = variance > 0 ? "evm-bad" : "evm-good";
+  d.innerHTML =
+    '<button class="vd-close" aria-label="Close activity detail" onclick="clearSelection()">&times;</button>' +
+    '<div class="vd-title"><span class="vd-wp-dot" style="background:' + wp.color + ';"></span>' + wp.name + '</div>' +
+    '<div class="vd-sub">' + a.id + ' — ' + a.name + '</div>' +
+    '<div class="vd-row"><span>BAC</span><span>' + fmtGBP(a.budget) + '</span></div>' +
+    '<div class="vd-row"><span>Planned % (' + dayToDateStr(currentDay) + ')</span><span>' + planPct.toFixed(1) + '%</span></div>' +
+    '<div class="vd-row"><span>Actual %</span><span>' + a.actPct.toFixed(1) + '%</span></div>' +
+    '<div class="vd-row"><span>PV (report)</span><span>' + fmtGBP(a.pvAtReport) + '</span></div>' +
+    '<div class="vd-row"><span>EV</span><span>' + fmtGBP(a.evAtReport) + '</span></div>' +
+    '<div class="vd-row"><span>AC</span><span>' + fmtGBP(a.ac) + '</span></div>' +
+    '<div class="vd-row"><span>Variance (AC−EV)</span><span class="' + vCls + '">' + fmtGBP(variance) + '</span></div>' +
+    '<div class="vd-row"><span>Package RAG</span><span class="' + ragCls + '"><span class="rag-glyph" aria-hidden="true">' + ragGlyph + '</span>' + ragLabel + '</span></div>';
+  d.hidden = false;
+}
+
+// ---- Shared chart tooltip --------------------------------------------------
+function tooltipEl() { return document.getElementById("chart-tooltip"); }
+function hideTooltip() { const t = tooltipEl(); if (t) t.style.display = "none"; }
+function positionTooltip(e) {
+  const t = tooltipEl();
+  if (!t) return;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  const tw = t.offsetWidth, th = t.offsetHeight;
+  if (x + tw > window.innerWidth - 8) x = e.clientX - tw - 14;
+  if (y + th > window.innerHeight - 8) y = e.clientY - th - 14;
+  t.style.left = Math.max(4, x) + "px";
+  t.style.top = Math.max(4, y) + "px";
+}
+
+function onGanttHover(e) {
+  const t = tooltipEl();
+  if (!t || !ganttLayout) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const y = e.clientY - r.top;
+  const { topPad, rowH, acts } = ganttLayout;
+  if (!acts || !acts.length || !(rowH > 0) || y < topPad) { hideTooltip(); return; }
+  const idx = Math.floor((y - topPad) / rowH);
+  if (idx < 0 || idx >= acts.length) { hideTooltip(); return; }
+  const a = acts[idx];
+  const planPct = getPlannedPct(a, currentDay) * 100;
+  t.innerHTML =
+    '<div class="tt-title">' + a.id + ' — ' + a.name + '</div>' +
+    '<div class="tt-row"><span>Baseline</span><span>' + dayToDateStr(a.s) + ' → ' + dayToDateStr(a.f) + '</span></div>' +
+    '<div class="tt-row"><span>Duration</span><span>' + a.dur + ' days</span></div>' +
+    '<div class="tt-row"><span>BAC</span><span>' + fmtGBP(a.budget) + '</span></div>' +
+    '<div class="tt-row"><span>Plan % (' + dayToDateStr(currentDay) + ')</span><span>' + planPct.toFixed(1) + '%</span></div>' +
+    '<div class="tt-row"><span>Actual %</span><span>' + a.actPct.toFixed(1) + '%</span></div>';
+  t.style.display = "block";
+  positionTooltip(e);
+}
+
+function onSCurveHover(e) {
+  const t = tooltipEl();
+  if (!t || !scurveLayout) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const { leftPad, chartW, barSlotW } = scurveLayout;
+  if (!(barSlotW > 0) || x < leftPad || x > leftPad + chartW) { hideTooltip(); return; }
+  let i = Math.floor((x - leftPad) / barSlotW);
+  if (i < 0) i = 0;
+  if (i > 29) i = 29;
+  const md = monthlyData[i];
+  if (!md) { hideTooltip(); return; }
+  let rows =
+    '<div class="tt-row"><span>Monthly PV</span><span>' + fmtGBP(md.mPV) + '</span></div>' +
+    '<div class="tt-row"><span>Cumulative PV</span><span>' + fmtGBP(md.cumPV) + '</span></div>';
+  if (md.cumEV !== null && md.cumEV !== undefined) rows += '<div class="tt-row"><span>Cumulative EV</span><span>' + fmtGBP(md.cumEV) + '</span></div>';
+  if (md.cumAC !== null && md.cumAC !== undefined) rows += '<div class="tt-row"><span>Cumulative AC</span><span>' + fmtGBP(md.cumAC) + '</span></div>';
+  t.innerHTML = '<div class="tt-title">' + md.label + '</div>' + rows;
+  t.style.display = "block";
+  positionTooltip(e);
+}
+
+// ---- SPI / CPI KPI strip (report-date earned value) ------------------------
+function renderEVMStrip() {
+  const el = document.getElementById("evm-kpi-strip");
+  if (!el) return;
+  const PV = activities.reduce((s, a) => s + a.pvAtReport, 0);
+  const EV = activities.reduce((s, a) => s + a.evAtReport, 0);
+  const AC = activities.reduce((s, a) => s + a.ac, 0);
+  const cpi = AC > 0 ? EV / AC : 0;    // <1 = over budget
+  const spi = PV > 0 ? EV / PV : 0;    // <1 = behind schedule
+  const costVar = EV - AC;             // negative = over budget
+  const schedVar = EV - PV;            // negative = behind schedule
+  const idxCls = v => (v >= 1.0 ? "evm-good" : v >= 0.95 ? "evm-warn" : "evm-bad");
+  const idxGlyph = v => (v >= 1.0 ? "▲" : v >= 0.95 ? "◆" : "▼");
+  el.innerHTML =
+    '<span class="evm-idx ' + idxCls(cpi) + '" title="Cost Performance Index (EV/AC). ≥1.00 means on/under budget."><span class="evm-glyph" aria-hidden="true">' + idxGlyph(cpi) + '</span>CPI ' + cpi.toFixed(2) + '</span>' +
+    '<span class="evm-idx ' + idxCls(spi) + '" title="Schedule Performance Index (EV/PV). ≥1.00 means on/ahead of schedule."><span class="evm-glyph" aria-hidden="true">' + idxGlyph(spi) + '</span>SPI ' + spi.toFixed(2) + '</span>' +
+    '<span class="evm-metric">PV <strong>' + fmtGBP(PV) + '</strong></span>' +
+    '<span class="evm-metric">EV <strong>' + fmtGBP(EV) + '</strong></span>' +
+    '<span class="evm-metric">AC <strong>' + fmtGBP(AC) + '</strong></span>' +
+    '<span class="evm-metric">Cost Var (EV−AC) <strong class="' + (costVar >= 0 ? "evm-good" : "evm-bad") + '">' + fmtGBP(costVar) + '</strong></span>' +
+    '<span class="evm-metric">Sched Var (EV−PV) <strong class="' + (schedVar >= 0 ? "evm-good" : "evm-bad") + '">' + fmtGBP(schedVar) + '</strong></span>';
+}
+
+// ---- Export: PNG of the 3D view, CSV of the activity EV table --------------
+function exportPNG() {
+  if (!renderer || !scene || !camera) return;
+  try {
+    renderer.render(scene, camera); // force a fresh frame before grabbing the buffer
+    const url = renderer.domElement.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "kvb-5d-view.png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (err) {
+    console.error("Export PNG failed", err);
+  }
+}
+
+function csvField(v) {
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function exportCSV() {
+  try {
+    const headers = ["Act ID", "Work Package", "Activity", "Dur", "Baseline Start", "Baseline Finish",
+      "BAC", "Plan% (report)", "Actual%", "PV", "EV", "AC", "Variance(AC-EV)"];
+    const rows = activities.map(a => [
+      a.id, a.wp, a.name, a.dur, dayToDateStr(a.s), dayToDateStr(a.f),
+      Math.round(a.budget), a.planPctAtReport.toFixed(1), a.actPct.toFixed(1),
+      Math.round(a.pvAtReport), Math.round(a.evAtReport), Math.round(a.ac),
+      Math.round(a.ac - a.evAtReport)
+    ]);
+    const csv = [headers].concat(rows).map(r => r.map(csvField).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "kvb-cost-report.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Export CSV failed", err);
+  }
+}
+
+// ---- Wire up interaction listeners -----------------------------------------
+function setup5DInteractions() {
+  if (renderer && renderer.domElement) {
+    const dom = renderer.domElement;
+    dom.addEventListener("mousedown", e => { pickDownX = e.clientX; pickDownY = e.clientY; });
+    dom.addEventListener("mouseup", e => {
+      // Ignore the click if the pointer moved (>5px) — that was an orbit/pan drag.
+      if (Math.hypot(e.clientX - pickDownX, e.clientY - pickDownY) > 5) return;
+      pick3DAt(e);
+    });
+  }
+  const gc = document.getElementById("gantt-canvas");
+  if (gc) {
+    gc.addEventListener("mousemove", onGanttHover);
+    gc.addEventListener("mouseleave", hideTooltip);
+  }
+  const sc = document.getElementById("scurve-canvas");
+  if (sc) {
+    sc.addEventListener("mousemove", onSCurveHover);
+    sc.addEventListener("mouseleave", hideTooltip);
+  }
+}
+
+// Boot application
+window.addEventListener("DOMContentLoaded", () => {
+  populateTables();
+  initThreeJS();
+  renderEVMStrip();
+  setup5DInteractions();
+  setTimeout(onWindowResize, 100);
+});
+</script>
+
+<!-- Shared reusable tooltip for both chart canvases -->
+<div id="chart-tooltip" role="tooltip" aria-hidden="true"></div>
+</body>
+</html>
