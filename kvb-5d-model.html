@@ -8,17 +8,17 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <style>
   :root {
-    --bg-dark: #0f172a;
-    --bg-panel: #1e293b;
-    --bg-card: #334155;
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --accent: #38bdf8;
-    --border: #475569;
-    --green: #10b981;
-    --amber: #f59e0b;
-    --red: #ef4444;
-    --blue: #3b82f6;
+    --bg-dark: #0f0b06;
+    --bg-panel: #1c160d;
+    --bg-card: #2b2114;
+    --text-main: #f4ecdd;
+    --text-muted: #b7a583;
+    --accent: #e0bb48;
+    --border: #5a4526;
+    --green: #4fbf8b;
+    --amber: #f0b429;
+    --red: #e3614b;
+    --blue: #c7a24a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   body { background: var(--bg-dark); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -49,7 +49,7 @@
     transition: all 0.15s;
   }
   .tab-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
-  .tab-btn.active { background: var(--accent); color: #0f172a; border-color: var(--accent); }
+  .tab-btn.active { background: var(--accent); color: #15100a; border-color: var(--accent); }
   .tab-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* Tab Content Containers */
@@ -71,7 +71,7 @@
   th { background: rgba(0,0,0,0.25); color: var(--text-muted); font-weight: 600; position: sticky; top: 0; z-index: 2; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   tr:hover { background: rgba(255,255,255,0.03); }
-  tr.total-row { background: rgba(56, 189, 248, 0.12); font-weight: 700; border-top: 2px solid var(--accent); }
+  tr.total-row { background: rgba(212, 175, 55, 0.12); font-weight: 700; border-top: 2px solid var(--accent); }
 
   .badge { padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; display: inline-block; }
   .bg-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
@@ -101,7 +101,7 @@
   .date-badge { background: var(--bg-dark); border: 1px solid var(--accent); color: var(--accent); padding: 4px 10px; border-radius: 5px; font-weight: 700; font-size: 13px; min-width: 110px; text-align: center; }
   .mode-switch { display: flex; background: var(--bg-dark); border-radius: 6px; padding: 2px; border: 1px solid var(--border); }
   .mode-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 4px; }
-  .mode-btn.active { background: var(--accent); color: #0f172a; }
+  .mode-btn.active { background: var(--accent); color: #15100a; }
 
   .wp-toggles { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 11px; }
   .wp-toggle { display: flex; align-items: center; gap: 4px; background: var(--bg-card); padding: 3px 8px; border-radius: 4px; cursor: pointer; user-select: none; }
@@ -115,7 +115,7 @@
     min-height: 0;
   }
   .viewer-panel {
-    background: #090d16;
+    background: #0b0805;
     border: 1px solid var(--border);
     border-radius: 8px;
     position: relative;
@@ -315,7 +315,7 @@
   <div class="grid-2">
     <div class="card">
       <div class="card-title">QS Engineering & Architectural Assumptions (From Drawings)</div>
-      <ul style="font-size:12.5px; line-height:1.65; padding-left:18px; color:#cbd5e1;">
+      <ul style="font-size:12.5px; line-height:1.65; padding-left:18px; color:#d8c7a8;">
         <li><strong>Substructure & Foundations:</strong> Drilled concrete caissons socketed into Nashville limestone bedrock with thick reinforced concrete mat foundations beneath the dual high-rise elevator/stair cores (1,355 GSF core footprint per floor) and transfer columns.</li>
         <li><strong>Superstructure Frame Type:</strong> Cast-in-place post-tensioned (PT) reinforced concrete flat-plate slabs (8"–10" thick) with high-strength concrete shear walls (8,000–10,000 psi). Acoustic and structural transfer slabs/girders located at <strong>Level 5</strong> (parking/ballroom podium to hotel tower step-back), <strong>Level 14</strong> (hotel to residential grid transition), and <strong>Level 32</strong> (upper tier setback).</li>
         <li><strong>External Facade System:</strong> Unitized aluminum and high-performance low-E glass curtain wall with bronze/terracotta vertical architectural fins on the tower (per Elkus Manfredi rendering), architectural metal louver screening on Podium Parking Levels 1–4, and expansive outdoor Amenity Terraces at Level 5 (hotel pool deck) and Level 38 (residential sky amenity & pool terrace).</li>
@@ -418,7 +418,7 @@
           <th>Baseline Start</th>
           <th>Baseline Finish</th>
           <th class="num">Budget (BAC)</th>
-          <th class="num">Daily Rate (£/d)</th>
+          <th class="num">Daily Rate (US$/d)</th>
           <th class="num">Plan % (31 Mar 26)</th>
           <th class="num">Actual % (31 Mar 26)</th>
           <th>Status</th>
@@ -440,10 +440,10 @@
             <tr>
               <th>NRM</th>
               <th>Element Description</th>
-              <th class="num">Element Total (£)</th>
+              <th class="num">Element Total (US$)</th>
               <th>Split Basis / Rule</th>
               <th>Target Activity</th>
-              <th class="num">Allocated (£)</th>
+              <th class="num">Allocated (US$)</th>
             </tr>
           </thead>
           <tbody id="nrm-tbody"></tbody>
@@ -477,7 +477,7 @@
               <tr>
                 <th>Act ID</th>
                 <th>Activity</th>
-                <th class="num">Budget (£)</th>
+                <th class="num">Budget (US$)</th>
                 <th class="num">Plan %</th>
                 <th class="num">Planned (PV)</th>
                 <th class="num">Act %</th>
@@ -543,7 +543,7 @@
       <div class="gantt-panel">
         <div class="panel-header">
           <span>Baseline Programme Gantt Chart & Logic Links</span>
-          <span id="gantt-kpi-summary" style="color:#cbd5e1; font-weight:500;"></span>
+          <span id="gantt-kpi-summary" style="color:#d8c7a8; font-weight:500;"></span>
         </div>
         <div class="canvas-wrap">
           <canvas id="gantt-canvas" class="chart-canvas" role="img" aria-label="Baseline programme Gantt chart with logic links and a synchronized status date line; per-activity progress summary shown in the panel header."></canvas>
@@ -553,7 +553,7 @@
       <div class="scurve-panel">
         <div class="panel-header" style="padding:0 0 6px 0; margin-bottom:4px;">
           <span>Monthly Cashflow Histogram & Cumulative 5D S-Curve (PV / EV / AC)</span>
-          <span id="scurve-kpi-summary" style="color:#cbd5e1; font-weight:500;"></span>
+          <span id="scurve-kpi-summary" style="color:#d8c7a8; font-weight:500;"></span>
         </div>
         <div class="canvas-wrap">
           <canvas id="scurve-canvas" class="chart-canvas" role="img" aria-label="Monthly cashflow histogram with cumulative 5D S-curves for Planned Value, Earned Value and Actual Cost; current PV, EV and AC totals shown in the panel header."></canvas>
@@ -653,7 +653,7 @@ activities.forEach(a => {
 });
 
 const workPackages = {
-  WP0: { name: "WP0: Preliminaries", color: "#94a3b8", visible: true },
+  WP0: { name: "WP0: Preliminaries", color: "#b2a186", visible: true },
   WP1: { name: "WP1: Substructure", color: "#a855f7", visible: true },
   WP2: { name: "WP2: Concrete Frame", color: "#3b82f6", visible: true },
   WP3: { name: "WP3: Facade & Roofs", color: "#06b6d4", visible: true },
@@ -687,7 +687,7 @@ const nrmLines = [
   { ref: "2.5", desc: "External Walls, Unitized Curtain Wall & Louvers", total: 36000000, rule: "25% per vertical envelope zone", allocs: [
     { act: "A107", val: 9000000 }, { act: "A108", val: 9000000 }, { act: "A109", val: 9000000 }, { act: "A110", val: 9000000 }
   ]},
-  { ref: "2.3", desc: "Roof Finishings & L5 / L36 Outdoor Amenity Decks", total: 4000000, rule: "50% L5 Pool Terrace (21,247 SF) / 50% L36 & 36M Roofs", allocs: [
+  { ref: "2.3", desc: "Roof Finishings & L5 / L38 Outdoor Amenity Decks", total: 4000000, rule: "50% L5 Pool Deck / 50% L38 Sky Amenity & 38M Roof", allocs: [
     { act: "A108", val: 2000000 }, { act: "A110", val: 2000000 }
   ]},
   { ref: "3.0", desc: "Internal Walls, Partitions & Finishes", total: 42000000, rule: "19.05% Podium/Ballroom, 33.33% Hotel, 47.62% Condos", allocs: [
@@ -726,9 +726,9 @@ function dayToDateStr(day) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function fmtGBP(val) {
+function fmtUSD(val) {
   const sign = val < 0 ? "-" : "";
-  return sign + "£" + Math.round(Math.abs(val)).toLocaleString("en-GB");
+  return sign + "$" + Math.round(Math.abs(val)).toLocaleString("en-US");
 }
 
 // Precompute 30 Monthly Buckets (21.67 working days per month average; exact 650 days across 30 months)
@@ -754,7 +754,7 @@ for (let m = 0; m < 30; m++) {
 }
 
 // Compute smooth historical EV and AC curves from Month 1 to Month 15 (31 Mar 2026)
-// Anchored strictly so Month 15 (index 14, endDay 325) equals exact report EV (£103,275,000) and AC (£106,018,000)
+// Anchored strictly so Month 15 (index 14, endDay 325) equals exact report EV ($103,275,000) and AC ($106,018,000)
 monthlyData.forEach((md, idx) => {
   if (idx < 15) {
     let evSum = 0;
@@ -835,8 +835,8 @@ function populateTables() {
       <td class="num">${a.dur}</td>
       <td>${dayToDateStr(a.s)}</td>
       <td>${dayToDateStr(a.f)}</td>
-      <td class="num">${fmtGBP(a.budget)}</td>
-      <td class="num">${fmtGBP(a.dailyRate)}</td>
+      <td class="num">${fmtUSD(a.budget)}</td>
+      <td class="num">${fmtUSD(a.dailyRate)}</td>
       <td class="num">${a.planPctAtReport.toFixed(1)}%</td>
       <td class="num">${a.actPct.toFixed(1)}%</td>
       <td>${stBadge}</td>
@@ -854,7 +854,7 @@ function populateTables() {
     <td class="num">${progTotalDays} Days</td>
     <td>01 Jan 2025</td>
     <td>30 Jun 2027</td>
-    <td class="num">${fmtGBP(progTotBAC)}</td>
+    <td class="num">${fmtUSD(progTotBAC)}</td>
     <td class="num">-</td>
     <td class="num">${progPlanPct.toFixed(1)}%</td>
     <td class="num">${progActPct.toFixed(1)}%</td>
@@ -872,18 +872,18 @@ function populateTables() {
       nHtml += `<tr>
         <td>${idx === 0 ? `<strong>${line.ref}</strong>` : ""}</td>
         <td>${idx === 0 ? line.desc : ""}</td>
-        <td class="num">${idx === 0 ? fmtGBP(line.total) : ""}</td>
-        <td style="font-size:11px; color:#cbd5e1;">${idx === 0 ? line.rule : ""}</td>
+        <td class="num">${idx === 0 ? fmtUSD(line.total) : ""}</td>
+        <td style="font-size:11px; color:#d8c7a8;">${idx === 0 ? line.rule : ""}</td>
         <td><span class="badge bg-blue">${al.act}</span></td>
-        <td class="num">${fmtGBP(al.val)}</td>
+        <td class="num">${fmtUSD(al.val)}</td>
       </tr>`;
     });
   });
   nHtml += `<tr class="total-row">
-    <td colspan="2">NRM COST PLAN TOTAL (CHECK = £0 DIFF)</td>
-    <td class="num">£245,000,000</td>
+    <td colspan="2">NRM COST PLAN TOTAL (CHECK = $0 DIFF)</td>
+    <td class="num">${fmtUSD(nrmLines.reduce((s, l) => s + l.total, 0))}</td>
     <td colspan="2">100% Allocated Across 19 Activities</td>
-    <td class="num">${fmtGBP(checkTotal)}</td>
+    <td class="num">${fmtUSD(checkTotal)}</td>
   </tr>`;
   nBody.innerHTML = nHtml;
 
@@ -900,11 +900,11 @@ function populateTables() {
     const ragGlyph = w.rag === "red" ? "▲" : w.rag === "amber" ? "△" : "▼";
     pkgHtml += `<tr>
       <td><strong>${w.name}</strong></td>
-      <td class="num">${fmtGBP(w.bac)}</td>
-      <td class="num">${fmtGBP(w.pv)}</td>
-      <td class="num">${fmtGBP(w.ev)}</td>
-      <td class="num">${fmtGBP(w.ac)}</td>
-      <td class="num">${fmtGBP(w.diff)}</td>
+      <td class="num">${fmtUSD(w.bac)}</td>
+      <td class="num">${fmtUSD(w.pv)}</td>
+      <td class="num">${fmtUSD(w.ev)}</td>
+      <td class="num">${fmtUSD(w.ac)}</td>
+      <td class="num">${fmtUSD(w.diff)}</td>
       <td class="num">${w.overrunPct > 0 ? "+" : ""}${w.overrunPct.toFixed(2)}%</td>
       <td><span class="badge ${badgeClass}"><span class="rag-glyph" aria-hidden="true">${ragGlyph}</span>${ragLabel}</span></td>
     </tr>`;
@@ -913,13 +913,13 @@ function populateTables() {
   const totOver = (totDiff / tEV) * 100;
   pkgHtml += `<tr class="total-row">
     <td>TOTAL COST REPORT (31 MAR 2026)</td>
-    <td class="num">${fmtGBP(tBAC)}</td>
-    <td class="num">${fmtGBP(tPV)}</td>
-    <td class="num">${fmtGBP(tEV)}</td>
-    <td class="num">${fmtGBP(tAC)}</td>
-    <td class="num">+${fmtGBP(totDiff)}</td>
+    <td class="num">${fmtUSD(tBAC)}</td>
+    <td class="num">${fmtUSD(tPV)}</td>
+    <td class="num">${fmtUSD(tEV)}</td>
+    <td class="num">${fmtUSD(tAC)}</td>
+    <td class="num">+${fmtUSD(totDiff)}</td>
     <td class="num">+${totOver.toFixed(2)}%</td>
-    <td><span class="badge bg-amber">Exact Match (£0 Diff)</span></td>
+    <td><span class="badge bg-amber">Exact Match ($0 Diff)</span></td>
   </tr>`;
   pkgBody.innerHTML = pkgHtml;
 
@@ -930,12 +930,12 @@ function populateTables() {
     evHtml += `<tr>
       <td><strong>${a.id}</strong></td>
       <td>${a.name}</td>
-      <td class="num">${fmtGBP(a.budget)}</td>
+      <td class="num">${fmtUSD(a.budget)}</td>
       <td class="num">${a.planPctAtReport.toFixed(1)}%</td>
-      <td class="num">${fmtGBP(a.pvAtReport)}</td>
+      <td class="num">${fmtUSD(a.pvAtReport)}</td>
       <td class="num">${a.actPct.toFixed(1)}%</td>
-      <td class="num">${fmtGBP(a.evAtReport)}</td>
-      <td class="num">${fmtGBP(a.ac)}</td>
+      <td class="num">${fmtUSD(a.evAtReport)}</td>
+      <td class="num">${fmtUSD(a.ac)}</td>
     </tr>`;
   });
   evBody.innerHTML = evHtml;
@@ -953,7 +953,7 @@ function initThreeJS() {
   const h = container.clientHeight || 500;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x090d16);
+  scene.background = new THREE.Color(0x0b0805);
 
   camera = new THREE.PerspectiveCamera(42, w / h, 1, 3000);
   camera.position.set(240, 190, 290);
@@ -981,7 +981,7 @@ function initThreeJS() {
   scene.add(dirLight2);
 
   // Ground Grid
-  const grid = new THREE.GridHelper(320, 32, 0x334155, 0x1e293b);
+  const grid = new THREE.GridHelper(320, 32, 0x33281a, 0x211a10);
   scene.add(grid);
 
   // Scale factor: 1 Three.js unit = 2.2 feet vertically & horizontally
@@ -990,7 +990,7 @@ function initThreeJS() {
   // Helper to register meshes
   function addPart(geom, x, y, z, wp, actId, partType, isWireframe = false) {
     const mat = new THREE.MeshPhongMaterial({
-      color: 0x64748b,
+      color: 0x7a6238,
       transparent: true,
       opacity: 0.85,
       shininess: 40
@@ -1000,7 +1000,7 @@ function initThreeJS() {
 
     // Subtle edge outline for architectural clarity
     const edges = new THREE.EdgesGeometry(geom);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.35 });
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x15100a, transparent: true, opacity: 0.35 });
     const line = new THREE.LineSegments(edges, lineMat);
     mesh.add(line);
 
@@ -1036,7 +1036,6 @@ function initThreeJS() {
   //    at the real 492 ft) and each footprint is DERIVED FROM that floor's GSF,
   //    so the podium/amenity full-plates (L1–L5) read large and the tower +
   //    crown step back automatically as GSF drops — no hand-tuned per-floor box.
-  const ASPECT = 1.55;             // plan W : D
   const PLAN_SCALE = SCALE * 0.45; // ft -> scene units for plan dimensions
   let prevElev = 0;
   floorData.forEach((f) => {
@@ -1046,14 +1045,18 @@ function initThreeJS() {
     const centerY = (prevElev * SCALE) + h / 2;
     const slabBottomY = prevElev * SCALE;
 
-    // Footprint from GSF: full-plate podium/amenity (L1–L5, >40k GSF) sits
-    // centred; the slender residential/hotel tower steps back to one corner.
+    // Footprint from GSF. Per the Elkus Manfredi concept: a broad, nearly-square
+    // podium/amenity base (L1–L5, >40k GSF) and above it a SLENDER rectangular
+    // slab tower of near-constant plate (a high W:D aspect) rising straight to a
+    // small mechanical cap — matching the concept rendering rather than a
+    // stepped ziggurat.
     const areaFt = f.gsf;
     const isPodium = areaFt > 40000;
-    const wFt = Math.sqrt(areaFt * ASPECT);
-    const dFt = Math.sqrt(areaFt / ASPECT);
-    const offX = isPodium ? 0 : -40;
-    const offZ = isPodium ? 0 : -12;
+    const aspect = isPodium ? 1.3 : 2.15;   // podium squarish, tower a thin slab
+    const wFt = Math.sqrt(areaFt * aspect);
+    const dFt = Math.sqrt(areaFt / aspect);
+    const offX = isPodium ? 0 : -46;
+    const offZ = isPodium ? 0 : -10;
 
     const W = wFt * PLAN_SCALE;
     const D = dFt * PLAN_SCALE;
@@ -1156,12 +1159,12 @@ function update3DModel() {
       part.mesh.visible = true;
       if (pct <= 0) {
         // Not started: ghostly wireframe
-        part.mesh.material.color.setHex(0x475569);
+        part.mesh.material.color.setHex(0x4d3c22);
         part.mesh.material.opacity = 0.08;
         part.line.material.opacity = 0.12;
       } else if (pct < 1) {
         // In progress: vibrant cyan/blue
-        part.mesh.material.color.setHex(0x38bdf8);
+        part.mesh.material.color.setHex(0xd4af37);
         part.mesh.material.opacity = part.partType === "facade" ? 0.45 : 0.85;
         part.line.material.opacity = 0.5;
       } else {
@@ -1169,7 +1172,7 @@ function update3DModel() {
         const compColors = {
           WP1: 0x8b5cf6,
           WP2: 0x3b82f6,
-          WP3: 0x0ea5e9,
+          WP3: 0xc08a3c,
           WP4: 0xeab308,
           WP5: 0xec4899,
           WP6: 0x10b981
@@ -1184,7 +1187,7 @@ function update3DModel() {
       const actPct = act.actPct / 100;
       if (actPct <= 0) {
         part.mesh.visible = true;
-        part.mesh.material.color.setHex(0x334155);
+        part.mesh.material.color.setHex(0x33281a);
         part.mesh.material.opacity = 0.05;
         part.line.material.opacity = 0.08;
       } else {
@@ -1209,7 +1212,7 @@ function update3DModel() {
       part.line.material.opacity = 0.95;
     } else {
       part.mesh.material.emissive.setHex(0x000000);
-      part.line.material.color.setHex(0x0f172a);
+      part.line.material.color.setHex(0x15100a);
     }
   });
 
@@ -1217,11 +1220,11 @@ function update3DModel() {
   const leg = document.getElementById("viewer-legend");
   if (currentMode === "planned") {
     leg.innerHTML = `
-      <div style="font-weight:700; color:#38bdf8; margin-bottom:4px;">PLANNED MODE — ${dayToDateStr(currentDay)} (Day ${currentDay}/650)</div>
-      <div class="legend-row"><span class="swatch" style="background:#0ea5e9;"></span> <strong>Complete:</strong> Activity finished by date</div>
-      <div class="legend-row"><span class="swatch" style="background:#38bdf8; border:1px solid #fff;"></span> <strong>In Progress:</strong> Active on ${dayToDateStr(currentDay)}</div>
-      <div class="legend-row"><span class="swatch" style="background:rgba(148,163,184,0.2); border:1px solid #64748b;"></span> <strong>Not Started:</strong> Ghosted wireframe</div>
-      <div style="margin-top:6px; font-size:10px; color:#94a3b8;">Drag to Orbit • Scroll to Zoom • Right-Click to Pan</div>
+      <div style="font-weight:700; color:#d4af37; margin-bottom:4px;">PLANNED MODE — ${dayToDateStr(currentDay)} (Day ${currentDay}/650)</div>
+      <div class="legend-row"><span class="swatch" style="background:#c08a3c;"></span> <strong>Complete:</strong> Activity finished by date</div>
+      <div class="legend-row"><span class="swatch" style="background:#d4af37; border:1px solid #fff;"></span> <strong>In Progress:</strong> Active on ${dayToDateStr(currentDay)}</div>
+      <div class="legend-row"><span class="swatch" style="background:rgba(148,163,184,0.2); border:1px solid #7a6238;"></span> <strong>Not Started:</strong> Ghosted wireframe</div>
+      <div style="margin-top:6px; font-size:10px; color:#b2a186;">Drag to Orbit • Scroll to Zoom • Right-Click to Pan</div>
     `;
   } else {
     // Build RAG rows from the already-computed workPackages overrun data (single source of truth).
@@ -1245,7 +1248,7 @@ function update3DModel() {
       <div class="legend-row"><span class="rag-glyph" aria-hidden="true">▼</span><span class="swatch" style="background:#10b981;"></span> <strong>Green (On/Under Budget):</strong> ${greenTxt}</div>
       <div class="legend-row"><span class="rag-glyph" aria-hidden="true">△</span><span class="swatch" style="background:#f59e0b;"></span> <strong>Amber (0% to 5% Over):</strong> ${amberTxt}</div>
       <div class="legend-row"><span class="rag-glyph" aria-hidden="true">▲</span><span class="swatch" style="background:#ef4444;"></span> <strong>Red (>5% Over Budget):</strong> ${redTxt}</div>
-      <div class="legend-row"><span class="swatch" style="background:rgba(148,163,184,0.15); border:1px solid #475569;"></span> <strong>Unbuilt at 31 Mar 26:</strong> Wireframe</div>
+      <div class="legend-row"><span class="swatch" style="background:rgba(148,163,184,0.15); border:1px solid #4d3c22;"></span> <strong>Unbuilt at 31 Mar 26:</strong> Wireframe</div>
     `;
   }
   requestRender();
@@ -1286,7 +1289,7 @@ function drawGanttChart() {
 
   // Draw Quarter/Month vertical grid lines
   ctx.font = "12px Inter, sans-serif";
-  ctx.fillStyle = "#94a3b8";
+  ctx.fillStyle = "#b2a186";
   ctx.strokeStyle = "rgba(255,255,255,0.06)";
   ctx.lineWidth = 1;
 
@@ -1316,7 +1319,7 @@ function drawGanttChart() {
     }
 
     // Activity label
-    ctx.fillStyle = "#e2e8f0";
+    ctx.fillStyle = "#efe6d6";
     ctx.font = "12px Inter, sans-serif";
     const shortName = `${a.id} ${a.name}`.substring(0, 32);
     ctx.fillText(shortName, 6, yCenter + 3.5);
@@ -1368,7 +1371,7 @@ function drawGanttChart() {
 
   // Draw Synchronized Vertical Date Line
   const dateX = leftPad + (currentDay / 650) * chartW;
-  ctx.strokeStyle = "#38bdf8";
+  ctx.strokeStyle = "#d4af37";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(dateX, topPad - 4);
@@ -1434,10 +1437,10 @@ function drawSCurveChart() {
     ...monthlyData.map(md => md.cumAC || 0),
     ...monthlyData.map(md => md.cumPV)
   ) * 1.1;
-  const maxCum = Math.ceil(rawMaxCum / 25000000) * 25000000; // round up to a tidy £25M step
+  const maxCum = Math.ceil(rawMaxCum / 25000000) * 25000000; // round up to a tidy $25M step
   const maxMonthly = Math.max(...monthlyData.map(md => md.mPV)) * 1.15;
 
-  // Horizontal Grid & Left Axis (Cumulative £M) + Right Axis (Monthly £M)
+  // Horizontal Grid & Left Axis (Cumulative $M) + Right Axis (Monthly $M)
   ctx.font = "12px Inter, sans-serif";
   ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
@@ -1448,9 +1451,9 @@ function drawSCurveChart() {
     ctx.lineTo(W - rightPad, y);
     ctx.stroke();
 
-    ctx.fillStyle = "#94a3b8";
-    ctx.fillText(`£${Math.round((maxCum * i / 5) / 1000000)}M`, 6, y + 3);
-    ctx.fillText(`£${((maxMonthly * i / 5) / 1000000).toFixed(1)}M/m`, W - rightPad + 4, y + 3);
+    ctx.fillStyle = "#b2a186";
+    ctx.fillText(`$${Math.round((maxCum * i / 5) / 1000000)}M`, 6, y + 3);
+    ctx.fillText(`$${((maxMonthly * i / 5) / 1000000).toFixed(1)}M/m`, W - rightPad + 4, y + 3);
   }
 
   // 1. Draw Monthly Planned Value Bars
@@ -1464,17 +1467,17 @@ function drawSCurveChart() {
     const bh = (md.mPV / maxMonthly) * chartH;
     const y = topPad + chartH - bh;
 
-    ctx.fillStyle = i < 15 ? "rgba(56, 189, 248, 0.28)" : "rgba(148, 163, 184, 0.18)";
+    ctx.fillStyle = i < 15 ? "rgba(212, 175, 55, 0.28)" : "rgba(148, 163, 184, 0.18)";
     ctx.fillRect(x, y, bw, bh);
 
     if (i % 3 === 0) {
-      ctx.fillStyle = "#94a3b8";
+      ctx.fillStyle = "#b2a186";
       ctx.fillText(md.label, x - 2, H - 6);
     }
   });
 
   // 2. Draw Cumulative Planned Value (PV) S-Curve (Blue)
-  ctx.strokeStyle = "#38bdf8";
+  ctx.strokeStyle = "#d4af37";
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.moveTo(leftPad, topPad + chartH);
@@ -1514,7 +1517,7 @@ function drawSCurveChart() {
 
   // 4. Draw Synchronized Date Line running through both bars and S-curve
   const dateX = leftPad + (currentDay / 650) * chartW;
-  ctx.strokeStyle = "#38bdf8";
+  ctx.strokeStyle = "#d4af37";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(dateX, topPad);
@@ -1529,9 +1532,9 @@ function drawSCurveChart() {
 
   // Legend & KPI Summary in S-Curve header
   document.getElementById("scurve-kpi-summary").innerHTML =
-    `<span style="color:#38bdf8;">&#9644; PV (${dayToDateStr(currentDay)}): ${fmtGBP(curPV)}</span> &nbsp;|&nbsp; ` +
-    `<span style="color:#10b981;">&#9644; EV (31 Mar 26): ${fmtGBP(activities.reduce((s, a) => s + a.evAtReport, 0))}</span> &nbsp;|&nbsp; ` +
-    `<span style="color:#ef4444;">&#9644; AC (31 Mar 26): ${fmtGBP(activities.reduce((s, a) => s + a.ac, 0))}</span>`;
+    `<span style="color:#d4af37;">&#9644; PV (${dayToDateStr(currentDay)}): ${fmtUSD(curPV)}</span> &nbsp;|&nbsp; ` +
+    `<span style="color:#10b981;">&#9644; EV (31 Mar 26): ${fmtUSD(activities.reduce((s, a) => s + a.evAtReport, 0))}</span> &nbsp;|&nbsp; ` +
+    `<span style="color:#ef4444;">&#9644; AC (31 Mar 26): ${fmtUSD(activities.reduce((s, a) => s + a.ac, 0))}</span>`;
 }
 
 function drawAllCharts() {
@@ -1692,7 +1695,7 @@ function clearSelection() {
 function showDetailPopup(a) {
   const d = document.getElementById("viewer-detail");
   if (!d) return;
-  const wp = workPackages[a.wp] || { name: a.wp, color: "#94a3b8", rag: "green" };
+  const wp = workPackages[a.wp] || { name: a.wp, color: "#b2a186", rag: "green" };
   const planPct = getPlannedPct(a, currentDay) * 100;
   const variance = a.ac - a.evAtReport;
   const ragGlyph = wp.rag === "red" ? "▲" : wp.rag === "amber" ? "△" : "▼";
@@ -1703,13 +1706,13 @@ function showDetailPopup(a) {
     '<button class="vd-close" aria-label="Close activity detail" onclick="clearSelection()">&times;</button>' +
     '<div class="vd-title"><span class="vd-wp-dot" style="background:' + wp.color + ';"></span>' + wp.name + '</div>' +
     '<div class="vd-sub">' + a.id + ' — ' + a.name + '</div>' +
-    '<div class="vd-row"><span>BAC</span><span>' + fmtGBP(a.budget) + '</span></div>' +
+    '<div class="vd-row"><span>BAC</span><span>' + fmtUSD(a.budget) + '</span></div>' +
     '<div class="vd-row"><span>Planned % (' + dayToDateStr(currentDay) + ')</span><span>' + planPct.toFixed(1) + '%</span></div>' +
     '<div class="vd-row"><span>Actual %</span><span>' + a.actPct.toFixed(1) + '%</span></div>' +
-    '<div class="vd-row"><span>PV (report)</span><span>' + fmtGBP(a.pvAtReport) + '</span></div>' +
-    '<div class="vd-row"><span>EV</span><span>' + fmtGBP(a.evAtReport) + '</span></div>' +
-    '<div class="vd-row"><span>AC</span><span>' + fmtGBP(a.ac) + '</span></div>' +
-    '<div class="vd-row"><span>Variance (AC−EV)</span><span class="' + vCls + '">' + fmtGBP(variance) + '</span></div>' +
+    '<div class="vd-row"><span>PV (report)</span><span>' + fmtUSD(a.pvAtReport) + '</span></div>' +
+    '<div class="vd-row"><span>EV</span><span>' + fmtUSD(a.evAtReport) + '</span></div>' +
+    '<div class="vd-row"><span>AC</span><span>' + fmtUSD(a.ac) + '</span></div>' +
+    '<div class="vd-row"><span>Variance (AC−EV)</span><span class="' + vCls + '">' + fmtUSD(variance) + '</span></div>' +
     '<div class="vd-row"><span>Package RAG</span><span class="' + ragCls + '"><span class="rag-glyph" aria-hidden="true">' + ragGlyph + '</span>' + ragLabel + '</span></div>';
   d.hidden = false;
 }
@@ -1743,7 +1746,7 @@ function onGanttHover(e) {
     '<div class="tt-title">' + a.id + ' — ' + a.name + '</div>' +
     '<div class="tt-row"><span>Baseline</span><span>' + dayToDateStr(a.s) + ' → ' + dayToDateStr(a.f) + '</span></div>' +
     '<div class="tt-row"><span>Duration</span><span>' + a.dur + ' days</span></div>' +
-    '<div class="tt-row"><span>BAC</span><span>' + fmtGBP(a.budget) + '</span></div>' +
+    '<div class="tt-row"><span>BAC</span><span>' + fmtUSD(a.budget) + '</span></div>' +
     '<div class="tt-row"><span>Plan % (' + dayToDateStr(currentDay) + ')</span><span>' + planPct.toFixed(1) + '%</span></div>' +
     '<div class="tt-row"><span>Actual %</span><span>' + a.actPct.toFixed(1) + '%</span></div>';
   t.style.display = "block";
@@ -1763,10 +1766,10 @@ function onSCurveHover(e) {
   const md = monthlyData[i];
   if (!md) { hideTooltip(); return; }
   let rows =
-    '<div class="tt-row"><span>Monthly PV</span><span>' + fmtGBP(md.mPV) + '</span></div>' +
-    '<div class="tt-row"><span>Cumulative PV</span><span>' + fmtGBP(md.cumPV) + '</span></div>';
-  if (md.cumEV !== null && md.cumEV !== undefined) rows += '<div class="tt-row"><span>Cumulative EV</span><span>' + fmtGBP(md.cumEV) + '</span></div>';
-  if (md.cumAC !== null && md.cumAC !== undefined) rows += '<div class="tt-row"><span>Cumulative AC</span><span>' + fmtGBP(md.cumAC) + '</span></div>';
+    '<div class="tt-row"><span>Monthly PV</span><span>' + fmtUSD(md.mPV) + '</span></div>' +
+    '<div class="tt-row"><span>Cumulative PV</span><span>' + fmtUSD(md.cumPV) + '</span></div>';
+  if (md.cumEV !== null && md.cumEV !== undefined) rows += '<div class="tt-row"><span>Cumulative EV</span><span>' + fmtUSD(md.cumEV) + '</span></div>';
+  if (md.cumAC !== null && md.cumAC !== undefined) rows += '<div class="tt-row"><span>Cumulative AC</span><span>' + fmtUSD(md.cumAC) + '</span></div>';
   t.innerHTML = '<div class="tt-title">' + md.label + '</div>' + rows;
   t.style.display = "block";
   positionTooltip(e);
@@ -1788,11 +1791,11 @@ function renderEVMStrip() {
   el.innerHTML =
     '<span class="evm-idx ' + idxCls(cpi) + '" title="Cost Performance Index (EV/AC). ≥1.00 means on/under budget."><span class="evm-glyph" aria-hidden="true">' + idxGlyph(cpi) + '</span>CPI ' + cpi.toFixed(2) + '</span>' +
     '<span class="evm-idx ' + idxCls(spi) + '" title="Schedule Performance Index (EV/PV). ≥1.00 means on/ahead of schedule."><span class="evm-glyph" aria-hidden="true">' + idxGlyph(spi) + '</span>SPI ' + spi.toFixed(2) + '</span>' +
-    '<span class="evm-metric">PV <strong>' + fmtGBP(PV) + '</strong></span>' +
-    '<span class="evm-metric">EV <strong>' + fmtGBP(EV) + '</strong></span>' +
-    '<span class="evm-metric">AC <strong>' + fmtGBP(AC) + '</strong></span>' +
-    '<span class="evm-metric">Cost Var (EV−AC) <strong class="' + (costVar >= 0 ? "evm-good" : "evm-bad") + '">' + fmtGBP(costVar) + '</strong></span>' +
-    '<span class="evm-metric">Sched Var (EV−PV) <strong class="' + (schedVar >= 0 ? "evm-good" : "evm-bad") + '">' + fmtGBP(schedVar) + '</strong></span>';
+    '<span class="evm-metric">PV <strong>' + fmtUSD(PV) + '</strong></span>' +
+    '<span class="evm-metric">EV <strong>' + fmtUSD(EV) + '</strong></span>' +
+    '<span class="evm-metric">AC <strong>' + fmtUSD(AC) + '</strong></span>' +
+    '<span class="evm-metric">Cost Var (EV−AC) <strong class="' + (costVar >= 0 ? "evm-good" : "evm-bad") + '">' + fmtUSD(costVar) + '</strong></span>' +
+    '<span class="evm-metric">Sched Var (EV−PV) <strong class="' + (schedVar >= 0 ? "evm-good" : "evm-bad") + '">' + fmtUSD(schedVar) + '</strong></span>';
 }
 
 // ---- Export: PNG of the 3D view, CSV of the activity EV table --------------
