@@ -35,9 +35,29 @@ test('classifyActiveRuntime uses a healthy active runtime even when the marker i
   })
 })
 
-test('classifyActiveRuntime refuses an unusable runtime even if a valid marker exists', () => {
+test('classifyActiveRuntime refuses an unusable runtime with a valid marker when the install is absent', () => {
   assert.deepEqual(classifyActiveRuntime(VALID_MARKER, 1, false), {
     hasValidMarker: true,
+    shouldUseActiveRuntime: false,
+    usabilityReason: 'unusable'
+  })
+})
+
+test('a valid marker plus an on-disk install rescues a false-negatived probe instead of forcing first-run', () => {
+  // The live import probe can time out under load (many profile backends
+  // spawning at once); a marked, present install must still launch.
+  assert.deepEqual(classifyActiveRuntime(VALID_MARKER, 1, false, true), {
+    hasValidMarker: true,
+    shouldUseActiveRuntime: true,
+    usabilityReason: 'marker-trusted'
+  })
+})
+
+test('installPresent without a valid marker does not rescue an unusable runtime', () => {
+  // No marker provenance => an unusable probe still falls through to bootstrap,
+  // so a genuinely empty/foreign dir on disk can't masquerade as a runtime.
+  assert.deepEqual(classifyActiveRuntime(null, 1, false, true), {
+    hasValidMarker: false,
     shouldUseActiveRuntime: false,
     usabilityReason: 'unusable'
   })

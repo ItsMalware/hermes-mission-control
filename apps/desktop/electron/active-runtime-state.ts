@@ -6,7 +6,7 @@ export interface BootstrapMarkerLike {
 export interface ActiveRuntimeState {
   hasValidMarker: boolean
   shouldUseActiveRuntime: boolean
-  usabilityReason: 'usable' | 'unusable'
+  usabilityReason: 'marker-trusted' | 'unusable' | 'usable'
 }
 
 export function hasValidBootstrapMarker(
@@ -35,24 +35,43 @@ export function hasValidBootstrapMarker(
 // right now?"; the marker is only provenance about how that install was
 // created. A missing/stale marker must never force a healthy local install into
 // the first-run bootstrap UI.
+//
+// The symmetric failure is just as bad: the live usability probe
+// (`import hermes_cli.config`) can FALSE-NEGATIVE under process contention — a
+// cold launch that spawns several profile backends at once can starve the probe
+// subprocess into its timeout even though the runtime is perfectly healthy.
+// Letting that drop a demonstrably-installed runtime onto the reinstall screen
+// is the worse outcome. So when the probe says "unusable" but a VALID bootstrap
+// marker AND the install are present on disk (`installPresent`), trust the
+// marked install and launch it; a genuinely broken runtime still fails loudly
+// and recoverably at spawn, not with a spurious first-run prompt.
 export function classifyActiveRuntime(
   marker: BootstrapMarkerLike | null | undefined,
   schemaVersion: number,
-  runtimeUsable: boolean
+  runtimeUsable: boolean,
+  installPresent = false
 ): ActiveRuntimeState {
   const hasValidMarker = hasValidBootstrapMarker(marker, schemaVersion)
 
-  if (!runtimeUsable) {
+  if (runtimeUsable) {
     return {
       hasValidMarker,
-      shouldUseActiveRuntime: false,
-      usabilityReason: 'unusable'
+      shouldUseActiveRuntime: true,
+      usabilityReason: 'usable'
+    }
+  }
+
+  if (hasValidMarker && installPresent) {
+    return {
+      hasValidMarker,
+      shouldUseActiveRuntime: true,
+      usabilityReason: 'marker-trusted'
     }
   }
 
   return {
     hasValidMarker,
-    shouldUseActiveRuntime: true,
-    usabilityReason: 'usable'
+    shouldUseActiveRuntime: false,
+    usabilityReason: 'unusable'
   }
 }

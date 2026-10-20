@@ -3679,7 +3679,17 @@ function activeRuntimeState() {
   // update`, which moves HEAD legitimately. The marker only attests "a
   // desktop-managed bootstrap ran here at least once"; runtime usability is
   // what decides whether we can actually launch.
-  return classifyActiveRuntime(readBootstrapMarker(), BOOTSTRAP_MARKER_SCHEMA_VERSION, isActiveRuntimeUsable())
+  // installPresent: marker-independent proof the install exists on disk (source
+  // checkout + venv Python). Lets classifyActiveRuntime rescue a healthy but
+  // probe-false-negatived runtime instead of forcing first-run (see its doc).
+  const installPresent = isHermesSourceRoot(ACTIVE_HERMES_ROOT) && fileExists(getVenvPython(VENV_ROOT))
+
+  return classifyActiveRuntime(
+    readBootstrapMarker(),
+    BOOTSTRAP_MARKER_SCHEMA_VERSION,
+    isActiveRuntimeUsable(),
+    installPresent
+  )
 }
 
 function writeBootstrapMarker(payload) {
