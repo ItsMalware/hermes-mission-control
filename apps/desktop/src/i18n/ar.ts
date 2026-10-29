@@ -282,6 +282,14 @@ export const ar = defineLocale({
     noResults: 'لا توجد لغة مطابقة'
   },
   settings: {
+    subpages: {
+      appearanceGeneral: 'عام',
+      appearanceTheme: 'السمة',
+      appearanceTypography: 'الطباعة',
+      appearanceWindowLayout: 'تخطيط النافذة',
+      appearanceChatDisplay: 'عرض المحادثة',
+      appearancePet: 'الحيوان الأليف'
+    },
     closeSettings: 'إغلاق الإعدادات',
     exportConfig: 'تصدير الإعدادات',
     importConfig: 'استيراد الإعدادات',

@@ -319,6 +319,14 @@ export const zh: Translations = {
   },
 
   settings: {
+    subpages: {
+      appearanceGeneral: '通用',
+      appearanceTheme: '主题',
+      appearanceTypography: '排版',
+      appearanceWindowLayout: '窗口布局',
+      appearanceChatDisplay: '聊天显示',
+      appearancePet: '宠物'
+    },
     closeSettings: '关闭设置',
     exportConfig: '导出配置',
     importConfig: '导入配置',

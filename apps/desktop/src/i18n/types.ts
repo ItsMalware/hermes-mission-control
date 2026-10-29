@@ -287,6 +287,14 @@ export interface Translations {
     resetConfirm: string
     exportFailed: string
     resetFailed: string
+    subpages: {
+      appearanceGeneral: string
+      appearanceTheme: string
+      appearanceTypography: string
+      appearanceWindowLayout: string
+      appearanceChatDisplay: string
+      appearancePet: string
+    }
     nav: {
       providers: string
       providerAccounts: string

@@ -328,6 +328,14 @@ export const en: Translations = {
   },
 
   settings: {
+    subpages: {
+      appearanceGeneral: 'General',
+      appearanceTheme: 'Theme',
+      appearanceTypography: 'Typography',
+      appearanceWindowLayout: 'Window Layout',
+      appearanceChatDisplay: 'Chat Display',
+      appearancePet: 'Pet'
+    },
     closeSettings: 'Close settings',
     exportConfig: 'Export config',
     importConfig: 'Import config',

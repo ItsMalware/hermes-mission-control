@@ -210,6 +210,14 @@ export const zhHant = defineLocale({
   },
 
   settings: {
+    subpages: {
+      appearanceGeneral: '一般',
+      appearanceTheme: '主題',
+      appearanceTypography: '字體排版',
+      appearanceWindowLayout: '視窗版面',
+      appearanceChatDisplay: '聊天顯示',
+      appearancePet: '寵物'
+    },
     closeSettings: '關閉設定',
     exportConfig: '匯出設定',
     importConfig: '匯入設定',

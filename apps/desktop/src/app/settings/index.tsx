@@ -10,12 +10,17 @@ import {
   Archive,
   BarChart3,
   Bell,
+  CircleLetterA,
   Download,
   Globe,
   Info,
   Keyboard,
   KeyRound,
+  MessageCircle,
+  Monitor,
   Package,
+  Palette,
+  PawPrint,
   RefreshCw,
   Settings2,
   Upload,
@@ -32,6 +37,7 @@ import { SKILLS_ROUTE } from '../routes'
 
 import { AboutSettings } from './about-settings'
 import { AppearanceSettings } from './appearance-settings'
+import { APPEARANCE_SUBPAGE_IDS, APPEARANCE_SUBPAGES, type AppearanceSubpageId } from './appearance-subpages'
 import { BillingSettings } from './billing'
 import { ConfigSettings } from './config-settings'
 import { SECTIONS } from './constants'
@@ -43,6 +49,15 @@ import { PluginsSettings } from './plugins-settings'
 import { PROVIDER_VIEWS, ProvidersSettings, type ProviderView } from './providers-settings'
 import { SessionsSettings } from './sessions-settings'
 import type { SettingsPageProps, SettingsView as SettingsViewId } from './types'
+
+const APPEARANCE_SUBPAGE_ICONS: Record<AppearanceSubpageId, typeof Settings2> = {
+  general: Settings2,
+  theme: Palette,
+  typography: CircleLetterA,
+  'window-layout': Monitor,
+  'chat-display': MessageCircle,
+  pet: PawPrint
+}
 
 const SETTINGS_VIEWS: readonly SettingsViewId[] = [
   ...SECTIONS.map(s => `config:${s.id}` as SettingsViewId),
@@ -81,6 +96,9 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
   // sub-view is deep-linkable and survives a refresh.
   const [providerView, setProviderView] = useRouteEnumParam<ProviderView>('pview', PROVIDER_VIEWS, 'accounts')
   const [keysView] = useRouteEnumParam<KeysView>('kview', KEYS_VIEWS, 'tools')
+  // Appearance subpages (Theme / Typography / Window Layout / …) — a second-level
+  // nav under the Appearance tab, deep-linked via `?page=`.
+  const [appearanceSubpage] = useRouteEnumParam<AppearanceSubpageId>('page', APPEARANCE_SUBPAGE_IDS, 'general')
 
   // Jump to a section + its sub-view in one navigate. Two sequential setters
   // would each read the same stale `search` and the second would clobber the
@@ -108,6 +126,11 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
   )
 
   const openKeysView = useCallback((view: KeysView) => openSubView('keys', 'kview', view, 'tools'), [openSubView])
+
+  const openAppearanceSubpage = useCallback(
+    (page: AppearanceSubpageId) => openSubView('config:appearance', 'page', page, 'general'),
+    [openSubView]
+  )
 
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -148,6 +171,16 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
 
         return {
           active: activeView === view,
+          children:
+            s.id === 'appearance'
+              ? APPEARANCE_SUBPAGES.map(page => ({
+                  active: activeView === view && appearanceSubpage === page.id,
+                  icon: APPEARANCE_SUBPAGE_ICONS[page.id],
+                  id: `aview:${page.id}`,
+                  label: t.settings.subpages[page.labelKey],
+                  onSelect: () => openAppearanceSubpage(page.id)
+                }))
+              : undefined,
           icon: s.icon,
           id: view,
           label: t.settings.sections[s.id] ?? s.label,
@@ -259,7 +292,17 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         onSelect: () => setActiveView('about')
       }
     ],
-    [activeView, keysView, providerView, t, setActiveView, openProviderView, openKeysView]
+    [
+      activeView,
+      appearanceSubpage,
+      keysView,
+      providerView,
+      t,
+      setActiveView,
+      openProviderView,
+      openKeysView,
+      openAppearanceSubpage
+    ]
   )
 
   const navFooter = (
@@ -300,7 +343,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
 
         <OverlayMain className="px-0 pb-0">
           {activeView === 'config:appearance' ? (
-            <AppearanceSettings />
+            <AppearanceSettings subpage={appearanceSubpage} />
           ) : activeView === 'about' ? (
             <AboutSettings />
           ) : activeView === 'gateway' ? (

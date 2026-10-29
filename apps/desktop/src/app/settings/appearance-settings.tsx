@@ -247,7 +247,7 @@ function MarketplaceThemeResults({
   )
 }
 
-export function AppearanceSettings() {
+export function AppearanceSettings({ subpage = 'general' }: { subpage?: string }) {
   const { t, isSavingLocale } = useI18n()
   const { themeName, mode, resolvedMode, availableThemes, setTheme, setMode } = useTheme()
   const toolViewMode = useStore($toolViewMode)
@@ -314,12 +314,15 @@ export function AppearanceSettings() {
         </p>
 
         <div className="mt-2">
-          <ListRow
-            action={<LanguageSwitcher />}
-            description={isSavingLocale ? t.language.saving : t.language.description}
-            title={t.language.label}
-          />
+          {subpage === 'general' && (
+            <ListRow
+              action={<LanguageSwitcher />}
+              description={isSavingLocale ? t.language.saving : t.language.description}
+              title={t.language.label}
+            />
+          )}
 
+          {subpage === 'theme' && (
           <ListRow
             below={
               <>
@@ -419,7 +422,9 @@ export function AppearanceSettings() {
             }
             wide
           />
+          )}
 
+          {subpage === 'window-layout' && (
           <ListRow
             action={
               <SegmentedControl
@@ -434,11 +439,16 @@ export function AppearanceSettings() {
             description={a.uiScaleDesc(zoomPercent)}
             title={a.uiScaleTitle}
           />
+          )}
 
-          <ChatFontSetting />
+          {subpage === 'typography' && (
+            <>
+              <ChatFontSetting />
+              <TerminalFontSetting />
+            </>
+          )}
 
-          <TerminalFontSetting />
-
+          {subpage === 'window-layout' && (
           <ListRow
             action={
               <div className="flex items-center gap-3">
@@ -464,7 +474,9 @@ export function AppearanceSettings() {
             description={a.translucencyDesc}
             title={a.translucencyTitle}
           />
+          )}
 
+          {subpage === 'chat-display' && (
           <ListRow
             action={
               <div className="flex items-center gap-3">
@@ -490,7 +502,9 @@ export function AppearanceSettings() {
             description={a.userBubbleDesc}
             title={a.userBubbleTitle}
           />
+          )}
 
+          {subpage === 'window-layout' && (
           <ListRow
             action={
               <SegmentedControl
@@ -508,7 +522,10 @@ export function AppearanceSettings() {
             description={a.backdropDesc}
             title={a.backdropTitle}
           />
+          )}
 
+          {subpage === 'chat-display' && (
+          <>
           <ListRow
             action={
               <SegmentedControl
@@ -570,14 +587,18 @@ export function AppearanceSettings() {
             description={a.embedsDesc}
             title={a.embedsTitle}
           />
+          </>
+          )}
 
-          <MinimizeToTraySetting />
+          {subpage === 'window-layout' && <MinimizeToTraySetting />}
         </div>
       </div>
 
-      <div className="mt-6">
-        <PetSettings />
-      </div>
+      {subpage === 'pet' && (
+        <div className="mt-6">
+          <PetSettings />
+        </div>
+      )}
     </SettingsContent>
   )
 }

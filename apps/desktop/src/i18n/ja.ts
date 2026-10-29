@@ -216,6 +216,14 @@ export const ja = defineLocale({
   },
 
   settings: {
+    subpages: {
+      appearanceGeneral: '一般',
+      appearanceTheme: 'テーマ',
+      appearanceTypography: 'タイポグラフィ',
+      appearanceWindowLayout: 'ウィンドウレイアウト',
+      appearanceChatDisplay: 'チャット表示',
+      appearancePet: 'ペット'
+    },
     closeSettings: '設定を閉じる',
     exportConfig: '設定を書き出す',
     importConfig: '設定を読み込む',
