@@ -2193,6 +2193,14 @@ export interface Translations {
     browserAddressPlaceholder: string
     browserCopyUrl: string
     browserPopOut: string
+    browserSendToHermes: string
+    browserSentToHermes: string
+    browserSendFailed: string
+    browserPopupOpened: string
+    browserImportFromChrome: string
+    browserImportedFromChrome: (count: number, domain: string) => string
+    browserImportNone: (domain: string) => string
+    browserImportFailed: string
     closeTab: (label: string) => string
     closeOthers: string
     closeToRight: string

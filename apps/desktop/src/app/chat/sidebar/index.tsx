@@ -163,6 +163,12 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
     route: '/ai-clis'
   },
   {
+    id: 'browser',
+    label: 'Browser',
+    icon: props => <Codicon name="globe" {...props} />,
+    action: 'open-browser'
+  },
+  {
     id: 'kanban',
     label: 'Kanban',
     icon: props => <Codicon name="project" {...props} />,

@@ -151,7 +151,9 @@ declare global {
       openExternal: (url: string) => Promise<void>
       browserPopout?: {
         open: (url: string) => Promise<boolean>
+        onOpened?: (callback: (info: { host: string; url: string }) => void) => () => void
       }
+      importChromeCookies?: (host: string) => Promise<{ domain: string; imported: number }>
       minimizeToTray?: {
         get: () => Promise<{ enabled: boolean; available: boolean }>
         set: (on: boolean) => Promise<{ enabled: boolean; available: boolean }>

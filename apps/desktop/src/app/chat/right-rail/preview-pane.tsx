@@ -9,6 +9,7 @@ import { isDesktopFsRemoteMode } from '@/lib/desktop-fs'
 import { Bug } from '@/lib/icons'
 import { rafCoalesce } from '@/lib/raf-coalesce'
 import { cn } from '@/lib/utils'
+import { appendComposerDraft } from '@/store/composer'
 import { notify, notifyError } from '@/store/notifications'
 import {
   $previewServerRestart,
@@ -37,6 +38,7 @@ type PreviewWebview = HTMLElement & {
   canGoBack?: () => boolean
   canGoForward?: () => boolean
   closeDevTools?: () => void
+  executeJavaScript?: (code: string) => Promise<unknown>
   getTitle?: () => string
   getURL?: () => string
   goBack?: () => void
@@ -69,22 +71,10 @@ interface PreviewLoadErrorState {
 const FILE_RELOAD_DEBOUNCE_MS = 200
 const SERVER_RESTART_TIMEOUT_MS = 45_000
 
-// Webview guests present a plain-Chrome User-Agent: Electron's default UA carries
-// `Hermes Mission Control/<v>` and `Electron/<v>` tokens that anti-bot services
-// (Cloudflare on LinkedIn, Google, etc.) flag as automation and 403. Strip only
-// those two tokens from the real UA, so the Chrome/AppleWebKit/platform versions
-// still match this exact engine (a mismatched hardcoded version is itself a tell).
-// Remove every non-standard product token after "(KHTML, like Gecko)" up to
-// "Chrome/", plus a trailing "Electron/…" — Electron injects the app name
-// ("Hermes/3.0.0") there AND an Electron token after Chrome, both of which
-// anti-bot services flag. What's left is a pristine Chrome UA whose
-// Chrome/AppleWebKit/platform versions still match this exact engine.
-const BROWSER_USER_AGENT =
-  typeof navigator !== 'undefined'
-    ? navigator.userAgent
-        .replace(/(\(KHTML, like Gecko\) )(?:(?!Chrome\/)\S+ )+/, '$1')
-        .replace(/ Electron\/\S+/g, '')
-    : ''
+// NB: the Browser's Chrome User-Agent + UA-Client-Hint headers are pinned on the
+// `persist:hermes-preview` SESSION in the main process (see main.ts) so the
+// docked webview, popups and child windows all present as the user's real
+// desktop Chrome uniformly. Nothing to set per-webview here.
 
 function loadErrorTitle(error: PreviewLoadErrorState, copy: Translations['preview']['web']): string {
   const description = error.description.toLowerCase()
@@ -576,10 +566,6 @@ export function PreviewPane({
     webview.className = 'flex h-full w-full flex-1 bg-transparent'
     webview.setAttribute('partition', 'persist:hermes-preview')
 
-    if (BROWSER_USER_AGENT) {
-      webview.setAttribute('useragent', BROWSER_USER_AGENT)
-    }
-
     // Browser tabs let pages open popups (sign-in / SSO windows); the main
     // process routes those http(s) window.open calls into real child windows
     // (see web-contents-created handler). Tool/file previews stay popup-free.
@@ -741,6 +727,65 @@ export function PreviewPane({
                 webview.reload?.()
               }
             }}
+            onSendToHermes={() => {
+              const webview = webviewRef.current
+
+              if (!webview?.executeJavaScript) {
+                return
+              }
+
+              // Hand the agent the RENDERED page (so logged-in pages it can't
+              // re-fetch still reach it) by appending it to the chat composer.
+              void webview
+                .executeJavaScript('document.body ? document.body.innerText : ""')
+                .then(result => {
+                  const pageUrl = webview.getURL?.() || currentUrl
+                  const pageTitle = webview.getTitle?.() || ''
+                  const body = String(result ?? '')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim()
+                  const MAX_CHARS = 16_000
+                  const clipped =
+                    body.length > MAX_CHARS ? `${body.slice(0, MAX_CHARS)}\n…[truncated]` : body
+                  const header = `Browser page — ${pageTitle || pageUrl}\n${pageUrl}`
+
+                  appendComposerDraft(clipped ? `${header}\n\n${clipped}` : header)
+                  notify({ kind: 'success', message: t.preview.browserSentToHermes })
+                })
+                .catch(error => notifyError(error, t.preview.browserSendFailed))
+            }}
+            onImportFromChrome={
+              window.hermesDesktop?.importChromeCookies && /^https?:\/\//i.test(currentUrl)
+                ? () => {
+                    let host = ''
+
+                    try {
+                      host = new URL(currentUrl).host
+                    } catch {
+                      host = ''
+                    }
+
+                    if (!host) {
+                      return
+                    }
+
+                    void window.hermesDesktop
+                      ?.importChromeCookies?.(host)
+                      .then(result => {
+                        if (result.imported > 0) {
+                          notify({
+                            kind: 'success',
+                            message: t.preview.browserImportedFromChrome(result.imported, result.domain)
+                          })
+                          webviewRef.current?.reload?.()
+                        } else {
+                          notify({ kind: 'info', message: t.preview.browserImportNone(result.domain) })
+                        }
+                      })
+                      .catch(error => notifyError(error, t.preview.browserImportFailed))
+                  }
+                : undefined
+            }
             url={currentUrl}
           />
         )}

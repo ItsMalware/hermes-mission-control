@@ -45,6 +45,12 @@ interface PreviewBrowserBarProps {
   /** Pop this tab into its own window. Omitted when the host can't host one. */
   onPopOut?: () => void
   onReloadOrStop: () => void
+  /** Capture this page's rendered text and hand it to the chat composer so the
+   *  agent can see it (including logged-in pages it can't re-fetch). */
+  onSendToHermes?: () => void
+  /** Import this site's login from the user's real Chrome (macOS). Omitted when
+   *  the host can't do it. */
+  onImportFromChrome?: () => void
 }
 
 export function PreviewBrowserBar({
@@ -56,7 +62,9 @@ export function PreviewBrowserBar({
   onForward,
   onNavigate,
   onPopOut,
-  onReloadOrStop
+  onReloadOrStop,
+  onSendToHermes,
+  onImportFromChrome
 }: PreviewBrowserBarProps) {
   const { t } = useI18n()
   const copy = t.preview
@@ -139,6 +147,32 @@ export function PreviewBrowserBar({
         label={copy.browserCopyUrl}
         text={url === 'about:blank' ? '' : url}
       />
+
+      {onImportFromChrome && (
+        <Tip label={copy.browserImportFromChrome}>
+          <button
+            aria-label={copy.browserImportFromChrome}
+            className={iconButton}
+            onClick={onImportFromChrome}
+            type="button"
+          >
+            <Codicon name="sign-in" size="0.8125rem" />
+          </button>
+        </Tip>
+      )}
+
+      {onSendToHermes && (
+        <Tip label={copy.browserSendToHermes}>
+          <button
+            aria-label={copy.browserSendToHermes}
+            className={iconButton}
+            onClick={onSendToHermes}
+            type="button"
+          >
+            <Codicon name="sparkle" size="0.8125rem" />
+          </button>
+        </Tip>
+      )}
 
       {onPopOut && (
         <Tip label={copy.browserPopOut}>

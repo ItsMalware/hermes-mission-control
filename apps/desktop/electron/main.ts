@@ -55,6 +55,7 @@ import {
   BROWSER_WINDOW_WIDTH,
   buildBrowserWindowUrl
 } from './browser-windows'
+import { importChromeCookiesForHost } from './chrome-cookie-import'
 import { decideBootstrapRepair } from './bootstrap-repair-guard'
 import { runBootstrap } from './bootstrap-runner'
 import { applyConnectionChange, resolveTerminalConnection } from './connection-apply'
@@ -10909,6 +10910,20 @@ ipcMain.handle('hermes:browser-popout:open', (_event, url) => {
   return true
 })
 
+// Import login from Chrome: copy the user's own Chrome cookies for a site into
+// the Browser session so a passkey / Touch-ID / QR login completed in real
+// Chrome carries over. macOS-only (reads Chrome's Keychain-encrypted store).
+ipcMain.handle('hermes:browser:import-chrome-cookies', async (_event, host) => {
+  if (process.platform !== 'darwin') {
+    throw new Error('Importing a login from Chrome is only supported on macOS.')
+  }
+
+  return importChromeCookiesForHost(
+    session.fromPartition('persist:hermes-preview'),
+    typeof host === 'string' ? host : ''
+  )
+})
+
 // User-configurable default project directory. The renderer reads this on
 // settings mount and seeds the value into the picker; writing back persists
 // it via writeDefaultProjectDir so resolveHermesCwd picks it up on the next
@@ -11969,19 +11984,51 @@ app.whenReady().then(() => {
   registerMediaProtocol()
   installEmbedReferer()
 
-  // In-app Browser: pin the webview guest session to a clean Chrome User-Agent
-  // (same strip as the renderer, but on the SESSION so window.open popups —
-  // which don't inherit the per-webview `useragent` attribute — are clean too),
-  // and turn http(s) popups into real child windows so sign-in / SSO flows
-  // (LinkedIn, Google) work. Guest webviews block popups by default, so the
-  // Browser webview also carries the `allowpopups` attribute (see preview-pane).
+  // In-app Browser: present as the user's real desktop Chrome on macOS. Google,
+  // LinkedIn (Cloudflare) and friends gate on the User-Agent AND the Client-Hint
+  // headers (sec-ch-ua*), and Electron's own tokens get flagged. Pin a genuine
+  // macOS Chrome UA on the preview SESSION (so window.open popups inherit it too)
+  // and rewrite the UA-Client-Hints to match. Also turn http(s) popups into real
+  // child windows so sign-in / SSO flows work; guest webviews block popups by
+  // default, so the Browser webview carries `allowpopups` (see preview-pane).
   try {
-    const cleanBrowserUa = app.userAgentFallback
-      .replace(/(\(KHTML, like Gecko\) )(?:(?!Chrome\/)\S+ )+/, '$1')
-      .replace(/ Electron\/\S+/g, '')
-    session.fromPartition('persist:hermes-preview').setUserAgent(cleanBrowserUa)
+    // Match the installed Chrome's major version when present (so it really is
+    // "just like the desktop"); fall back to Electron's own Chromium major.
+    let chromeMajor = (app.userAgentFallback.match(/Chrome\/(\d+)/) || [])[1] || '131'
+
+    if (IS_MAC) {
+      try {
+        const installed = execFileSync(
+          '/usr/bin/defaults',
+          ['read', '/Applications/Google Chrome.app/Contents/Info.plist', 'CFBundleShortVersionString'],
+          { encoding: 'utf8', timeout: 2_000, stdio: ['ignore', 'pipe', 'ignore'] }
+        ).trim()
+        const major = installed.split('.')[0]
+
+        if (/^\d+$/.test(major)) {
+          chromeMajor = major
+        }
+      } catch {
+        // Chrome not installed / unreadable → keep the Electron Chromium major.
+      }
+    }
+
+    const chromeUa = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeMajor}.0.0.0 Safari/537.36`
+    const secChUa = `"Chromium";v="${chromeMajor}", "Google Chrome";v="${chromeMajor}", "Not=A?Brand";v="99"`
+    const previewSession = session.fromPartition('persist:hermes-preview')
+
+    previewSession.setUserAgent(chromeUa)
+    previewSession.webRequest.onBeforeSendHeaders((details, callback) => {
+      const requestHeaders = { ...details.requestHeaders }
+
+      requestHeaders['User-Agent'] = chromeUa
+      requestHeaders['sec-ch-ua'] = secChUa
+      requestHeaders['sec-ch-ua-mobile'] = '?0'
+      requestHeaders['sec-ch-ua-platform'] = '"macOS"'
+      callback({ requestHeaders })
+    })
   } catch (error) {
-    rememberLog(`[browser] could not pin preview session user-agent: ${error}`)
+    rememberLog(`[browser] could not pin preview session Chrome headers: ${error}`)
   }
 
   app.on('web-contents-created', (_event, contents) => {
@@ -11991,6 +12038,19 @@ app.whenReady().then(() => {
 
     contents.setWindowOpenHandler(({ url }) => {
       if (/^https?:\/\//i.test(url)) {
+        // Popups are ALLOWED (so sign-in / SSO flows work), but a new window can
+        // open behind the app or on another display — tell the renderer so the
+        // user always sees that a popup opened (and for which site).
+        try {
+          const host = new URL(url).host
+
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('hermes:browser-popup-opened', { host, url })
+          }
+        } catch {
+          void 0
+        }
+
         return {
           action: 'allow',
           overrideBrowserWindowOptions: {

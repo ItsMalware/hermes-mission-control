@@ -139,8 +139,15 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   setPreviewShortcutActive: active => ipcRenderer.send('hermes:previewShortcutActive', Boolean(active)),
   openExternal: url => ipcRenderer.invoke('hermes:openExternal', url),
   browserPopout: {
-    open: url => ipcRenderer.invoke('hermes:browser-popout:open', url)
+    open: url => ipcRenderer.invoke('hermes:browser-popout:open', url),
+    onOpened: callback => {
+      const listener = (_event, info) => callback(info)
+      ipcRenderer.on('hermes:browser-popup-opened', listener)
+
+      return () => ipcRenderer.removeListener('hermes:browser-popup-opened', listener)
+    }
   },
+  importChromeCookies: host => ipcRenderer.invoke('hermes:browser:import-chrome-cookies', host),
   minimizeToTray: {
     get: () => ipcRenderer.invoke('hermes:minimize-to-tray:get'),
     set: on => ipcRenderer.invoke('hermes:minimize-to-tray:set', on),
