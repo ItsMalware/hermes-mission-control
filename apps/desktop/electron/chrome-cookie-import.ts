@@ -33,7 +33,7 @@ const CHROME_USER_DATA_DIR = path.join(
 // Profiles that never hold a user's real logins — skip them when scanning.
 const NON_LOGIN_PROFILES = new Set(['System Profile', 'Guest Profile'])
 
-interface RawChromeCookie {
+export interface RawChromeCookie {
   hostKey: string
   name: string
   encryptedHex: string
@@ -58,7 +58,7 @@ function chromeSafeStorageKey(): string {
   const out = execFileSync(
     '/usr/bin/security',
     ['find-generic-password', '-s', 'Chrome Safe Storage', '-a', 'Chrome', '-w'],
-    { encoding: 'utf8', timeout: 40_000 }
+    { encoding: 'utf8', timeout: 120_000 }
   )
 
   return out.trim()
@@ -152,8 +152,53 @@ function listCookieProfiles(userDataDir = CHROME_USER_DATA_DIR): { name: string;
   })
 }
 
-/** Read matching cookie rows from ONE profile's Cookies DB. */
-function readRowsFromDb(cookiesDb: string, domain: string): RawChromeCookie[] {
+/**
+ * SQL for one site's cookie rows. Every text column is hex-encoded and the
+ * columns are joined with `|`, so the output is pure `[0-9A-F|]` no matter what
+ * a cookie name/path contains — and no matter how the sqlite3 CLI renders
+ * control characters (3.50+ prints them escaped, e.g. char(31) as a literal
+ * `^_`, which silently broke the old unit-separator framing). Exported for tests.
+ */
+export function cookieRowQuery(domain: string): string {
+  const safe = domain.replace(/'/g, "''")
+
+  return (
+    `SELECT hex(host_key)||'|'||hex(name)||'|'||hex(encrypted_value)||'|'||hex(path)||'|'||` +
+    `is_secure||'|'||is_httponly||'|'||expires_utc||'|'||samesite||'|'||last_update_utc ` +
+    `FROM cookies WHERE host_key='${safe}' OR host_key LIKE '%.${safe}'`
+  )
+}
+
+/** Parse the sqlite3 output of {@link cookieRowQuery}. Exported for tests. */
+export function parseCookieRows(out: string): RawChromeCookie[] {
+  const rows: RawChromeCookie[] = []
+  const text = (hex: string) => Buffer.from(hex, 'hex').toString('utf8')
+
+  for (const line of out.split('\n')) {
+    const parts = line.trim().split('|')
+
+    if (parts.length < 9 || !parts[0]) {
+      continue
+    }
+
+    rows.push({
+      hostKey: text(parts[0]),
+      name: text(parts[1]),
+      encryptedHex: parts[2],
+      path: text(parts[3]) || '/',
+      secure: parts[4] === '1',
+      httpOnly: parts[5] === '1',
+      expiresUtc: Number(parts[6]) || 0,
+      sameSite: Number(parts[7]),
+      lastUpdateUtc: Number(parts[8]) || 0
+    })
+  }
+
+  return rows
+}
+
+/** Read matching cookie rows from ONE profile's Cookies DB. Exported for tests. */
+export function readRowsFromDb(cookiesDb: string, domain: string): RawChromeCookie[] {
   // Copy the DB (+WAL/SHM) so a running Chrome's lock can't block the read.
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-chrome-cookies-'))
   const tmpDb = path.join(tmpDir, 'Cookies')
@@ -165,45 +210,13 @@ function readRowsFromDb(cookiesDb: string, domain: string): RawChromeCookie[] {
       }
     }
 
-    const safe = domain.replace(/'/g, "''")
-    const query =
-      `SELECT host_key||char(31)||name||char(31)||hex(encrypted_value)||char(31)||path||char(31)||` +
-      `is_secure||char(31)||is_httponly||char(31)||expires_utc||char(31)||samesite||char(31)||last_update_utc ` +
-      `FROM cookies WHERE host_key='${safe}' OR host_key LIKE '%.${safe}'`
-
-    const out = execFileSync('/usr/bin/sqlite3', ['-readonly', tmpDb, query], {
+    const out = execFileSync('/usr/bin/sqlite3', ['-readonly', tmpDb, cookieRowQuery(domain)], {
       encoding: 'utf8',
       timeout: 15_000,
       maxBuffer: 64 * 1024 * 1024
     })
 
-    const rows: RawChromeCookie[] = []
-
-    for (const line of out.split('\n')) {
-      if (!line) {
-        continue
-      }
-
-      const parts = line.split(String.fromCharCode(31))
-
-      if (parts.length < 8) {
-        continue
-      }
-
-      rows.push({
-        hostKey: parts[0],
-        name: parts[1],
-        encryptedHex: parts[2],
-        path: parts[3] || '/',
-        secure: parts[4] === '1',
-        httpOnly: parts[5] === '1',
-        expiresUtc: Number(parts[6]) || 0,
-        sameSite: Number(parts[7]),
-        lastUpdateUtc: Number(parts[8]) || 0
-      })
-    }
-
-    return rows
+    return parseCookieRows(out)
   } finally {
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true })
@@ -270,6 +283,28 @@ const SAME_SITE: Record<number, 'lax' | 'no_restriction' | 'strict'> = {
 }
 
 /**
+ * Map a Chrome row to Electron `cookies.set` details. A host_key without a
+ * leading dot is a host-only cookie: omit `domain` so Electron keeps it
+ * host-only (passing it would widen the cookie to every subdomain, and is
+ * rejected outright for `__Host-` cookies). Exported for tests.
+ */
+export function toElectronCookie(row: RawChromeCookie, value: string): Electron.CookiesSetDetails {
+  const bareHost = row.hostKey.replace(/^\./, '')
+
+  return {
+    url: `http${row.secure ? 's' : ''}://${bareHost}${row.path || '/'}`,
+    name: row.name,
+    value,
+    ...(row.hostKey.startsWith('.') ? { domain: row.hostKey } : {}),
+    path: row.path || '/',
+    secure: row.secure,
+    httpOnly: row.httpOnly,
+    sameSite: SAME_SITE[row.sameSite] ?? 'unspecified',
+    ...(row.expiresUtc > 0 ? { expirationDate: Math.floor(row.expiresUtc / 1_000_000 - 11_644_473_600) } : {})
+  }
+}
+
+/**
  * Import every Chrome cookie for `host`'s registrable domain into `targetSession`.
  * Returns how many were set (and the domain used). Throws only on setup failures
  * (no Chrome, Keychain denied); individual bad cookies are skipped.
@@ -296,26 +331,15 @@ export async function importChromeCookiesForHost(
       continue
     }
 
-    const bareHost = row.hostKey.replace(/^\./, '')
-    const url = `http${row.secure ? 's' : ''}://${bareHost}${row.path || '/'}`
-
     try {
-      await targetSession.cookies.set({
-        url,
-        name: row.name,
-        value,
-        domain: row.hostKey,
-        path: row.path || '/',
-        secure: row.secure,
-        httpOnly: row.httpOnly,
-        sameSite: SAME_SITE[row.sameSite] ?? 'unspecified',
-        ...(row.expiresUtc > 0
-          ? { expirationDate: Math.floor(row.expiresUtc / 1_000_000 - 11_644_473_600) }
-          : {})
-      })
+      await targetSession.cookies.set(toElectronCookie(row, value))
       imported++
-    } catch {
-      // Electron rejects a few (bad secure/domain combos); keep importing the rest.
+    } catch (error) {
+      // Electron rejects a few (bad secure/domain combos); keep importing the
+      // rest, but say which so a "still logged out" report is diagnosable.
+      console.warn(
+        `[chrome-cookie-import] skipped ${row.name} @ ${row.hostKey}: ${error instanceof Error ? error.message : error}`
+      )
     }
   }
 
